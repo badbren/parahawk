@@ -1,0 +1,29 @@
+# systemd unit for a bare-metal (non-Docker) deploy on a $5/mo VPS.
+# 1. Put the repo at /opt/parahawk and create /opt/parahawk/.env
+# 2. cd /opt/parahawk && npm ci && npm run build
+# 3. sudo cp deploy/parahawk.service /etc/systemd/system/parahawk.service
+# 4. sudo systemctl daemon-reload && sudo systemctl enable --now parahawk
+# 5. journalctl -u parahawk -f      # follow logs
+
+[Unit]
+Description=Parahawk — Parasite Pool stats & alerts
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/parahawk
+EnvironmentFile=/opt/parahawk/.env
+ExecStart=/usr/bin/node dist/index.js
+Restart=always
+RestartSec=5
+# Basic hardening
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+# Create a dedicated user first: sudo useradd -r -s /usr/sbin/nologin parahawk
+User=parahawk
+Group=parahawk
+
+[Install]
+WantedBy=multi-user.target

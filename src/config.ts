@@ -17,6 +17,8 @@ function int(v: string | undefined, dflt: number): number {
 export const config = {
   mockData: bool(process.env.MOCK_DATA, true),
   port: int(process.env.PORT, 3000),
+  /** Public base URL of the site, used for links in Discord embeds. */
+  publicBaseUrl: process.env.PUBLIC_BASE_URL ?? "",
 
   lightningAddress: process.env.LIGHTNING_ADDRESS ?? "",
 

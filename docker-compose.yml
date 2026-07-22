@@ -1,0 +1,12 @@
+services:
+  parahawk:
+    build: .
+    image: parahawk:latest
+    container_name: parahawk
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "${PORT:-3000}:${PORT:-3000}"
+    # Single process: web + Discord bot + pollers all run inside this container.
+    # State lives in Supabase (or in-memory when unconfigured), so no volumes
+    # are required for a basic deploy.

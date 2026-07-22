@@ -4,6 +4,7 @@ import {
   type RESTPostAPIChatInputApplicationCommandsJSONBody,
 } from "discord.js";
 import { brandEmbed, verdictColor } from "./embeds.js";
+import { config } from "../config.js";
 import { getOverview } from "../services/overview.js";
 import { estimateCurrentPotPhd } from "../services/pot.js";
 import { getStore } from "../db/index.js";
@@ -194,7 +195,7 @@ const unwatch: Command = {
 };
 
 function webBase(): string {
-  return process.env.PUBLIC_BASE_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
+  return config.publicBaseUrl || `http://localhost:${config.port}`;
 }
 
 export const commands: Command[] = [pot, price, odds, odometer, watch, unwatch];
