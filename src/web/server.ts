@@ -4,6 +4,8 @@ import { renderOverview } from "./pages/overview.js";
 import { renderHistory } from "./pages/history.js";
 import { renderCalc } from "./pages/calc.js";
 import { renderAbout } from "./pages/about.js";
+import { renderLuck } from "./pages/luck.js";
+import { renderAddress } from "./pages/address.js";
 import { getOverview } from "../services/overview.js";
 
 /** Wrap an async page renderer with error handling. */
@@ -23,8 +25,17 @@ export function createServer(): express.Express {
 
   app.get("/", page(renderOverview));
   app.get("/history", page(renderHistory));
+  app.get("/luck", page(renderLuck));
   app.get("/calc", page(renderCalc));
   app.get("/about", page(renderAbout));
+
+  app.get("/address/:addr", async (req, res) => {
+    try {
+      res.type("html").send(await renderAddress(req.params.addr));
+    } catch (err) {
+      res.status(500).type("text").send(`error: ${(err as Error).message}`);
+    }
+  });
 
   // JSON snapshot for programmatic use / debugging
   app.get("/api/overview", async (_req, res) => {
