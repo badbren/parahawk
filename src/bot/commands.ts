@@ -125,6 +125,62 @@ const odds: Command = {
   },
 };
 
+// ── /strategy ─────────────────────────────────────────────────────────────────
+const strategy: Command = {
+  data: new SlashCommandBuilder()
+    .setName("strategy")
+    .setDescription("Rental strategy: hash × time (or budget/PHd) → cost + real odds")
+    .addNumberOption((o) => o.setName("hashrate").setDescription("PH/s you'd rent").setMinValue(0))
+    .addNumberOption((o) => o.setName("hours").setDescription("Duration in hours (48h+ locks in on KMH)").setMinValue(0))
+    .addNumberOption((o) => o.setName("budget").setDescription("Spend in sats (→ PHd at live hashprice)").setMinValue(0))
+    .addNumberOption((o) => o.setName("phd").setDescription("Set PHd of work directly").setMinValue(0))
+    .toJSON(),
+  async execute(i) {
+    const hashrate = i.options.getNumber("hashrate") ?? undefined;
+    const hours = i.options.getNumber("hours") ?? undefined;
+    const budget = i.options.getNumber("budget") ?? undefined;
+    const phdOpt = i.options.getNumber("phd") ?? undefined;
+
+    const o = await getOverview();
+    const hashprice = o.pool.hashpriceSatsPerPhd || 50_000;
+
+    let phd: number;
+    if (phdOpt !== undefined) phd = phdOpt;
+    else if (budget !== undefined) phd = budget / hashprice;
+    else if (hashrate !== undefined && hours !== undefined) phd = (hashrate * hours) / 24;
+    else {
+      await i.reply({
+        content: "Give me either `hashrate`+`hours`, a `budget` (sats), or `phd`.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const r = oddsForWork(phd);
+    const costSats = phd * hashprice;
+    const usd = o.pool.btcPriceUsd > 0 ? (costSats / 1e8) * o.pool.btcPriceUsd : 0;
+    const lock =
+      hours !== undefined
+        ? hours >= 48
+          ? `🔒 ${hours}h ≥ 48h — KMH locks in price & hash`
+          : `⚠ ${hours}h < 48h — not locked in on KMH ("pray")`
+        : null;
+
+    const embed = brandEmbed()
+      .setTitle(`🎯 Rental strategy — ${fmtPhd(phd)}`)
+      .addFields(
+        { name: "Cost @ live hashprice", value: `${fmtInt(costSats)} sats${usd > 0 ? ` (~${fmtUsd(usd)})` : ""}`, inline: false },
+        { name: "🥑 10T", value: pct(r.tenTChance), inline: true },
+        { name: "🏠 21T", value: pct(r.twentyOneTChance), inline: true },
+        { name: "🎰 Block", value: pct(r.blockChance), inline: true },
+      )
+      .setDescription(
+        `Odds depend only on total PHd — steady or moonshot, same expected result (moonshot = more variance).${lock ? `\n${lock}` : ""}`,
+      );
+    await i.reply({ embeds: [embed] });
+  },
+};
+
 // ── /odometer <bc1q> ──────────────────────────────────────────────────────────
 const odometer: Command = {
   data: new SlashCommandBuilder()
@@ -205,5 +261,5 @@ function webBase(): string {
   return config.publicBaseUrl || `http://localhost:${config.port}`;
 }
 
-export const commands: Command[] = [pot, price, odds, odometer, watch, unwatch];
+export const commands: Command[] = [pot, price, odds, strategy, odometer, watch, unwatch];
 export const commandMap = new Map(commands.map((c) => [c.data.name, c]));
