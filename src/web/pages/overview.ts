@@ -6,6 +6,7 @@ import {
   fmtUsd,
   fmtUsd0,
   fmtInt,
+  fmtPhd,
   fmtDuration,
   potEmoji,
   hashpriceEmoji,
@@ -51,6 +52,12 @@ export async function renderOverview(): Promise<string> {
 
   <div class="card"><div class="k">Highest diff since block</div><div class="v">${fmtDiff(o.pool.highestDiffSinceBlock)}</div>
     <div class="sub">${((o.pool.highestDiffSinceBlock / o.pool.networkDifficulty) * 100).toFixed(2)}% of a block</div></div>
+${
+    o.pool.workSinceLastBlockDiff && o.pool.workSinceLastBlockDiff > 0
+      ? `  <div class="card"><div class="k">Total work this block</div><div class="v">${fmtDiff(o.pool.workSinceLastBlockDiff)}</div>
+    <div class="sub">${fmtPhd(o.pool.workSinceLastBlockDiff / 20.1e9)} banked · ${((o.pool.workSinceLastBlockDiff / 20.1e9 / 6300) * 100).toFixed(0)}% of an expected block</div></div>`
+      : ""
+  }
 
   <div class="card"><div class="k">Users / workers</div><div class="v">${fmtInt(o.pool.users)} <span class="dim">/</span> ${fmtInt(o.pool.workers)}</div>
     <div class="sub">online now</div></div>

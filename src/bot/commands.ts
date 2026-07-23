@@ -62,6 +62,13 @@ const pot: Command = {
         { name: "Pool hashrate", value: fmtHashrate(o.pool.poolHashratePhs), inline: true },
         { name: "Est. PHd banked", value: fmtPhd(estPhd), inline: true },
       );
+    if (o.pool.workSinceLastBlockDiff && o.pool.workSinceLastBlockDiff > 0) {
+      embed.addFields({
+        name: "Total work this block",
+        value: `${fmtDiff(o.pool.workSinceLastBlockDiff)} (${((o.pool.workSinceLastBlockDiff / 20.1e9 / 6300) * 100).toFixed(0)}% of an expected block)`,
+        inline: true,
+      });
+    }
     await i.reply({ embeds: [embed] });
   },
 };
