@@ -6,6 +6,7 @@ import { renderCalc } from "./pages/calc.js";
 import { renderAbout } from "./pages/about.js";
 import { renderLuck } from "./pages/luck.js";
 import { renderBoard } from "./pages/board.js";
+import { renderCados } from "./pages/cados.js";
 import { renderAddress } from "./pages/address.js";
 import { getOverview } from "../services/overview.js";
 
@@ -26,6 +27,7 @@ export function createServer(): express.Express {
 
   app.get("/", page(renderOverview));
   app.get("/board", page(renderBoard));
+  app.get("/cados", page(renderCados));
   app.get("/history", page(renderHistory));
   app.get("/luck", page(renderLuck));
   app.get("/calc", page(renderCalc));

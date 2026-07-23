@@ -59,9 +59,9 @@ export async function renderOverview(): Promise<string> {
 ${
     o.latestHit
       ? `<div class="card" style="margin-top:16px;border-color:#3a1414">
-           <div class="k">🔴 Latest ${o.latestHit.tier} hit (Bravocado board)</div>
-           <div class="v" style="font-size:20px">${fmtDiff(o.latestHit.difficulty)} <span class="dim" style="font-size:13px">by</span> <a href="/address/${o.latestHit.address}">${o.latestHit.address.slice(0, 12)}…${o.latestHit.address.slice(-4)}</a></div>
-           <div class="sub">${new Date(o.latestHit.ts).toLocaleString("en-US")}${o.latestHit.orderId ? ` · order ${o.latestHit.orderId}` : ""} · <a href="/history">see all hits →</a></div>
+           <div class="k">${o.latestHit.tier === "sub" ? "🟢" : o.latestHit.tier === "21T" ? "🏠" : "🥑"} Latest top share${o.latestHit.tier !== "sub" ? ` — ${o.latestHit.tier}+ BRAVOCADO!` : ""}</div>
+           <div class="v" style="font-size:28px">${fmtDiff(o.latestHit.difficulty)} <span class="dim" style="font-size:16px">by</span> <span class="dim">${o.latestHit.address.slice(0, 12)}…${o.latestHit.address.slice(-4)}</span></div>
+           <div class="sub">${new Date(o.latestHit.ts).toLocaleString("en-US")} · <a href="/board">Bravocado board →</a> · <a href="/history">all top diffs →</a></div>
          </div>`
       : ""
   }
