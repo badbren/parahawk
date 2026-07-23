@@ -220,9 +220,24 @@ interface RouterOrder {
   best_share: number | null;
 }
 
-/** Strip the ".refinery" suffix Parasite adds to Refinery usernames. */
+/** The bc1… address is everything before the first "." in the username. */
 export function addressFromRouterUsername(username: string): string {
-  return (username || "").replace(/\.refinery$/i, "");
+  const u = username || "";
+  const dot = u.indexOf(".");
+  return dot === -1 ? u : u.slice(0, dot);
+}
+
+/**
+ * Delivery route from the username suffix. We only label "Refinery" when we're
+ * certain the order came through parasite.space's Refinery (the ".refinery"
+ * suffix). Anything else (other rental proxies, KMH, direct) is unknowable from
+ * public data, so it's "UNKNOWN".
+ */
+export function providerFromRouterUsername(username: string): string {
+  const u = username || "";
+  const dot = u.indexOf(".");
+  if (dot === -1) return "UNKNOWN";
+  return u.slice(dot + 1).toLowerCase() === "refinery" ? "Refinery" : "UNKNOWN";
 }
 
 function mapRouterOrder(o: RouterOrder): RefineryOrder & { address: string } {
@@ -242,6 +257,7 @@ function mapRouterOrder(o: RouterOrder): RefineryOrder & { address: string } {
     hashratePhs: Number(o.hashrate ?? 0) / H_PER_PH,
     bestShare: Number(o.best_share ?? 0),
     progressPercent: Math.round(progress),
+    provider: providerFromRouterUsername(o.username),
     address: addressFromRouterUsername(o.username),
   };
 }

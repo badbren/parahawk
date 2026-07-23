@@ -26,6 +26,8 @@ export interface CadoData {
   awards: CadoAward[];
   byHour: number[]; // length 24, UTC
   byDow: number[]; // length 7, Mon..Sun, UTC
+  byHourCentral: number[]; // length 24, America/Chicago
+  byDowCentral: number[]; // length 7, Mon..Sun, America/Chicago
   count: number;
   firstTs: number | null;
   lastTs: number | null;
@@ -46,6 +48,26 @@ interface MempoolTx {
 }
 
 const cache = new Cached<CadoData>(30 * 60 * 1000);
+
+const DOW_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+const centralFmt = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Chicago",
+  hour: "2-digit",
+  hour12: false,
+  weekday: "short",
+});
+
+/** Hour (0-23) and day-of-week (0=Sun) for a timestamp in US Central time. */
+function centralParts(ts: number): { hour: number; dow: number } {
+  const parts = centralFmt.formatToParts(new Date(ts));
+  let hour = 0;
+  let dow = 0;
+  for (const p of parts) {
+    if (p.type === "hour") hour = Number(p.value) % 24; // "24" → 0 at midnight
+    else if (p.type === "weekday") dow = DOW_INDEX[p.value] ?? 0;
+  }
+  return { hour, dow };
+}
 
 function mempoolBase(): string {
   return config.mempool.baseUrl.replace(/\/$/, "");
@@ -96,10 +118,15 @@ export async function getCadoData(): Promise<CadoData> {
 
     const byHour = Array(24).fill(0) as number[];
     const byDow = Array(7).fill(0) as number[];
+    const byHourCentral = Array(24).fill(0) as number[];
+    const byDowCentral = Array(7).fill(0) as number[];
     for (const a of awards) {
       const d = new Date(a.ts);
       byHour[d.getUTCHours()]!++;
       byDow[(d.getUTCDay() + 6) % 7]!++; // Mon=0..Sun=6
+      const c = centralParts(a.ts);
+      byHourCentral[c.hour]!++;
+      byDowCentral[(c.dow + 6) % 7]!++;
     }
     const gaps = awards.slice(1).map((a, i) => (a.ts - awards[i]!.ts) / 3_600_000).sort((p, q) => p - q);
     const medianGapHours = gaps.length ? gaps[Math.floor(gaps.length / 2)]! : null;
@@ -108,6 +135,8 @@ export async function getCadoData(): Promise<CadoData> {
       awards,
       byHour,
       byDow,
+      byHourCentral,
+      byDowCentral,
       count: awards.length,
       firstTs: awards[0]?.ts ?? null,
       lastTs: awards[awards.length - 1]?.ts ?? null,
@@ -124,6 +153,8 @@ export async function getCadoData(): Promise<CadoData> {
         awards: [],
         byHour: Array(24).fill(0),
         byDow: Array(7).fill(0),
+        byHourCentral: Array(24).fill(0),
+        byDowCentral: Array(7).fill(0),
         count: 0,
         firstTs: null,
         lastTs: null,

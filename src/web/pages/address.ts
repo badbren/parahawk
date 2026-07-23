@@ -23,13 +23,15 @@ function pct(p: number): string {
   return `${v.toFixed(v < 1 ? 2 : 1)}%`;
 }
 
-function orderRows(orders: { id: string; status: string; requestedPhd: number; hashratePhs: number; bestShare: number; progressPercent: number }[]): string {
-  if (orders.length === 0) return `<tr><td colspan="5" class="dim">no orders</td></tr>`;
+function orderRows(orders: { id: string; status: string; requestedPhd: number; hashratePhs: number; bestShare: number; progressPercent: number; provider?: string }[]): string {
+  if (orders.length === 0) return `<tr><td colspan="6" class="dim">no orders</td></tr>`;
   return orders
     .map((o) => {
       const statusColor = o.status === "fulfilled" ? "green" : o.status === "expired" ? "red" : "amber";
+      const prov = o.provider ?? "UNKNOWN";
       return `<tr>
         <td>${esc(o.id)}</td>
+        <td class="${prov === "Refinery" ? "green" : "dim"}">${esc(prov)}</td>
         <td class="${statusColor}">${o.status}</td>
         <td>${o.requestedPhd} PHd</td>
         <td>${fmtDiff(o.bestShare)}</td>
@@ -118,7 +120,7 @@ ${
 
 <h2>Refinery orders</h2>
 <table>
-  <tr><th>ID</th><th>Status</th><th>Requested</th><th>Best share</th><th>Progress</th></tr>
+  <tr><th>ID</th><th>Via</th><th>Status</th><th>Requested</th><th>Best share</th><th>Progress</th></tr>
   ${orderRows(u.orders)}
 </table>
 

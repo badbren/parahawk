@@ -41,6 +41,8 @@ export interface RefineryOrder {
   bestShare: number;
   /** Progress toward fulfilment, 0–100. */
   progressPercent: number;
+  /** Delivery route, from the worker username suffix (Refinery/Rigly/MRR/…). */
+  provider?: string;
 }
 
 export interface WorkerRig {
