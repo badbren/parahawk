@@ -88,7 +88,7 @@ ${
           .map(
             (x) => `<tr>
               <td class="dim">${esc(new Date(x.ts).toLocaleString("en-US"))}</td>
-              <td class="${x.tier === "21T" ? "amber" : "red"}">${esc(x.tier)}</td>
+              <td class="${x.tier === "21T" ? "amber" : x.tier === "10T" ? "red" : "dim"}">${esc(x.tier)}</td>
               <td>${fmtDiff(x.difficulty)}</td>
               <td>${x.orderId ? esc(x.orderId) : "<span class='dim'>—</span>"}</td>
               <td class="dim">${x.worker ? esc(x.worker) : "—"}</td>

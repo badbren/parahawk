@@ -1,5 +1,6 @@
 import type { Store } from "../db/types.js";
 import { integratePhd, type HashrateSample } from "../math/pot.js";
+import { PHD_TO_DIFF } from "../math/constants.js";
 import type { OverviewSnapshot } from "./overview.js";
 
 /**
@@ -12,6 +13,11 @@ export async function estimateCurrentPotPhd(
   store: Store,
   o: OverviewSnapshot,
 ): Promise<number> {
+  // Parasite reports total work since the last block directly — use it when present.
+  if (o.pool.workSinceLastBlockDiff && o.pool.workSinceLastBlockDiff > 0) {
+    return o.pool.workSinceLastBlockDiff / PHD_TO_DIFF;
+  }
+
   // look back generously (up to ~5 days) then filter to the current cycle
   const since = Date.now() - 5 * 86_400_000;
   const samples = await store.getSamplesSince(since);

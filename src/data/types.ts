@@ -22,8 +22,10 @@ export interface PoolStats {
   workers: number;
   /** BTC spot price in USD (Parasite shows this; we also get it from mempool). */
   btcPriceUsd: number;
-  /** Refinery hashprice in sats per PHd (~52,000 now). */
+  /** Refinery hashprice in sats per PHd (~52,000 now). 0 when unavailable. */
   hashpriceSatsPerPhd: number;
+  /** Total work accumulated since the last found block, in difficulty units. */
+  workSinceLastBlockDiff?: number;
 }
 
 export type OrderStatus = "active" | "fulfilled" | "expired";
@@ -60,7 +62,22 @@ export interface RefineryState {
   orders: RefineryOrder[];
 }
 
-export type HitTier = "10T" | "21T" | "block";
+/** A miner on a pool leaderboard (addresses are masked by Parasite). */
+export interface LeaderboardEntry {
+  rank: number;
+  address: string;
+  /** Best difficulty (for the difficulty board). */
+  bestDiff?: number;
+  /** Blocks participated in (for the loyalty board). */
+  blocks?: number;
+}
+
+export interface Leaderboard {
+  difficulty: LeaderboardEntry[];
+  loyalty: LeaderboardEntry[];
+}
+
+export type HitTier = "sub" | "10T" | "21T" | "block";
 
 /** A single big share ("Bravocado" 10T+ / "homeminers" 21T+) seen by the pool. */
 export interface HitEvent {

@@ -15,6 +15,7 @@ export interface PageOpts {
 
 const NAV: Array<[string, string]> = [
   ["/", "overview"],
+  ["/board", "board"],
   ["/history", "history"],
   ["/luck", "luck"],
   ["/calc", "calc"],

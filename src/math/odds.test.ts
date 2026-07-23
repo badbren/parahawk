@@ -13,7 +13,12 @@ import {
   computeOdometer,
 } from "./work.js";
 import { computePotAge, integratePhd } from "./pot.js";
-import { evaluateHashprice, satsPerPhdToUsd } from "./hashprice.js";
+import {
+  evaluateHashprice,
+  satsPerPhdToUsd,
+  hashpriceSatsPerPhd,
+  blockSubsidyBtc,
+} from "./hashprice.js";
 import {
   RATE_10T_PHD,
   RATE_21T_PHD,
@@ -127,5 +132,18 @@ describe("hashprice", () => {
     expect(evaluateHashprice(40_000, 100_000).verdict).toBe("good");
     expect(evaluateHashprice(52_000, 100_000).verdict).toBe("normal");
     expect(evaluateHashprice(70_000, 100_000).verdict).toBe("expensive");
+  });
+
+  it("block subsidy halves on schedule", () => {
+    expect(blockSubsidyBtc(0)).toBe(50);
+    expect(blockSubsidyBtc(210_000)).toBe(25);
+    expect(blockSubsidyBtc(840_000)).toBe(3.125); // 2024 halving
+    expect(blockSubsidyBtc(959_200)).toBe(3.125);
+  });
+
+  it("computes bitcoin hashprice ~49.5k sats/PHd at 127T diff, 3.125 subsidy", () => {
+    const hp = hashpriceSatsPerPhd(127e12, 959_200);
+    expect(hp).toBeGreaterThan(48_000);
+    expect(hp).toBeLessThan(51_000);
   });
 });

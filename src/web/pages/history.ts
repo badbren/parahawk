@@ -42,7 +42,7 @@ export async function renderHistory(): Promise<string> {
             .sort((a, b) => b.ts - a.ts)
             .slice(0, 40)
             .map((x) => {
-              const tierClass = x.tier === "21T" ? "amber" : "red";
+              const tierClass = x.tier === "21T" ? "amber" : x.tier === "10T" ? "red" : "dim";
               return `<tr>
                 <td class="dim">${esc(new Date(x.ts).toLocaleString("en-US"))}</td>
                 <td class="${tierClass}">${esc(x.tier)}</td>
@@ -65,8 +65,8 @@ export async function renderHistory(): Promise<string> {
 <h2>Refinery hashprice (sats/PHd)</h2>
 <canvas id="c_hashprice" height="90"></canvas>
 
-<h2>🔴 10T+ hits (Bravocado board)</h2>
-<p class="muted-note">Every 10T+ share the pool has seen — red = 10T (Bravocado), amber = 21T+ (homeminers). Hover a dot for who hit it, their share difficulty, and order.</p>
+<h2>🔴 Top diffs per block — 10T+ pop out</h2>
+<p class="muted-note">The best share found each block. Grey = sub-10T (the norm), 🔴 red = 10T+ (Bravocado), 🟠 amber = 21T+ (homeminers). Hover a dot for the miner (masked by Parasite), difficulty, and block. See the <a href="/board">Bravocado board</a> for the 10T+ club.</p>
 <canvas id="c_hits" height="80"></canvas>
 
 <h3 style="margin-top:18px;color:#fff;font-size:13px;text-transform:uppercase;letter-spacing:1px">Who hit it</h3>
@@ -104,15 +104,17 @@ new Chart(document.getElementById("c_hashprice"), {
   data:{ labels:D.timeLabels, datasets:[{ data:D.hashpriceVals, borderColor:AMBER, backgroundColor:"rgba(245,196,81,.08)", fill:true }] },
   options: baseOpts("sats/PHd")
 });
-const RED = "#ff5c5c";
+const RED = "#ff5c5c", DIMDOT = "#4a4a4a";
+const dotColor = (t) => t==="21T" ? AMBER : t==="10T" ? RED : DIMDOT;
 new Chart(document.getElementById("c_hits"), {
   type:"scatter",
   data:{ datasets:[{
-    label:"10T+ hits",
+    label:"top diffs",
     data:D.hitPoints,
-    pointBackgroundColor:D.hitMeta.map(m => m.tier==="21T" ? AMBER : RED),
-    pointBorderColor:D.hitMeta.map(m => m.tier==="21T" ? AMBER : RED),
-    pointRadius:5, pointHoverRadius:7
+    pointBackgroundColor:D.hitMeta.map(m => dotColor(m.tier)),
+    pointBorderColor:D.hitMeta.map(m => dotColor(m.tier)),
+    pointRadius:D.hitMeta.map(m => m.tier==="sub" ? 3 : 6),
+    pointHoverRadius:8
   }]},
   options:{ responsive:true,
     plugins:{ legend:{display:false}, tooltip:{ callbacks:{
