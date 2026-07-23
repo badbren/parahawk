@@ -43,6 +43,14 @@ export interface RefineryOrder {
   progressPercent: number;
 }
 
+export interface WorkerRig {
+  name: string;
+  /** Live hashrate for this worker, PH/s. */
+  hashratePhs: number;
+  /** Best difficulty this worker has submitted. */
+  bestDiff: number;
+}
+
 export interface UserStats {
   address: string;
   /** Live hashrate for this address, PH/s. */
@@ -53,6 +61,14 @@ export interface UserStats {
   totalWorkDiff: number;
   /** Refinery orders belonging to this address. */
   orders: RefineryOrder[];
+  /** Number of workers/rigs on this address. */
+  workers?: number;
+  /** Individual rigs (Bitaxe, NerdQAxe, …) with live hashrate + best diff. */
+  rigs?: WorkerRig[];
+  /** Blocks this address has participated in (from account metadata). */
+  blockCount?: number;
+  /** Uptime string as reported by Parasite (e.g. "14d 7h"). */
+  uptime?: string;
 }
 
 export interface RefineryState {

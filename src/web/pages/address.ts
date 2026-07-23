@@ -78,6 +78,24 @@ export async function renderAddress(addressRaw: string): Promise<string> {
 </div>
 <p class="muted-note">Expected best difficulty for this much work: ~${fmtDiff(odo.expectedBestDiffMin)} – ${fmtDiff(odo.expectedBestDiffMax)} (1–1.5× total work). Observed best is ${odo.luckRatio.toFixed(2)}× the midpoint.</p>
 
+${
+  u.rigs && u.rigs.length > 0
+    ? `<h2>⛏️ Rigs${u.workers ? ` (${u.workers} workers` : ""}${u.uptime ? ` · up ${esc(u.uptime)}` : ""}${u.workers ? ")" : ""}</h2>
+       <table>
+         <tr><th>Worker</th><th>Hashrate</th><th>Best diff</th></tr>
+         ${u.rigs
+           .map(
+             (r) => `<tr>
+               <td>${esc(r.name)}</td>
+               <td class="${r.hashratePhs > 0 ? "" : "dim"}">${r.hashratePhs > 0 ? fmtHashrate(r.hashratePhs) : "idle"}</td>
+               <td>${fmtDiff(r.bestDiff)}</td>
+             </tr>`,
+           )
+           .join("")}
+       </table>`
+    : ""
+}
+
 <h2>🔴 10T+ hits</h2>
 ${
   hits.length === 0

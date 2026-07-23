@@ -281,33 +281,57 @@ export async function getRefineryState(): Promise<RefineryState> {
 
 // ── per-address ───────────────────────────────────────────────────────────────
 
+interface UserApi {
+  hashrate?: number; // H/s
+  workers?: number;
+  bestDifficulty?: string | number;
+  uptime?: string;
+  workerData?: Array<{ name?: string; hashrate?: string | number; bestDifficulty?: string | number }>;
+}
+interface AccountApi {
+  account?: { total_diff?: number; metadata?: { block_count?: number } } | null;
+}
+
 export async function getUserStats(address: string): Promise<UserStats> {
   if (config.mockData) return mockUserStats(address);
 
-  // Best-effort real mapping. Confirmed: user-diffs gives this address's best
-  // shares; router/orders gives its Refinery orders (full addresses). The
-  // /api/user/<addr> account shape is finalised once we see a real miner's JSON.
+  // Confirmed real shapes (parasite.space):
+  //   /api/user/<addr>            → hashrate(H/s), workers, bestDifficulty("906G"), workerData[]
+  //   /api/account/<addr>         → account.total_diff (Total Work), metadata.block_count
+  //   /api/highest-diff?address=… → this address's per-block best shares
+  //   /api/router/orders          → filtered by address for its Refinery orders
   const encoded = encodeURIComponent(address);
-  const [account, diffs, orders] = await Promise.all([
-    fetchJson<Record<string, any>>(`${base()}/api/user/${encoded}`).catch(() => null),
+  const [user, account, diffs, orders] = await Promise.all([
+    fetchJson<UserApi>(`${base()}/api/user/${encoded}`).catch(() => ({}) as UserApi),
+    fetchJson<AccountApi>(`${base()}/api/account/${encoded}`).catch(() => ({}) as AccountApi),
     fetchJson<HighestDiffRow[]>(
       `${base()}/api/highest-diff?address=${encoded}&type=user-diffs&limit=500`,
     ).catch(() => [] as HighestDiffRow[]),
     getRouterOrders().catch(() => [] as Array<RefineryOrder & { address: string }>),
   ]);
 
-  const bestDifficulty = (diffs ?? []).reduce((m, d) => Math.max(m, Number(d.difficulty ?? 0)), 0);
-  const a = account ?? {};
+  const diffsMax = (diffs ?? []).reduce((m, d) => Math.max(m, Number(d.difficulty ?? 0)), 0);
+  const bestDifficulty = Math.max(parseDiffStr(user.bestDifficulty ?? 0), diffsMax);
+  const totalWorkDiff = Number(account.account?.total_diff ?? 0) || diffsMax;
   const myOrders = orders.filter((o) => o.address === address).map(({ address: _a, ...rest }) => rest);
-  // total work: prefer an account field; else approximate from best diff.
-  const totalWorkDiff = Number(a.totalWork ?? a.total_work ?? a.workSinceLastBlock ?? bestDifficulty);
+  const rigs = (user.workerData ?? [])
+    .map((w) => ({
+      name: String(w.name ?? "?"),
+      hashratePhs: Number(w.hashrate ?? 0) / H_PER_PH,
+      bestDiff: parseDiffStr(w.bestDifficulty ?? 0),
+    }))
+    .sort((a, b) => b.hashratePhs - a.hashratePhs);
 
   return {
     address,
-    hashratePhs: Number(a.hashrate ?? a.hashrate15m ?? 0) / (a.hashrate ? H_PER_PH : 1) || 0,
+    hashratePhs: Number(user.hashrate ?? 0) / H_PER_PH,
     bestDifficulty,
     totalWorkDiff,
     orders: myOrders,
+    workers: user.workers,
+    rigs,
+    blockCount: account.account?.metadata?.block_count,
+    uptime: user.uptime,
   };
 }
 
