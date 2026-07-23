@@ -36,7 +36,7 @@ npm test        # vitest — the pure math module (odds, pot age, work, hashpric
 | Route | What |
 |-------|------|
 | `/` | Live overview — pot age, pool hashrate, hashprice, difficulty, BTC price, users/workers. Auto-refreshes every 30s. |
-| `/history` | Charts from Parahawk's own time series: hashrate, hashprice, and every completed pot cycle. |
+| `/history` | Charts from Parahawk's own time series: hashrate, hashprice, every completed pot cycle, and the **10T+ hit board** (red dots — who hit it, share difficulty, order). |
 | `/luck` | **The luck audit** — hits-per-PHd by hour-of-day and weekday, the myth-buster. |
 | `/calc` | Interactive odds calculator (client-side, shares the bot's math). |
 | `/address/<bc1q>` | Public odometer for any address: lifetime PHd, best diff, badge odds, orders. |
@@ -88,7 +88,7 @@ Then fill in `.env`. See the sections below. Set `MOCK_DATA=false` only once you
 ### 1. Supabase (the database) — ~2 minutes
 
 1. Create a project at [supabase.com](https://supabase.com) (free tier is plenty).
-2. Open **SQL Editor → New query**, paste the contents of [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql), and **Run**. (Or, with the Supabase CLI linked: `supabase db push`.)
+2. Open **SQL Editor → New query**, paste the contents of [`supabase/migrations/20260722000000_init.sql`](supabase/migrations/20260722000000_init.sql), and **Run**. (Or, with the Supabase CLI linked: `supabase db push`.)
 3. Go to **Settings → API** and copy:
    - **Project URL** → `SUPABASE_URL`
    - **service_role** secret key → `SUPABASE_SERVICE_KEY` (server-side only — never ship it to a browser).

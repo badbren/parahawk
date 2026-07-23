@@ -65,6 +65,20 @@ create table if not exists address_snapshots (
 );
 create index if not exists address_snapshots_addr_ts_idx on address_snapshots (address, ts desc);
 
+-- ── 10T+ share hits ("Bravocado" board) ─────────────────────────────────────
+-- Individual big shares seen by the pool: who hit it, how big, which order.
+create table if not exists share_hits (
+  id         text primary key,          -- stable id for dedupe across polls
+  ts         timestamptz not null,
+  address    text not null,
+  difficulty double precision not null, -- share difficulty (e.g. 1.2e13 = 12T)
+  tier       text not null,             -- '10T' | '21T' | 'block'
+  order_id   text,
+  worker     text
+);
+create index if not exists share_hits_ts_idx on share_hits (ts desc);
+create index if not exists share_hits_address_idx on share_hits (address);
+
 -- ── Luck-audit bucket helper view ───────────────────────────────────────────
 -- Aggregates best-diff observations by hour-of-day and day-of-week so the
 -- /luck page can compare hits-per-PHd across buckets. Uses UTC.

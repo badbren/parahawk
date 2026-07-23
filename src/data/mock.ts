@@ -5,6 +5,7 @@ import type {
   RefineryOrder,
   ChainTip,
   OrderStatus,
+  HitEvent,
 } from "./types.js";
 
 /**
@@ -125,4 +126,65 @@ export function mockRefineryState(now: number = Date.now()): RefineryState {
 
 function round1(n: number): number {
   return Math.round(n * 10) / 10;
+}
+
+// ── Mock 10T+ hits ("Bravocado" board) ──────────────────────────────────────
+
+/** A small stable pool of fake miner addresses for the mock hit feed. */
+const MOCK_ADDRESSES = [
+  "bc1qhawk5x2mnf0parasite0pot0aq7f9x0wlh8kk2ug",
+  "bc1qavocad0green0miner0z9x2n0yrf2493p83kkfjh",
+  "bc1qpleb0share0hodl0qtzq2n0yrf2493p83kk0abcd",
+  "bc1qmoonrig0sha256d0kgdygjrsqtzq2n0yrf24abcd",
+  "bc1qsatoshi0lives0on0f2493p83kkfjhx0wlh0efgh",
+  "bc1qdiff0chaser0node0n0yrf2493p83kkfjhx0ijkl",
+  "bc1qcold0storage0miner0tzq2n0yrf2493p8300mnop",
+  "bc1qhashrate0hero0rig0dygjrsqtzq2n0yrf24qrst",
+  "bc1qorange0pill0plebs0rf2493p83kkfjhx0wl0uvwx",
+  "bc1qhomeminer0basement0q2n0yrf2493p83kkf0yz01",
+  "bc1qgreen0energy0hash0jrsqtzq2n0yrf2493p02345",
+  "bc1qnode0runner0stack0zq2n0yrf2493p83kkf06789",
+];
+
+const TEN_T = 10e12;
+const TWENTYONE_T = 21e12;
+
+/**
+ * Deterministic mock 10T+ hits in a time range. Real frequency is ~one per
+ * 500 PHd of pool work; this mock generates a few per day so the board and the
+ * chart are visibly populated for demos. The real feed (getRecentHits) replaces
+ * this once a Parasite endpoint is wired.
+ */
+export function mockHitsInRange(sinceMs: number, untilMs: number): HitEvent[] {
+  const HOUR = 3_600_000;
+  const hits: HitEvent[] = [];
+  const startHour = Math.floor(sinceMs / HOUR);
+  const endHour = Math.floor(untilMs / HOUR);
+  for (let h = startHour; h <= endHour; h++) {
+    const seed = hashString(`hit:${h}`);
+    // ~10% of hours produce a hit (~2.4/day)
+    if (seed % 100 >= 10) continue;
+    const count = seed % 100 < 2 ? 2 : 1; // occasionally a double
+    for (let i = 0; i < count; i++) {
+      const s = hashString(`hit:${h}:${i}`);
+      const ts = h * HOUR + (s % 3600) * 1000;
+      if (ts < sinceMs || ts > untilMs) continue;
+      const is21 = s % 9 === 0;
+      // 10T–18T normally; 21T–42T for the rarer homeminers tier
+      const difficulty = is21
+        ? TWENTYONE_T * (1 + (s % 100) / 50)
+        : TEN_T * (1 + (s % 80) / 100);
+      const addr = MOCK_ADDRESSES[s % MOCK_ADDRESSES.length]!;
+      hits.push({
+        id: `hit_${h}_${i}`,
+        ts,
+        address: addr,
+        difficulty: Math.round(difficulty),
+        tier: difficulty >= TWENTYONE_T ? "21T" : "10T",
+        orderId: s % 3 === 0 ? `ord_${s % 9000}` : null,
+        worker: `w${s % 9}`,
+      });
+    }
+  }
+  return hits.sort((a, b) => a.ts - b.ts);
 }

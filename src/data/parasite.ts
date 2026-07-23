@@ -1,7 +1,7 @@
 import { config } from "../config.js";
 import { Cached, fetchJson } from "./cache.js";
-import { mockPoolStats, mockUserStats, mockRefineryState } from "./mock.js";
-import type { PoolStats, UserStats, RefineryState, Freshness } from "./types.js";
+import { mockPoolStats, mockUserStats, mockRefineryState, mockHitsInRange } from "./mock.js";
+import type { PoolStats, UserStats, RefineryState, Freshness, HitEvent } from "./types.js";
 
 /**
  * Adapter over Parasite Pool's undocumented API.
@@ -105,6 +105,35 @@ export async function getRefineryState(): Promise<RefineryState> {
     const last = refineryCache.get();
     if (last) return last;
     throw err;
+  }
+}
+
+/**
+ * Recent 10T+ share hits ("Bravocado" board). Mock generates a realistic feed;
+ * the real version needs a Parasite "recent big shares" endpoint — set
+ * PARASITE_HITS_PATH and map the payload here. Returns [] if unavailable.
+ */
+export async function getRecentHits(sinceMs?: number): Promise<HitEvent[]> {
+  const now = Date.now();
+  const since = sinceMs ?? now - 24 * 60 * 60 * 1000;
+  if (config.mockData) return mockHitsInRange(since, now);
+
+  const path = process.env.PARASITE_HITS_PATH;
+  if (!config.parasite.baseUrl || !path) return [];
+  try {
+    const raw = await fetchJson<unknown[]>(`${base()}${path}`);
+    // TODO(real API): map the real payload fields into HitEvent.
+    return (Array.isArray(raw) ? raw : []).map((r: any, i: number) => ({
+      id: String(r.id ?? `${r.ts ?? now}_${i}`),
+      ts: typeof r.ts === "number" ? r.ts : Date.parse(r.ts ?? "") || now,
+      address: String(r.address ?? r.addr ?? "unknown"),
+      difficulty: Number(r.difficulty ?? r.diff ?? 0),
+      tier: Number(r.difficulty ?? r.diff ?? 0) >= 21e12 ? "21T" : "10T",
+      orderId: r.orderId ?? r.order_id ?? null,
+      worker: r.worker ?? null,
+    }));
+  } catch {
+    return [];
   }
 }
 

@@ -1,6 +1,7 @@
 import { renderPage } from "../layout.js";
 import { getUserStats } from "../../data/parasite.js";
 import { getOverview } from "../../services/overview.js";
+import { getStore } from "../../db/index.js";
 import { computeOdometer } from "../../math/work.js";
 import { oddsForWork } from "../../math/odds.js";
 import {
@@ -48,7 +49,11 @@ export async function renderAddress(addressRaw: string): Promise<string> {
     });
   }
 
-  const [o, u] = await Promise.all([getOverview(), getUserStats(address)]);
+  const [o, u, hits] = await Promise.all([
+    getOverview(),
+    getUserStats(address),
+    getStore().getHitsForAddress(address, 25),
+  ]);
   const odo = computeOdometer(u.totalWorkDiff, u.bestDifficulty, o.pool.networkDifficulty);
   const odds = oddsForWork(odo.lifetimePhd);
   const luck = odo.luckRatio >= 1.1 ? "🍀 luckier than expected" : odo.luckRatio <= 0.9 ? "🥲 below expectation" : "≈ on expectation";
@@ -72,6 +77,26 @@ export async function renderAddress(addressRaw: string): Promise<string> {
   <div class="card"><div class="k">🎰 Block</div><div class="v red">${pct(odds.blockChance)}</div><div class="sub">P(≥1) at this much work</div></div>
 </div>
 <p class="muted-note">Expected best difficulty for this much work: ~${fmtDiff(odo.expectedBestDiffMin)} – ${fmtDiff(odo.expectedBestDiffMax)} (1–1.5× total work). Observed best is ${odo.luckRatio.toFixed(2)}× the midpoint.</p>
+
+<h2>🔴 10T+ hits</h2>
+${
+  hits.length === 0
+    ? `<p class="muted-note">No 10T+ hits recorded for this address yet.</p>`
+    : `<table>
+        <tr><th>When</th><th>Tier</th><th>Difficulty</th><th>Order</th><th>Worker</th></tr>
+        ${hits
+          .map(
+            (x) => `<tr>
+              <td class="dim">${esc(new Date(x.ts).toLocaleString("en-US"))}</td>
+              <td class="${x.tier === "21T" ? "amber" : "red"}">${esc(x.tier)}</td>
+              <td>${fmtDiff(x.difficulty)}</td>
+              <td>${x.orderId ? esc(x.orderId) : "<span class='dim'>—</span>"}</td>
+              <td class="dim">${x.worker ? esc(x.worker) : "—"}</td>
+            </tr>`,
+          )
+          .join("")}
+      </table>`
+}
 
 <h2>Refinery orders</h2>
 <table>

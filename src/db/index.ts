@@ -1,7 +1,7 @@
 import { config, hasSupabase } from "../config.js";
 import { MemoryStore } from "./memory.js";
 import { SupabaseStore } from "./supabase.js";
-import { mockPoolStats, mockChainHeight, mockLastFoundHeight } from "../data/mock.js";
+import { mockPoolStats, mockChainHeight, mockLastFoundHeight, mockHitsInRange } from "../data/mock.js";
 import { integratePhd } from "../math/pot.js";
 import type { Store } from "./types.js";
 
@@ -22,7 +22,14 @@ export function getStore(): Store {
  */
 export async function seedMockHistory(): Promise<void> {
   const s = getStore();
-  if (!config.mockData || s.kind !== "memory") return;
+  if (!config.mockData) return;
+  // Only seed when the store is empty, so we don't duplicate samples in a
+  // persistent (Supabase) DB across restarts. Memory is always empty on boot.
+  const existing = await s.getRecentSamples(1).catch(() => []);
+  if (existing.length > 0) {
+    console.log("🌱 seed skipped (store already has samples)");
+    return;
+  }
 
   const now = Date.now();
   const HOUR = 3_600_000;
@@ -31,9 +38,10 @@ export async function seedMockHistory(): Promise<void> {
 
   let prevFound = mockLastFoundHeight(start);
   let cycleStart = start;
+  const samples = [];
   for (let t = start; t <= now; t += HOUR) {
     const p = mockPoolStats(t);
-    await s.insertSample({
+    samples.push({
       ts: t,
       poolHashrate: p.poolHashratePhs,
       hashprice: p.hashpriceSatsPerPhd,
@@ -64,4 +72,20 @@ export async function seedMockHistory(): Promise<void> {
       cycleStart = t;
     }
   }
+
+  await s.insertSamples(samples);
+
+  // Seed the 10T+ hit board so the chart + table are populated immediately.
+  const hits = mockHitsInRange(start, now);
+  await s.insertHits(
+    hits.map((h) => ({
+      id: h.id,
+      ts: h.ts,
+      address: h.address,
+      difficulty: h.difficulty,
+      tier: h.tier,
+      orderId: h.orderId,
+      worker: h.worker,
+    })),
+  );
 }

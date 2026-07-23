@@ -36,6 +36,16 @@ export interface AddressSnapshot {
   totalWork: number;
 }
 
+export interface HitRow {
+  id: string;
+  ts: number;
+  address: string;
+  difficulty: number;
+  tier: string;
+  orderId: string | null;
+  worker: string | null;
+}
+
 export interface LuckBucket {
   dayOfWeek: number; // 0=Sun..6=Sat
   hourOfDay: number; // 0..23
@@ -47,6 +57,8 @@ export interface LuckBucket {
 
 export interface Store {
   insertSample(s: PollSample): Promise<void>;
+  /** Bulk insert (used by seeding); default may loop insertSample. */
+  insertSamples(samples: PollSample[]): Promise<void>;
   getSamplesSince(sinceMs: number): Promise<PollSample[]>;
   getRecentSamples(limit: number): Promise<PollSample[]>;
 
@@ -61,6 +73,12 @@ export interface Store {
 
   insertAddressSnapshot(s: AddressSnapshot): Promise<void>;
   getAddressSnapshots(address: string, limit: number): Promise<AddressSnapshot[]>;
+
+  /** Insert new 10T+ hits, ignoring ids already stored. Returns count inserted. */
+  insertHits(hits: HitRow[]): Promise<number>;
+  getHitsSince(sinceMs: number, limit: number): Promise<HitRow[]>;
+  getHitsForAddress(address: string, limit: number): Promise<HitRow[]>;
+  getLatestHit(): Promise<HitRow | null>;
 
   getLuckBuckets(): Promise<LuckBucket[]>;
 

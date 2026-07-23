@@ -2,13 +2,16 @@ import { getPoolStats, poolFreshness } from "../data/parasite.js";
 import { getChainTip, chainFreshness } from "../data/mempool.js";
 import { computePotAge, type PotAge } from "../math/pot.js";
 import { evaluateHashprice, type HashpriceEval } from "../math/hashprice.js";
+import { getStore } from "../db/index.js";
 import type { PoolStats, ChainTip, Freshness } from "../data/types.js";
+import type { HitRow } from "../db/types.js";
 
 export interface OverviewSnapshot {
   pool: PoolStats;
   chain: ChainTip;
   potAge: PotAge;
   hashprice: HashpriceEval;
+  latestHit: HitRow | null;
   freshness: { pool: Freshness; chain: Freshness; stale: boolean };
   generatedAt: number;
 }
@@ -23,6 +26,7 @@ export async function getOverview(): Promise<OverviewSnapshot> {
   const [pool, chain] = await Promise.all([getPoolStats(), getChainTip()]);
   const potAge = computePotAge(chain.height, pool.lastFoundHeight);
   const hashprice = evaluateHashprice(pool.hashpriceSatsPerPhd, pool.btcPriceUsd);
+  const latestHit = await getStore().getLatestHit().catch(() => null);
   const pf = poolFreshness();
   const cf = chainFreshness();
   return {
@@ -30,6 +34,7 @@ export async function getOverview(): Promise<OverviewSnapshot> {
     chain,
     potAge,
     hashprice,
+    latestHit,
     freshness: { pool: pf, chain: cf, stale: pf.stale || cf.stale },
     generatedAt: Date.now(),
   };

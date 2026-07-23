@@ -60,6 +60,22 @@ export interface RefineryState {
   orders: RefineryOrder[];
 }
 
+export type HitTier = "10T" | "21T" | "block";
+
+/** A single big share ("Bravocado" 10T+ / "homeminers" 21T+) seen by the pool. */
+export interface HitEvent {
+  /** Stable unique id so repeated polls don't double-insert. */
+  id: string;
+  ts: number; // unix ms
+  address: string;
+  /** Share difficulty (difficulty units, e.g. 1.2e13 = 12T). */
+  difficulty: number;
+  tier: HitTier;
+  /** Refinery order the share came from, if attributable. */
+  orderId: string | null;
+  worker: string | null;
+}
+
 /** Chain data from mempool.space. */
 export interface ChainTip {
   height: number;

@@ -56,6 +56,16 @@ export async function renderOverview(): Promise<string> {
     <div class="sub">online now</div></div>
 </div>
 
+${
+    o.latestHit
+      ? `<div class="card" style="margin-top:16px;border-color:#3a1414">
+           <div class="k">🔴 Latest ${o.latestHit.tier} hit (Bravocado board)</div>
+           <div class="v" style="font-size:20px">${fmtDiff(o.latestHit.difficulty)} <span class="dim" style="font-size:13px">by</span> <a href="/address/${o.latestHit.address}">${o.latestHit.address.slice(0, 12)}…${o.latestHit.address.slice(-4)}</a></div>
+           <div class="sub">${new Date(o.latestHit.ts).toLocaleString("en-US")}${o.latestHit.orderId ? ` · order ${o.latestHit.orderId}` : ""} · <a href="/history">see all hits →</a></div>
+         </div>`
+      : ""
+  }
+
 <p class="muted-note" style="margin-top:24px">
   Finder gets 1 BTC; the remaining ~2.15 BTC splits among miners by shares since the previous block.
   <a href="/about">How payouts work →</a>

@@ -5,6 +5,7 @@ import type {
   WatchSubscription,
   AddressSnapshot,
   LuckBucket,
+  HitRow,
 } from "./types.js";
 
 /**
@@ -18,11 +19,17 @@ export class MemoryStore implements Store {
   private blocks: BlockFound[] = [];
   private watches: WatchSubscription[] = [];
   private snapshots: AddressSnapshot[] = [];
+  private hits = new Map<string, HitRow>();
   private nextWatchId = 1;
 
   async insertSample(s: PollSample): Promise<void> {
     this.samples.push(s);
     // keep memory bounded (~30 days at 45s ≈ 57k rows; cap generously)
+    if (this.samples.length > 80_000) this.samples.splice(0, this.samples.length - 80_000);
+  }
+
+  async insertSamples(samples: PollSample[]): Promise<void> {
+    this.samples.push(...samples);
     if (this.samples.length > 80_000) this.samples.splice(0, this.samples.length - 80_000);
   }
 
@@ -81,6 +88,37 @@ export class MemoryStore implements Store {
       .filter((s) => s.address === address)
       .sort((a, b) => b.ts - a.ts)
       .slice(0, limit);
+  }
+
+  async insertHits(hits: HitRow[]): Promise<number> {
+    let inserted = 0;
+    for (const h of hits) {
+      if (!this.hits.has(h.id)) {
+        this.hits.set(h.id, h);
+        inserted++;
+      }
+    }
+    return inserted;
+  }
+
+  async getHitsSince(sinceMs: number, limit: number): Promise<HitRow[]> {
+    return [...this.hits.values()]
+      .filter((h) => h.ts >= sinceMs)
+      .sort((a, b) => b.ts - a.ts)
+      .slice(0, limit);
+  }
+
+  async getHitsForAddress(address: string, limit: number): Promise<HitRow[]> {
+    return [...this.hits.values()]
+      .filter((h) => h.address === address)
+      .sort((a, b) => b.ts - a.ts)
+      .slice(0, limit);
+  }
+
+  async getLatestHit(): Promise<HitRow | null> {
+    let latest: HitRow | null = null;
+    for (const h of this.hits.values()) if (!latest || h.ts > latest.ts) latest = h;
+    return latest;
   }
 
   async runMaintenance(): Promise<void> {

@@ -7,6 +7,7 @@ import type {
   WatchSubscription,
   AddressSnapshot,
   LuckBucket,
+  HitRow,
 } from "./types.js";
 
 function iso(ms: number): string {
@@ -39,6 +40,26 @@ export class SupabaseStore implements Store {
       best_diff_since_block: s.bestDiffSinceBlock,
       btc_price: s.btcPrice,
     });
+  }
+
+  async insertSamples(samples: PollSample[]): Promise<void> {
+    if (samples.length === 0) return;
+    // chunk to keep request sizes sane
+    const CHUNK = 500;
+    for (let i = 0; i < samples.length; i += CHUNK) {
+      const rows = samples.slice(i, i + CHUNK).map((s) => ({
+        ts: iso(s.ts),
+        pool_hashrate: s.poolHashrate,
+        hashprice: s.hashprice,
+        users: s.users,
+        workers: s.workers,
+        chain_height: s.chainHeight,
+        last_found_height: s.lastFoundHeight,
+        best_diff_since_block: s.bestDiffSinceBlock,
+        btc_price: s.btcPrice,
+      }));
+      await this.db.from("poll_samples").insert(rows);
+    }
   }
 
   private rowToSample(r: Record<string, any>): PollSample {
@@ -177,6 +198,67 @@ export class SupabaseStore implements Store {
       bestDifficulty: r.best_difficulty ?? 0,
       totalWork: r.total_work ?? 0,
     }));
+  }
+
+  async insertHits(hits: HitRow[]): Promise<number> {
+    if (hits.length === 0) return 0;
+    const { data } = await this.db
+      .from("share_hits")
+      .upsert(
+        hits.map((h) => ({
+          id: h.id,
+          ts: iso(h.ts),
+          address: h.address,
+          difficulty: h.difficulty,
+          tier: h.tier,
+          order_id: h.orderId,
+          worker: h.worker,
+        })),
+        { onConflict: "id", ignoreDuplicates: true },
+      )
+      .select();
+    return (data ?? []).length;
+  }
+
+  private rowToHit(r: Record<string, any>): HitRow {
+    return {
+      id: r.id,
+      ts: ms(r.ts),
+      address: r.address,
+      difficulty: r.difficulty ?? 0,
+      tier: r.tier ?? "10T",
+      orderId: r.order_id ?? null,
+      worker: r.worker ?? null,
+    };
+  }
+
+  async getHitsSince(sinceMs: number, limit: number): Promise<HitRow[]> {
+    const { data } = await this.db
+      .from("share_hits")
+      .select("*")
+      .gte("ts", iso(sinceMs))
+      .order("ts", { ascending: false })
+      .limit(limit);
+    return (data ?? []).map((r) => this.rowToHit(r));
+  }
+
+  async getHitsForAddress(address: string, limit: number): Promise<HitRow[]> {
+    const { data } = await this.db
+      .from("share_hits")
+      .select("*")
+      .eq("address", address)
+      .order("ts", { ascending: false })
+      .limit(limit);
+    return (data ?? []).map((r) => this.rowToHit(r));
+  }
+
+  async getLatestHit(): Promise<HitRow | null> {
+    const { data } = await this.db
+      .from("share_hits")
+      .select("*")
+      .order("ts", { ascending: false })
+      .limit(1);
+    return data && data[0] ? this.rowToHit(data[0]) : null;
   }
 
   async runMaintenance(): Promise<void> {

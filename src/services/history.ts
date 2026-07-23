@@ -1,5 +1,6 @@
 import { getStore } from "../db/index.js";
 import { MINUTES_PER_BLOCK } from "../math/constants.js";
+import type { HitRow } from "../db/types.js";
 
 export interface Point {
   t: number; // unix ms
@@ -18,6 +19,7 @@ export interface HistoryData {
   users: Point[];
   potLengths: PotLength[];
   blockMarkers: number[]; // ms timestamps
+  hits: HitRow[];
   sampleCount: number;
   rangeDays: number;
 }
@@ -38,6 +40,7 @@ export async function getHistory(rangeDays = 7): Promise<HistoryData> {
   const since = Date.now() - rangeDays * 86_400_000;
   const samples = await store.getSamplesSince(since);
   const blocks = await store.getBlocksFound(100);
+  const hits = await store.getHitsSince(since, 500);
 
   const ds = downsample(samples, 600);
   return {
@@ -55,6 +58,7 @@ export async function getHistory(rangeDays = 7): Promise<HistoryData> {
         estPhd: b.estCyclePhd,
       })),
     blockMarkers: blocks.map((b) => b.foundAt),
+    hits,
     sampleCount: samples.length,
     rangeDays,
   };

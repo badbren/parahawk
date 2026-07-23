@@ -8,3 +8,5 @@ npm-debug.log*
 .data/
 coverage/
 *.tsbuildinfo
+supabase/.temp/
+supabase/.branches/
