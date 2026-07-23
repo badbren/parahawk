@@ -114,8 +114,12 @@ ${opts.body}
 </div></main>
 <footer class="bot"><div class="wrap">
   <div>
-    <div>Parahawk — free stats &amp; alerts for the <a href="https://parasite.wtf" target="_blank" rel="noopener">Parasite Pool</a> 🥑</div>
-    <div class="muted-note">not affiliated with Parasite Pool · data is best-effort · no financial advice</div>
+    <div>Parahawk — free stats &amp; alerts for the <a href="https://parasite.space" target="_blank" rel="noopener">Parasite Pool</a> 🥑</div>
+    <div style="margin-top:6px">
+      <a href="https://ordinalmaxibiz.wiki/bravocados" target="_blank" rel="noopener">🥑 Bravocados wiki</a> ·
+      <a href="https://ordinalmaxibiz.wiki/explorer" target="_blank" rel="noopener">OMB explorer</a>
+    </div>
+    <div class="muted-note">not affiliated with Parasite Pool or OMB · data is best-effort · no financial advice</div>
   </div>
   ${tipBlock}
 </div></footer>

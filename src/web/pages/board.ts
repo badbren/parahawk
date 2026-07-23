@@ -86,6 +86,13 @@ export async function renderBoard(): Promise<string> {
 <p class="lead">Live from Parasite's leaderboards + the Refinery order book. Auto-refreshes every 45s.</p>
 
 <h2>🥑 Bravocado board — 10T+ club</h2>
+<div class="stale" style="background:#0d1408;border-color:#33501f;color:#c7f59a">
+  Land a big share on Parasite and you earn a <strong>Bravocado</strong> — an
+  <a href="https://ordinalmaxibiz.wiki/bravocados" target="_blank" rel="noopener">OMB companion ordinal</a>
+  (1,002 on-chain avocados; the first 100 go one-at-a-time to miners who hit, in order, from the dispensary wallet).
+  Browse the collection on the <a href="https://ordinalmaxibiz.wiki/bravocados" target="_blank" rel="noopener">Bravocados wiki</a>
+  and the <a href="https://ordinalmaxibiz.wiki/explorer" target="_blank" rel="noopener">OMB explorer</a>.
+</div>
 <p class="muted-note">Every miner whose best difficulty this round is 10T or higher. 🥑 10T+ · 🏠 21T+ (homeminers). Best-diff per miner is what Parasite exposes; per-miner hit counts aren't public (the share feed is anonymised).</p>
 <table>
   <tr><th>#</th><th>Address</th><th>Best difficulty</th><th>Tier</th></tr>
