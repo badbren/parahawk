@@ -4,14 +4,16 @@ import { config } from "../config.js";
 let cached: string | null = null;
 
 /**
- * Server-generated QR code (PNG data URL) for the tip Lightning address.
- * Encoded as a `lightning:` URI so wallets recognise it. Cached after first gen.
- * Returns null when no LIGHTNING_ADDRESS is configured.
+ * Server-generated QR code (PNG data URL) for the tip address. A Lightning
+ * address (contains "@") is encoded as a `lightning:` URI; anything else is
+ * treated as an on-chain bitcoin address and encoded as `bitcoin:` so wallets
+ * recognise it. Cached after first gen. Returns null when no address is set.
  */
 export async function tipQrDataUrl(): Promise<string | null> {
-  if (!config.lightningAddress) return null;
+  const addr = config.lightningAddress;
+  if (!addr) return null;
   if (cached) return cached;
-  const uri = `lightning:${config.lightningAddress}`;
+  const uri = addr.includes("@") ? `lightning:${addr}` : `bitcoin:${addr}`;
   cached = await QRCode.toDataURL(uri, {
     margin: 1,
     width: 220,
