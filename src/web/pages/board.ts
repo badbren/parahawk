@@ -41,7 +41,7 @@ export async function renderBoard(): Promise<string> {
           .join("");
 
   const diffRows = lb.difficulty
-    .slice(0, 25)
+    .slice(0, 100)
     .map(
       (e: LeaderboardEntry) =>
         `<tr><td class="dim">${e.rank}</td><td>${addrCell(e.address)}</td><td>${fmtDiff(e.bestDiff ?? 0)}</td></tr>`,
@@ -66,17 +66,17 @@ ${cados}
 <div class="board2col">
   <div class="btable">
     <h3>🥑 Bravocado Board — 10T+ club</h3>
-    <table>
-      <tr><th>#</th><th>Address</th><th>Best diff</th><th>Tier</th></tr>
-      ${bravoRows}
-    </table>
+    <div class="tscroll"><table>
+      <thead><tr><th>#</th><th>Address</th><th>Best diff</th><th>Tier</th></tr></thead>
+      <tbody>${bravoRows}</tbody>
+    </table></div>
   </div>
   <div class="btable">
-    <h3>Top difficulties — current round</h3>
-    <table>
-      <tr><th>#</th><th>Address</th><th>Best diff</th></tr>
-      ${diffRows}
-    </table>
+    <h3>Top difficulties — current round <span class="dim" style="font-size:12px">top 100</span></h3>
+    <div class="tscroll"><table>
+      <thead><tr><th>#</th><th>Address</th><th>Best diff</th></tr></thead>
+      <tbody>${diffRows}</tbody>
+    </table></div>
   </div>
 </div>
 
@@ -89,6 +89,10 @@ ${cados}
 .board2col table{margin:0}
 .board2col th,.board2col td{padding:6px 9px;font-size:13px}
 .board2col th{font-size:11px}
+.board2col .tscroll{max-height:600px;overflow-y:auto;border:1px solid var(--line)}
+.board2col thead th{position:sticky;top:0;background:#0d0d0d;z-index:1}
+.board2col .tscroll::-webkit-scrollbar{width:8px}
+.board2col .tscroll::-webkit-scrollbar-thumb{background:#222;border-radius:4px}
 </style>
 <script>setTimeout(function(){location.reload();},45000);</script>
 `;

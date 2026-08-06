@@ -300,7 +300,7 @@ export async function getLeaderboard(): Promise<Leaderboard> {
   }
   try {
     const [diff, loyalty] = await Promise.all([
-      fetchJson<LbRow[]>(`${base()}/api/leaderboard?type=difficulty&limit=25&round=current`),
+      fetchJson<LbRow[]>(`${base()}/api/leaderboard?type=difficulty&limit=100&round=current`),
       fetchJson<LbRow[]>(`${base()}/api/leaderboard?type=loyalty&limit=25&round=current`),
     ]);
     const lb = {
