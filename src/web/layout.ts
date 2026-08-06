@@ -22,11 +22,15 @@ const NAV_GROUPS: Array<Array<[string, string]>> = [
   [
     ["/", "overview"],
     ["/history", "pool"],
+  ],
+  [
+    ["/potmath", "pot math"],
     ["/luck", "luck"],
   ],
   [
     ["/board", "bravocados"],
     ["/cados", "awards"],
+    ["/wiki", "mr.v wiki"],
   ],
   [
     ["/calc", "calc"],
@@ -63,6 +67,12 @@ nav a{
   filter:url(#nav-rough);
 }
 nav a.active,nav a:hover{color:#fff}
+.addrsearch{display:flex; gap:0; flex:1 1 320px; max-width:520px; min-width:220px; order:3}
+.addrsearch input{background:#0a0a0a; border:1px solid var(--line); border-right:0; color:var(--fg); padding:11px 15px; width:100%; font-size:17px}
+.addrsearch input::placeholder{color:#5a5a5a}
+.addrsearch button{background:#0a0a0a; border:1px solid var(--line); color:var(--dim); padding:0 16px; cursor:pointer; font-size:20px; text-transform:none; letter-spacing:0}
+.addrsearch button:hover{background:#141414; color:var(--fg)}
+@media(max-width:900px){.addrsearch{order:9; flex-basis:100%; max-width:none}}
 main{padding:38px 0 80px}
 h1{font-size:34px; margin:0 0 8px; color:#fff}
 h2{font-size:24px; margin:48px 0 16px; color:#fff; text-transform:uppercase; letter-spacing:1.5px; border-bottom:1px solid var(--line); padding-bottom:10px}
@@ -137,6 +147,10 @@ ${opts.head ?? ""}
 </defs></svg>
 <header class="top"><div class="wrap">
   <a class="brand" href="/" aria-label="Parahawk home">${parahawkLogo({ height: 80 })}</a>
+  <form class="addrsearch" role="search" onsubmit="var v=this.q.value.trim(); if(v){window.location.href='/address/'+encodeURIComponent(v);} return false;">
+    <input name="q" type="text" placeholder="Enter wallet address…  (bc1…)" autocomplete="off" spellcheck="false" aria-label="Look up a wallet address"/>
+    <button type="submit" aria-label="Search">⌕</button>
+  </form>
   <nav>${nav}</nav>
 </div></header>
 <main><div class="wrap">

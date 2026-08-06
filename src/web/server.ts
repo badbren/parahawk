@@ -5,6 +5,9 @@ import { renderHistory } from "./pages/history.js";
 import { renderCalc } from "./pages/calc.js";
 import { renderAbout } from "./pages/about.js";
 import { renderLuck } from "./pages/luck.js";
+import { renderPotMath } from "./pages/potmath.js";
+import { renderWiki } from "./pages/wiki.js";
+import { renderLeaving } from "./pages/leaving.js";
 import { renderBoard } from "./pages/board.js";
 import { renderCados } from "./pages/cados.js";
 import { renderAddress } from "./pages/address.js";
@@ -26,13 +29,25 @@ export function createServer(): express.Express {
   const app = express();
   app.disable("x-powered-by");
 
+  // Static assets (wiki images, etc.) served from ./public at /assets.
+  app.use("/assets", express.static("public", { maxAge: "1h" }));
+
   app.get("/", page(renderOverview));
   app.get("/board", page(renderBoard));
   app.get("/cados", page(renderCados));
   app.get("/history", page(renderHistory));
   app.get("/luck", page(renderLuck));
+  app.get("/potmath", page(renderPotMath));
   app.get("/calc", page(renderCalc));
   app.get("/about", page(renderAbout));
+  app.get("/wiki", page(renderWiki));
+  app.get("/leaving", async (req, res) => {
+    try {
+      res.type("html").send(await renderLeaving(String(req.query.url ?? "")));
+    } catch (err) {
+      res.status(500).type("text").send(`error: ${(err as Error).message}`);
+    }
+  });
 
   app.get("/address/:addr", async (req, res) => {
     try {

@@ -7,6 +7,7 @@ import { brandEmbed, verdictColor } from "./embeds.js";
 import { config } from "../config.js";
 import { getOverview } from "../services/overview.js";
 import { estimateCurrentPotPhd } from "../services/pot.js";
+import { getPotMath } from "../services/potmath.js";
 import { getStore } from "../db/index.js";
 import { getUserStats } from "../data/parasite.js";
 import { oddsForWork } from "../math/odds.js";
@@ -38,6 +39,16 @@ function isBc1(addr: string): boolean {
   return /^bc1[0-9a-z]{6,87}$/i.test(addr.trim());
 }
 
+/**
+ * Pot-fill urgency from expected wait (days) to the next block:
+ * 🟢 fills slow (<1d), 🟡 filling (1–2d), 🔴 wait for reset (>2d).
+ */
+function waitEmoji(expectedDays: number): "🟢" | "🟡" | "🔴" {
+  if (expectedDays < 1) return "🟢";
+  if (expectedDays <= 2) return "🟡";
+  return "🔴";
+}
+
 // ── /pot ────────────────────────────────────────────────────────────────────
 const pot: Command = {
   data: new SlashCommandBuilder()
@@ -47,20 +58,37 @@ const pot: Command = {
   async execute(i) {
     const o = await getOverview();
     const estPhd = await estimateCurrentPotPhd(getStore(), o);
+    const pm = await getPotMath();
     const v = o.potAge.verdict;
+    const we = waitEmoji(pm.expectedDays);
     const note =
       v === "fresh"
         ? "🟢 fresh — full pot recently reset"
         : v === "aging"
           ? "🟡 aging — pot filling up"
           : "🔴 stale — many wait for the reset before renting";
+    const waitNote =
+      we === "🟢"
+        ? "🟢 pot fills slow — plenty of room for rentals"
+        : we === "🟡"
+          ? "🟡 pot filling steadily — mind the wait before piling in"
+          : "🔴 wait for reset before adding rentals";
+    const rarityOneIn = Math.max(1, Math.round(1 / pm.rarity));
     const embed = brandEmbed(verdictColor(v))
-      .setTitle(`${potEmoji(v)} Pot age — ${fmtDuration(o.potAge.hours)}`)
-      .setDescription(note)
+      .setTitle(`${we} ${potEmoji(v)} Pot age — ${fmtDuration(o.potAge.hours)}`)
+      .setDescription(`${note}\n${waitNote}`)
       .addFields(
         { name: "Blocks since last found", value: `${o.potAge.blocks} (since #${fmtInt(o.pool.lastFoundHeight)})`, inline: true },
         { name: "Pool hashrate", value: fmtHashrate(o.pool.poolHashratePhs), inline: true },
         { name: "Est. PHd banked", value: fmtPhd(estPhd), inline: true },
+        { name: "Round depth / luck", value: `${pm.depth.toFixed(2)}× · ${Math.round(pm.luckPct)}% luck`, inline: true },
+        { name: "Round rarity", value: `~${Math.round(pm.rarity * 100)}% of rounds run this deep (1 in ${rarityOneIn})`, inline: true },
+        { name: "Share price", value: `${fmtInt(pm.satsPerG)} sats/G (subsidy only)`, inline: true },
+        {
+          name: "Expected wait",
+          value: `${fmtDuration(pm.expectedDays * 24)} @ ${fmtHashrate(pm.hGauge)} · 1D avg ${pm.h1d.toFixed(0)} → ~${fmtDuration(pm.expectedDays1d * 24)}`,
+          inline: false,
+        },
       );
     if (o.pool.workSinceLastBlockDiff && o.pool.workSinceLastBlockDiff > 0) {
       embed.addFields({

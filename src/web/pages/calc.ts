@@ -27,14 +27,14 @@ export async function renderCalc(): Promise<string> {
   <div class="card"><div class="k">W — work since last block (T)</div><input type="number" id="pm_w" value="${seedW}" step="0.1" min="0"/></div>
   <div class="card"><div class="k">D — minimum needed diff (T)</div><input type="number" id="pm_d" value="${seedD}" step="0.1" min="0"/></div>
   <div class="card"><div class="k">H — pool hashrate (PH/s)</div><input type="number" id="pm_h" value="${seedH}" step="1" min="0"/></div>
-  <div class="card" style="border-color:#33501f;background:#0d1408"><div class="k green">Your work this round (G)</div><input type="number" id="pm_g" placeholder="e.g. 500" step="1" min="0"/></div>
+  <div class="card" style="border-color:#33501f;background:#0d1408"><div class="k green">Your work this round (T)</div><input type="number" id="pm_g" placeholder="e.g. 5" step="0.1" min="0"/></div>
 </div>
 <div class="grid" style="margin-top:14px">
   <div class="card"><div class="k">Round depth</div><div class="v" id="pm_depth">–</div><div class="sub" id="pm_depth_c">W / D</div></div>
   <div class="card"><div class="k">Round rarity</div><div class="v" id="pm_rarity">–</div><div class="sub">P(round ≥ W) = e^(−W/D)</div></div>
   <div class="card"><div class="k">Share price</div><div class="v green" id="pm_sats">–</div><div class="sub">212,500 / W · subsidy only</div></div>
   <div class="card"><div class="k">Expected wait</div><div class="v" id="pm_wait">–</div><div class="sub" id="pm_wait_c">at H</div></div>
-  <div class="card" style="border-color:#33501f;background:#0d1408"><div class="k green">💰 Your stake in this pot</div><div class="v green" id="pm_stake">–</div><div class="sub" id="pm_stake_c">enter your work (G) to see your cut</div></div>
+  <div class="card" style="border-color:#33501f;background:#0d1408"><div class="k green">💰 Your stake in this pot</div><div class="v green" id="pm_stake">–</div><div class="sub" id="pm_stake_c">enter your work this round (T) to see your cut</div></div>
 </div>
 <script src="/potmath.js"></script>
 <script>
@@ -52,11 +52,12 @@ export async function renderCalc(): Promise<string> {
     $("pm_wait").textContent = fmtDur(m.expectedDays);
     $("pm_wait_c").textContent = "at "+(H||0)+" PH/s";
     if(!isNaN(g) && $("pm_g").value!=="" && W>0){
-      $("pm_stake").textContent = fmtInt(P.stakeValue(g,W))+" sats";
-      $("pm_stake_c").textContent = g+" G × "+fmtInt(m.satsPerG)+" sats/G — payout if the pot cracked now (subsidy only)";
+      var gG = g*1000; // T → G (1T = 1,000 G)
+      $("pm_stake").textContent = fmtInt(P.stakeValue(gG,W))+" sats";
+      $("pm_stake_c").textContent = g+" T ("+fmtInt(gG)+" G) × "+fmtInt(m.satsPerG)+" sats/G — payout if the pot cracked now (subsidy only)";
     } else {
       $("pm_stake").textContent = "–";
-      $("pm_stake_c").textContent = "enter your work (G) to see your cut";
+      $("pm_stake_c").textContent = "enter your work this round (T) to see your cut";
     }
   }
   ["pm_w","pm_d","pm_h","pm_g"].forEach(function(id){$(id).addEventListener("input",recompute);});
