@@ -36,7 +36,6 @@ export async function renderAbout(): Promise<string> {
   <li><strong>Pool history</strong> — charts with 1H/4H/1D/1W timeframes: hashrate, hashprice, users/workers, and every completed pot cycle.</li>
   <li><strong>Pot Math</strong> — round depth, rarity, share price and expected wait, the luck audit (hits-per-PHd by hour &amp; weekday), and a what-if / rental-odds calculator.</li>
   <li><strong>Order Books</strong> — the live Refinery rental order book.</li>
-  <li><strong>Discord bot</strong> — block alerts plus <code>/pot</code>, <code>/price</code>, <code>/odds</code>, <code>/odometer</code>, <code>/watch</code>.</li>
 </ul>
 
 <h2>How Parasite payouts work</h2>
