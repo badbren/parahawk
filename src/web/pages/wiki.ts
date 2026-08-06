@@ -6,26 +6,27 @@ interface WikiCard {
   alt: string;
   title: string;
   url: string;
+  /** Crisp nearest-neighbour scaling for small pixel-art images. */
+  pixel?: boolean;
 }
 
 /**
  * Mr.V's wikis — two big, clickable cards. Each links through the /leaving
  * interstitial so users get an "external site" warning before they go.
- * Replace the placeholder art in public/wiki/ with the real images
- * (omb.png / bravocado.png) and update the img paths below.
  */
 const CARDS: WikiCard[] = [
   {
-    img: "/assets/wiki/omb.svg",
+    img: "/assets/wiki/omb.jpg",
     alt: "Ordinal Maxi Biz",
     title: "Ordinal Maxi Biz Wiki",
     url: "https://ordinalmaxibiz.wiki/",
   },
   {
-    img: "/assets/wiki/bravocado.svg",
+    img: "/assets/wiki/bravocado.png",
     alt: "Bravocados",
     title: "Bravocados Wiki",
     url: "https://ordinalmaxibiz.wiki/bravocados",
+    pixel: true,
   },
 ];
 
@@ -34,7 +35,7 @@ export async function renderWiki(): Promise<string> {
     (c) => `
     <a class="wcard" href="/leaving?url=${encodeURIComponent(c.url)}">
       <span class="whead">${esc(c.title)}</span>
-      <span class="wimg"><img src="${esc(c.img)}" alt="${esc(c.alt)}"/></span>
+      <span class="wimg"><img class="${c.pixel ? "pixel" : ""}" src="${esc(c.img)}" alt="${esc(c.alt)}"/></span>
       <span class="wgo">visit wiki ↗</span>
     </a>`,
   ).join("");
@@ -57,6 +58,7 @@ export async function renderWiki(): Promise<string> {
 .wcard .whead{color:#fff;font-size:24px;text-transform:uppercase;letter-spacing:2px;margin-bottom:16px;text-align:center}
 .wcard .wimg{width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#000;border:1px solid var(--line)}
 .wcard .wimg img{width:100%;height:100%;object-fit:contain}
+.wcard .wimg img.pixel{image-rendering:pixelated;object-fit:contain}
 .wcard .wgo{margin-top:16px;color:var(--green);font-size:17px;letter-spacing:1px;text-transform:uppercase}
 </style>
 `;

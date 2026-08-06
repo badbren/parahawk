@@ -25,17 +25,14 @@ const NAV_GROUPS: Array<Array<[string, string]>> = [
   ],
   [
     ["/potmath", "pot math"],
-    ["/luck", "luck"],
+    ["/order-books", "order books"],
   ],
   [
     ["/board", "bravocados"],
     ["/cados", "awards"],
     ["/wiki", "mr.v wiki"],
   ],
-  [
-    ["/calc", "calc"],
-    ["/about", "about"],
-  ],
+  [["/about", "about"]],
 ];
 
 const STYLE = `

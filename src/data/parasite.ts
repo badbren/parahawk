@@ -1,6 +1,12 @@
 import { config } from "../config.js";
 import { Cached, fetchJson } from "./cache.js";
-import { mockPoolStats, mockUserStats, mockRefineryState, mockHitsInRange } from "./mock.js";
+import {
+  mockPoolStats,
+  mockUserStats,
+  mockRefineryState,
+  mockHitsInRange,
+  mockLeaderboard,
+} from "./mock.js";
 import type {
   PoolStats,
   UserStats,
@@ -156,6 +162,28 @@ export async function getRecentHits(sinceMs?: number): Promise<HitEvent[]> {
   }
 }
 
+/** Top Parasite diff share per bitcoin block height (address is masked upstream). */
+export interface TopDiff {
+  address: string;
+  difficulty: number;
+}
+
+export async function getTopDiffByBlock(limit = 50): Promise<Map<number, TopDiff>> {
+  const map = new Map<number, TopDiff>();
+  if (config.mockData) return map;
+  try {
+    const rows = await fetchJson<HighestDiffRow[]>(`${base()}/api/highest-diff?limit=${limit}`);
+    for (const r of Array.isArray(rows) ? rows : []) {
+      const h = Number(r.block_height);
+      if (!h) continue;
+      map.set(h, { address: r.top_diff_address ?? "", difficulty: Number(r.difficulty ?? 0) });
+    }
+  } catch {
+    /* leave map empty — strip just omits the top-diff line */
+  }
+  return map;
+}
+
 // ── leaderboard ───────────────────────────────────────────────────────────────
 
 interface LbRow {
@@ -177,18 +205,7 @@ function mapLbEntry(r: LbRow): LeaderboardEntry {
 
 export async function getLeaderboard(): Promise<Leaderboard> {
   if (config.mockData) {
-    // synthesise a small leaderboard from mock users
-    const mk = (n: number, big: boolean): LeaderboardEntry[] =>
-      Array.from({ length: n }, (_, i) => {
-        const u = mockUserStats(`bc1qmock${i}xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`);
-        return {
-          rank: i + 1,
-          address: `bc1q...${(1000 + i).toString(36)}`,
-          bestDiff: big ? u.bestDifficulty : undefined,
-          blocks: big ? undefined : 600 + i,
-        };
-      });
-    const lb = { difficulty: mk(15, true), loyalty: mk(15, false) };
+    const lb = mockLeaderboard();
     leaderboardCache.set(lb);
     return lb;
   }

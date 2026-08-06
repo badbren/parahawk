@@ -2,6 +2,18 @@ import { renderPage } from "../layout.js";
 import { getHistory } from "../../services/history.js";
 import { fmtInt, fmtDiff, esc } from "../format.js";
 
+function maskAddr(a: string): string {
+  if (a.includes("...") || a.includes("…")) return a;
+  return `${a.slice(0, 12)}…${a.slice(-4)}`;
+}
+
+function addrCell(a: string): string {
+  const masked = a.includes("...") || a.includes("…");
+  return masked
+    ? `<span class="dim">${esc(maskAddr(a))}</span>`
+    : `<a href="/address/${esc(a)}">${esc(maskAddr(a))}</a>`;
+}
+
 function labelOf(ms: number): string {
   const d = new Date(ms);
   const mo = d.toLocaleString("en-US", { month: "short" });
@@ -46,7 +58,7 @@ export async function renderHistory(): Promise<string> {
               return `<tr>
                 <td class="dim">${esc(new Date(x.ts).toLocaleString("en-US"))}</td>
                 <td class="${tierClass}">${esc(x.tier)}</td>
-                <td><a href="/address/${esc(x.address)}">${esc(x.address.slice(0, 12))}…${esc(x.address.slice(-4))}</a></td>
+                <td>${addrCell(x.address)}</td>
                 <td>${fmtDiff(x.difficulty)}</td>
                 <td>${x.orderId ? esc(x.orderId) : "<span class='dim'>—</span>"}</td>
                 <td class="dim">${x.worker ? esc(x.worker) : "—"}</td>
@@ -120,7 +132,7 @@ new Chart(document.getElementById("c_hits"), {
     plugins:{ legend:{display:false}, tooltip:{ callbacks:{
       label:(ctx)=>{ const m=D.hitMeta[ctx.dataIndex]||{}; return [
         m.tier+" hit — "+ctx.parsed.y+"T",
-        (m.addr||"").slice(0,14)+"…"+(m.addr||"").slice(-4),
+        (function(a){a=a||"";return (a.indexOf("...")>=0||a.indexOf("…")>=0)?a:(a.slice(0,14)+"…"+a.slice(-4));})(m.addr),
         "order: "+(m.order||"—")+"  worker: "+(m.worker||"—"),
         m.when ];
       }

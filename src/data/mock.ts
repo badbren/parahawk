@@ -6,6 +6,8 @@ import type {
   ChainTip,
   OrderStatus,
   HitEvent,
+  Leaderboard,
+  LeaderboardEntry,
 } from "./types.js";
 
 /**
@@ -216,4 +218,19 @@ export function mockHitsInRange(sinceMs: number, untilMs: number): HitEvent[] {
     }
   }
   return hits.sort((a, b) => a.ts - b.ts);
+}
+
+/** A small synthetic leaderboard (difficulty + loyalty) built from mock users. */
+export function mockLeaderboard(): Leaderboard {
+  const mk = (n: number, big: boolean): LeaderboardEntry[] =>
+    Array.from({ length: n }, (_, i) => {
+      const u = mockUserStats(`bc1qmock${i}xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`);
+      return {
+        rank: i + 1,
+        address: `bc1q...${(1000 + i).toString(36)}`,
+        bestDiff: big ? u.bestDifficulty : undefined,
+        blocks: big ? undefined : 600 + i,
+      };
+    });
+  return { difficulty: mk(15, true), loyalty: mk(15, false) };
 }

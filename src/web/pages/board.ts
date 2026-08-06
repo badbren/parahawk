@@ -1,6 +1,6 @@
 import { renderPage } from "../layout.js";
-import { getLeaderboard, getRefineryState } from "../../data/parasite.js";
-import { fmtDiff, fmtHashrate, fmtInt, esc } from "../format.js";
+import { getLeaderboard } from "../../data/parasite.js";
+import { fmtDiff, fmtInt, esc } from "../format.js";
 import type { LeaderboardEntry } from "../../data/types.js";
 
 const TEN_T = 10e12;
@@ -19,7 +19,7 @@ function bravoBadge(diff: number): string {
 }
 
 export async function renderBoard(): Promise<string> {
-  const [lb, refinery] = await Promise.all([getLeaderboard(), getRefineryState()]);
+  const lb = await getLeaderboard();
 
   const bravocados = lb.difficulty
     .filter((e) => (e.bestDiff ?? 0) >= TEN_T)
@@ -61,43 +61,9 @@ export async function renderBoard(): Promise<string> {
     )
     .join("");
 
-  const active = refinery.orders.filter((o) => o.status === "active");
-  // provider breakdown across all orders
-  const provCounts = new Map<string, number>();
-  for (const o of refinery.orders) {
-    const p = o.provider ?? "UNKNOWN";
-    provCounts.set(p, (provCounts.get(p) ?? 0) + 1);
-  }
-  const provSummary = [...provCounts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .map(([p, n]) => `${esc(p)} <span class="dim">${n}</span>`)
-    .join(" · ");
-
-  const orderRows =
-    refinery.orders.length === 0
-      ? `<tr><td colspan="7" class="dim">no orders (or Refinery data unavailable)</td></tr>`
-      : refinery.orders
-          .slice(0, 50)
-          .map((o) => {
-            const sc = o.status === "fulfilled" ? "green" : o.status === "expired" ? "red" : "amber";
-            const addr = (o as { address?: string }).address ?? "";
-            const prov = o.provider ?? "UNKNOWN";
-            const provClass = prov === "Refinery" ? "green" : "dim";
-            return `<tr>
-              <td class="dim">${esc(o.id)}</td>
-              <td>${addr ? addrCell(addr) : "<span class='dim'>—</span>"}</td>
-              <td class="${provClass}">${esc(prov)}</td>
-              <td class="${sc}">${o.status}</td>
-              <td>${fmtHashrate(o.hashratePhs)}</td>
-              <td>${fmtDiff(o.bestShare)}</td>
-              <td><div class="bar"><span style="width:${Math.min(100, o.progressPercent)}%"></span></div> ${o.progressPercent}%</td>
-            </tr>`;
-          })
-          .join("");
-
   const body = `
 <h1>Miners &amp; Bravocados 🥑</h1>
-<p class="lead">Live from Parasite's leaderboards + the Refinery order book. Auto-refreshes every 45s.</p>
+<p class="lead">Live from Parasite's leaderboards. Auto-refreshes every 45s.</p>
 
 <h2>🥑 Bravocado board — 10T+ club</h2>
 <div class="stale" style="background:#0d1408;border-color:#33501f;color:#c7f59a">
@@ -125,18 +91,7 @@ export async function renderBoard(): Promise<string> {
   ${loyaltyRows}
 </table>
 
-<h2>⚙️ Refinery order book — ${active.length} active</h2>
-<p class="muted-note">Live rental orders. Addresses are full here, so they link to each miner's odometer. <strong>Via</strong>: ${provSummary || "—"}.</p>
-<table>
-  <tr><th>ID</th><th>Address</th><th>Via</th><th>Status</th><th>Hashrate</th><th>Best share</th><th>Progress</th></tr>
-  ${orderRows}
-</table>
-
-<p class="muted-note" style="margin-top:18px">
-  <strong>Via = Refinery</strong> only when we can prove it — the worker connected through parasite.space's Refinery (the <code>.refinery</code> suffix). Everything else is <strong>UNKNOWN</strong>: other rental proxies,
-  <a href="https://app.kissmyhash.com" target="_blank" rel="noopener">Kiss My Hash</a>, or direct hardware all look the same in Parasite's public data (KMH is login-gated and routes hashrate as ordinary workers), so we don't guess.
-</p>
-<p class="muted-note">Leaderboard addresses are masked by Parasite; Refinery order addresses are public. Not financial advice.</p>
+<p class="muted-note">Leaderboard addresses are masked by Parasite. Not financial advice.</p>
 <script>setTimeout(function(){location.reload();},45000);</script>
 `;
 

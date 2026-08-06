@@ -49,22 +49,41 @@ export async function renderCados(): Promise<string> {
   <div class="card"><div class="k">Median gap</div><div class="v">${c.medianGapHours != null ? c.medianGapHours.toFixed(1) + "h" : "—"}</div><div class="sub">between awards</div></div>
 </div>
 
-<h2>Cados awarded over time</h2>
-<canvas id="c_cum" height="80"></canvas>
+<h2>Charts</h2>
+<div class="chartgrid">
+  <div class="chartcard full">
+    <h3>Cados awarded over time</h3>
+    <div class="cwrap"><canvas id="c_cum"></canvas></div>
+  </div>
+  <div class="chartcard">
+    <h3>By hour of day — UTC</h3>
+    <p class="muted-note" style="margin:0 0 8px">Each bar = cados awarded in that hour.</p>
+    <div class="cwrap"><canvas id="c_hour"></canvas></div>
+  </div>
+  <div class="chartcard">
+    <h3>By hour of day — Central (${peakHourC}:00 peak)</h3>
+    <p class="muted-note" style="margin:0 0 8px">Same data in US Central (DST-aware).</p>
+    <div class="cwrap"><canvas id="c_hourC"></canvas></div>
+  </div>
+  <div class="chartcard">
+    <h3>By weekday — UTC</h3>
+    <div class="cwrap"><canvas id="c_dow"></canvas></div>
+  </div>
+  <div class="chartcard">
+    <h3>By weekday — Central${c.count ? ` (${DOW[peakDowC]} peak)` : ""}</h3>
+    <div class="cwrap"><canvas id="c_dowC"></canvas></div>
+  </div>
+</div>
 
-<h2>By hour of day — UTC</h2>
-<p class="muted-note">Do cados cluster at certain hours? Each bar = number of cados awarded in that hour.</p>
-<canvas id="c_hour" height="70"></canvas>
-
-<h2>By hour of day — Central (${peakHourC}:00 peak)</h2>
-<p class="muted-note">Same data, converted to US Central time (America/Chicago, DST-aware).</p>
-<canvas id="c_hourC" height="70"></canvas>
-
-<h2>By weekday — UTC</h2>
-<canvas id="c_dow" height="60"></canvas>
-
-<h2>By weekday — Central${c.count ? ` (${DOW[peakDowC]} peak)` : ""}</h2>
-<canvas id="c_dowC" height="60"></canvas>
+<style>
+.chartgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:22px;margin-top:8px}
+@media(max-width:820px){.chartgrid{grid-template-columns:1fr}}
+.chartcard{border:1px solid var(--line);background:#0a0a0a;padding:18px}
+.chartcard.full{grid-column:1/-1}
+.chartcard h3{margin:0 0 10px;font-size:17px;color:#fff;text-transform:uppercase;letter-spacing:1px;border:0}
+.chartcard .cwrap{position:relative;height:260px}
+.chartcard.full .cwrap{height:300px}
+</style>
 
 <p class="muted-note" style="margin-top:20px">
   <strong>How this is built &amp; its limits:</strong> a cado counts as awarded when it leaves the
@@ -82,27 +101,27 @@ Chart.defaults.color=DIM; Chart.defaults.borderColor=LINE; Chart.defaults.font.f
 new Chart(document.getElementById("c_cum"), {
   type:"line",
   data:{ labels:D.cumLabels, datasets:[{ data:D.cumData, borderColor:GREEN, backgroundColor:"rgba(143,209,79,.08)", fill:true, stepped:true, pointRadius:0 }]},
-  options:{ responsive:true, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{maxTicksLimit:8}, grid:{color:LINE} }, y:{ title:{display:true,text:"cumulative cados"}, grid:{color:LINE}, beginAtZero:true } } }
+  options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{maxTicksLimit:8}, grid:{color:LINE} }, y:{ title:{display:true,text:"cumulative cados"}, grid:{color:LINE}, beginAtZero:true } } }
 });
 new Chart(document.getElementById("c_hour"), {
   type:"bar",
   data:{ labels:D.hourLabels, datasets:[{ data:D.byHour, backgroundColor:"rgba(143,209,79,.55)" }]},
-  options:{ responsive:true, plugins:{legend:{display:false}}, scales:{ x:{ title:{display:true,text:"hour (UTC)"}, grid:{color:LINE} }, y:{ grid:{color:LINE}, beginAtZero:true, ticks:{precision:0} } } }
+  options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ title:{display:true,text:"hour (UTC)"}, grid:{color:LINE} }, y:{ grid:{color:LINE}, beginAtZero:true, ticks:{precision:0} } } }
 });
 new Chart(document.getElementById("c_hourC"), {
   type:"bar",
   data:{ labels:D.hourLabels, datasets:[{ data:D.byHourCentral, backgroundColor:"rgba(143,209,79,.55)" }]},
-  options:{ responsive:true, plugins:{legend:{display:false}}, scales:{ x:{ title:{display:true,text:"hour (Central)"}, grid:{color:LINE} }, y:{ grid:{color:LINE}, beginAtZero:true, ticks:{precision:0} } } }
+  options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ title:{display:true,text:"hour (Central)"}, grid:{color:LINE} }, y:{ grid:{color:LINE}, beginAtZero:true, ticks:{precision:0} } } }
 });
 new Chart(document.getElementById("c_dow"), {
   type:"bar",
   data:{ labels:D.dowLabels, datasets:[{ data:D.byDow, backgroundColor:"rgba(245,196,81,.6)" }]},
-  options:{ responsive:true, plugins:{legend:{display:false}}, scales:{ x:{ grid:{color:LINE} }, y:{ grid:{color:LINE}, beginAtZero:true, ticks:{precision:0} } } }
+  options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ grid:{color:LINE} }, y:{ grid:{color:LINE}, beginAtZero:true, ticks:{precision:0} } } }
 });
 new Chart(document.getElementById("c_dowC"), {
   type:"bar",
   data:{ labels:D.dowLabels, datasets:[{ data:D.byDowCentral, backgroundColor:"rgba(245,196,81,.6)" }]},
-  options:{ responsive:true, plugins:{legend:{display:false}}, scales:{ x:{ grid:{color:LINE} }, y:{ grid:{color:LINE}, beginAtZero:true, ticks:{precision:0} } } }
+  options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ grid:{color:LINE} }, y:{ grid:{color:LINE}, beginAtZero:true, ticks:{precision:0} } } }
 });
 </script>
 `;

@@ -58,7 +58,7 @@ export async function renderOverview(): Promise<string> {
   const [o, lb, blocks] = await Promise.all([
     getOverview(),
     getLeaderboard().catch(() => ({ difficulty: [], loyalty: [] })),
-    getRecentBlocks(13).catch(() => []),
+    getRecentBlocks(26).catch(() => []),
   ]);
   const pm = potMathFromOverview(o);
   const pot = o.potAge;
@@ -75,7 +75,7 @@ ${renderBlocksStrip(blocks)}
 <div class="grid statrow">
   <div class="card"><div class="k">↗ Highest diff since last block</div><div class="v">${fmtDiff(o.pool.highestDiffSinceBlock)}</div><div class="sub">${highestPctOfBlock.toFixed(2)}% of a block</div></div>
   <div class="card"><div class="k">⛏ Total work since last block</div><div class="v">${fmtDiff(o.pool.workSinceLastBlockDiff ?? 0)}</div><div class="sub">${pm.depth.toFixed(2)}× an average round</div></div>
-  <div class="card"><div class="k">↗ Minimum needed diff</div><div class="v">${fmtDiff(o.pool.networkDifficulty)}</div><div class="sub">→ ${pm.nextD}T next retarget</div></div>
+  <div class="card"><div class="k">↗ Minimum needed diff</div><div class="v">${fmtDiff(o.pool.networkDifficulty)}</div><div class="sub">→ ${pm.nextD.toFixed(2)}T next retarget</div></div>
   <div class="card"><div class="k">⚡ Avg to find block</div><div class="v">${fmtDuration(pm.expectedDays * 24)}</div><div class="sub">at ${fmtHashrate(o.pool.poolHashratePhs)} live</div></div>
   <div class="card"><div class="k">🔖 Last block found</div><div class="v">${fmtInt(o.pool.lastFoundHeight)}</div><div class="sub ${potClass}">${pot.verdict === "fresh" ? "🟢" : pot.verdict === "aging" ? "🟡" : "🔴"} ${fmtDuration(pot.hours)} ago</div></div>
   <div class="card"><div class="k">💰 Bitcoin price</div><div class="v">${fmtUsd0(o.pool.btcPriceUsd)}</div><div class="sub">chain tip #${fmtInt(o.chain.height)}</div></div>
@@ -95,9 +95,9 @@ ${renderBlocksStrip(blocks)}
     <div class="k">Historic hashrate</div>
     <p class="muted-note" style="margin:10px 0 16px">Pool hashrate has ranged from a quiet baseline to rental-driven spikes over the last month.</p>
     <div class="grid" style="grid-template-columns:1fr 1fr 1fr; gap:12px">
-      <div><div class="k">1D avg</div><div class="v" style="font-size:30px">${o.pool.avg1dPhs}<small class="dim" style="font-size:15px"> PH/s</small></div><div class="sub">${trendVsLive(o.pool.avg1dPhs, o.pool.poolHashratePhs)} vs live</div></div>
-      <div><div class="k">6D avg</div><div class="v" style="font-size:30px">${o.pool.avg6dPhs}<small class="dim" style="font-size:15px"> PH/s</small></div><div class="sub">${trendVsLive(o.pool.avg6dPhs, o.pool.poolHashratePhs)} vs live</div></div>
-      <div><div class="k">9D avg</div><div class="v" style="font-size:30px">${o.pool.avg9dPhs}<small class="dim" style="font-size:15px"> PH/s</small></div><div class="sub">${trendVsLive(o.pool.avg9dPhs, o.pool.poolHashratePhs)} vs live</div></div>
+      <div><div class="k">1D avg</div><div class="v" style="font-size:30px">${o.pool.avg1dPhs.toFixed(2)}<small class="dim" style="font-size:15px"> PH/s</small></div><div class="sub">${trendVsLive(o.pool.avg1dPhs, o.pool.poolHashratePhs)} vs live</div></div>
+      <div><div class="k">6D avg</div><div class="v" style="font-size:30px">${o.pool.avg6dPhs.toFixed(2)}<small class="dim" style="font-size:15px"> PH/s</small></div><div class="sub">${trendVsLive(o.pool.avg6dPhs, o.pool.poolHashratePhs)} vs live</div></div>
+      <div><div class="k">9D avg</div><div class="v" style="font-size:30px">${o.pool.avg9dPhs.toFixed(2)}<small class="dim" style="font-size:15px"> PH/s</small></div><div class="sub">${trendVsLive(o.pool.avg9dPhs, o.pool.poolHashratePhs)} vs live</div></div>
     </div>
     <p class="muted-note" style="margin-top:18px"><a href="/history">Full historic charts on the Pool page →</a></p>
   </div>
@@ -106,7 +106,7 @@ ${renderBlocksStrip(blocks)}
 <div class="grid" style="grid-template-columns:minmax(280px,1fr) minmax(280px,1fr) minmax(280px,1fr)">
   <div class="card"><div class="k">Users / workers online</div><div class="v">${fmtInt(o.pool.users)} <span class="dim">/</span> ${fmtInt(o.pool.workers)}</div><div class="sub">miners on the pool right now</div></div>
   <div class="card"><div class="k">Refinery hashprice</div><div class="v">${fmtInt(o.pool.hashpriceSatsPerPhd)}</div><div class="sub">sats/PHd · vs 50k baseline: ${o.hashprice.verdict}</div></div>
-  <div class="card"><div class="k">Network difficulty</div><div class="v">${fmtDiff(o.pool.networkDifficulty)}</div><div class="sub">retarget → ${pm.nextD}T</div></div>
+  <div class="card"><div class="k">Network difficulty</div><div class="v">${fmtDiff(o.pool.networkDifficulty)}</div><div class="sub">retarget → ${pm.nextD.toFixed(2)}T</div></div>
 </div>
 
 <h2>Leaderboard — since last block</h2>
