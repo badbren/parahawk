@@ -1,8 +1,10 @@
 import { renderPage } from "../layout.js";
 import { getLeaderboard } from "../../data/parasite.js";
 import { renderCadosBody } from "./cados.js";
-import { fmtDiff, esc } from "../format.js";
+import { getStore } from "../../db/index.js";
+import { fmtDiff, fmtInt, esc } from "../format.js";
 import type { LeaderboardEntry } from "../../data/types.js";
+import type { HitRow } from "../../db/types.js";
 
 const TEN_T = 10e12;
 const TWENTYONE_T = 21e12;
@@ -20,10 +22,24 @@ function bravoBadge(diff: number): string {
 }
 
 export async function renderBoard(): Promise<string> {
-  const [cados, lb] = await Promise.all([
+  const [cados, lb, storedHits] = await Promise.all([
     renderCadosBody().catch(() => ""),
     getLeaderboard(),
+    getStore().getHitsSince(0, 500).catch(() => [] as HitRow[]),
   ]);
+
+  const tenTHits = storedHits.filter((h) => h.difficulty >= TEN_T).sort((a, b) => b.ts - a.ts);
+  const hitRows =
+    tenTHits.length === 0
+      ? `<tr><td colspan="4" class="dim">no 10T+ hits recorded yet — fills in as Parahawk polls</td></tr>`
+      : tenTHits
+          .map(
+            (h) =>
+              `<tr><td class="dim">${esc(new Date(h.ts).toLocaleString("en-US"))}</td><td>${addrCell(
+                h.address,
+              )}</td><td>${fmtDiff(h.difficulty)}</td><td>${bravoBadge(h.difficulty)}</td></tr>`,
+          )
+          .join("");
 
   const bravocados = lb.difficulty
     .filter((e) => (e.bestDiff ?? 0) >= TEN_T)
@@ -53,6 +69,16 @@ export async function renderBoard(): Promise<string> {
 <p class="lead">When each Bravocado dropped, and who's in the 10T+ club this round. Auto-refreshes every 45s.</p>
 
 ${cados}
+
+<h2>All-time 10T+ hits <span class="dim" style="font-size:13px">· Parahawk-recorded</span></h2>
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+  <div class="card"><div class="k">10T+ hits recorded</div><div class="v">${fmtInt(tenTHits.length)}</div><div class="sub">top share ≥10T per block, since Parahawk started polling</div></div>
+</div>
+<div class="tscroll" style="margin-top:12px"><table>
+  <thead><tr><th>When</th><th>Address</th><th>Best diff</th><th>Tier</th></tr></thead>
+  <tbody>${hitRows}</tbody>
+</table></div>
+<p class="muted-note">Parahawk records the top Parasite share per block from its own polling, so this count grows over time and won't retroactively match every historical cado — the awards above are reconstructed from complete on-chain history. Addresses here are masked by Parasite's feed.</p>
 
 <h2>10T+ club &amp; top difficulties — current round</h2>
 <div class="stale" style="background:#0d1408;border-color:#33501f;color:#c7f59a">
@@ -89,10 +115,11 @@ ${cados}
 .board2col table{margin:0}
 .board2col th,.board2col td{padding:6px 9px;font-size:13px}
 .board2col th{font-size:11px}
-.board2col .tscroll{max-height:600px;overflow-y:auto;border:1px solid var(--line)}
-.board2col thead th{position:sticky;top:0;background:#0d0d0d;z-index:1}
-.board2col .tscroll::-webkit-scrollbar{width:8px}
-.board2col .tscroll::-webkit-scrollbar-thumb{background:#222;border-radius:4px}
+.tscroll{max-height:600px;overflow-y:auto;border:1px solid var(--line)}
+.tscroll table{margin:0}
+.tscroll thead th{position:sticky;top:0;background:#0d0d0d;z-index:1}
+.tscroll::-webkit-scrollbar{width:8px}
+.tscroll::-webkit-scrollbar-thumb{background:#222;border-radius:4px}
 </style>
 <script>setTimeout(function(){location.reload();},45000);</script>
 `;
