@@ -3,7 +3,7 @@ import { getOverview } from "../../services/overview.js";
 import { potMathFromOverview } from "../../services/potmath.js";
 import { getLeaderboard } from "../../data/parasite.js";
 import { getRecentBlocks, renderBlocksStrip } from "../../data/blocks.js";
-import { hashrateGauge, niceGaugeMax } from "../gauge.js";
+import { hashrateGauge, gaugeScaleFor } from "../gauge.js";
 import type { LeaderboardEntry } from "../../data/types.js";
 import {
   fmtHashrate,
@@ -64,9 +64,9 @@ export async function renderOverview(): Promise<string> {
   const pot = o.potAge;
   const potClass = pot.verdict === "fresh" ? "green" : pot.verdict === "aging" ? "amber" : "red";
   const powerPct = (o.pool.poolHashratePhs / GAUGE_MAX) * 100;
-  // Dial auto-scales to a nice round number above the current reading, so the
-  // needle sits mid-dial and the scale grows in clean steps as hashrate climbs.
-  const gaugeMax = niceGaugeMax(o.pool.poolHashratePhs);
+  // Dial full-scale = 5× the reading, sticky in ±25% bands (100→500, holds
+  // until <75 or >125, then re-anchors). Stateless — see gaugeScaleFor.
+  const gaugeMax = gaugeScaleFor(o.pool.poolHashratePhs);
   const highestPctOfBlock = (o.pool.highestDiffSinceBlock / o.pool.networkDifficulty) * 100;
 
   const body = `

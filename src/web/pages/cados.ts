@@ -1,6 +1,5 @@
-import { renderPage } from "../layout.js";
 import { getCadoData } from "../../services/cados.js";
-import { fmtInt } from "../format.js";
+import { fmtInt, jsonForScript } from "../format.js";
 
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -9,7 +8,9 @@ function dateLabel(ms: number): string {
   return `${d.toLocaleString("en-US", { month: "short" })} ${d.getUTCDate()}`;
 }
 
-export async function renderCados(): Promise<string> {
+/** The Bravocado-awards analytics section (cards + charts), no page chrome —
+ * folded into the Bravocados board page. */
+export async function renderCadosBody(): Promise<string> {
   const c = await getCadoData();
 
   // cumulative timeline points
@@ -21,7 +22,7 @@ export async function renderCados(): Promise<string> {
   const peakHourC = c.byHourCentral.indexOf(Math.max(...c.byHourCentral, 0));
   const peakDowC = c.byDowCentral.indexOf(Math.max(...c.byDowCentral, 0));
 
-  const data = JSON.stringify({
+  const data = jsonForScript({
     cumLabels,
     cumData,
     hourLabels,
@@ -38,8 +39,8 @@ export async function renderCados(): Promise<string> {
       : "—";
 
   const body = `
-<h1>Bravocado awards 🥑</h1>
-<p class="lead">When each Bravocado was handed out — reconstructed on-chain from the OMB dispensary wallet's transfers. ${c.ok ? "" : "<span class='amber'>(live fetch failed — showing what we have)</span>"}</p>
+<h2>Bravocado awards 🥑</h2>
+<p class="muted-note" style="margin:-4px 0 18px">When each Bravocado was handed out — reconstructed on-chain from the OMB dispensary wallet's transfers. ${c.ok ? "" : "<span class='amber'>(live fetch failed — showing what we have)</span>"}</p>
 
 <div class="grid">
   <div class="card"><div class="k">Cados awarded</div><div class="v">${fmtInt(c.count)}</div><div class="sub">on-chain transfers</div></div>
@@ -126,5 +127,5 @@ new Chart(document.getElementById("c_dowC"), {
 </script>
 `;
 
-  return renderPage({ title: "Bravocado awards", active: "awards", body });
+  return body;
 }

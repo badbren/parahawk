@@ -102,6 +102,16 @@ export async function currentPotHours(): Promise<number> {
   return o.potAge.hours;
 }
 
+/**
+ * Run ONE poll cycle (collect + block-check + hits). Used by the Vercel Cron
+ * endpoint on serverless, where there's no long-lived process for setInterval.
+ * Module state resets between invocations, but checkBlock re-inits from the
+ * store and insertHits dedupes by id, so a stateless per-tick run is correct.
+ */
+export async function runPollOnce(): Promise<void> {
+  await Promise.allSettled([collect(), checkBlock(), collectHits()]);
+}
+
 export function startPollers(): void {
   const store = getStore();
   console.log(`🗄  store=${store.kind}  poll=${config.pollIntervalSeconds}s  block=${config.blockPollIntervalSeconds}s`);

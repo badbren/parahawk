@@ -1,12 +1,13 @@
 import { renderPage } from "../layout.js";
 import { getLeaderboard } from "../../data/parasite.js";
-import { fmtDiff, fmtInt, esc } from "../format.js";
+import { renderCadosBody } from "./cados.js";
+import { fmtDiff, esc } from "../format.js";
 import type { LeaderboardEntry } from "../../data/types.js";
 
 const TEN_T = 10e12;
 const TWENTYONE_T = 21e12;
 
-/** A full bc1/3/1 address (Refinery) gets a link; masked ones don't. */
+/** A full bc1/3/1 address gets a link; masked ones don't. */
 function addrCell(address: string): string {
   const masked = address.includes("...");
   const short = masked ? address : `${address.slice(0, 12)}…${address.slice(-4)}`;
@@ -19,7 +20,10 @@ function bravoBadge(diff: number): string {
 }
 
 export async function renderBoard(): Promise<string> {
-  const lb = await getLeaderboard();
+  const [cados, lb] = await Promise.all([
+    renderCadosBody().catch(() => ""),
+    getLeaderboard(),
+  ]);
 
   const bravocados = lb.difficulty
     .filter((e) => (e.bestDiff ?? 0) >= TEN_T)
@@ -27,73 +31,67 @@ export async function renderBoard(): Promise<string> {
 
   const bravoRows =
     bravocados.length === 0
-      ? `<tr><td colspan="4" class="dim">no 10T+ miners in the current round yet</td></tr>`
+      ? `<tr><td colspan="4" class="dim">no 10T+ miners this round yet</td></tr>`
       : bravocados
           .map(
-            (e, i) => `<tr>
-              <td class="dim">${i + 1}</td>
-              <td>${addrCell(e.address)}</td>
-              <td>${fmtDiff(e.bestDiff ?? 0)}</td>
-              <td>${bravoBadge(e.bestDiff ?? 0)}</td>
-            </tr>`,
+            (e, i) => `<tr><td class="dim">${i + 1}</td><td>${addrCell(e.address)}</td><td>${fmtDiff(
+              e.bestDiff ?? 0,
+            )}</td><td>${bravoBadge(e.bestDiff ?? 0)}</td></tr>`,
           )
           .join("");
 
   const diffRows = lb.difficulty
     .slice(0, 25)
     .map(
-      (e: LeaderboardEntry) => `<tr>
-        <td class="dim">${e.rank}</td>
-        <td>${addrCell(e.address)}</td>
-        <td>${fmtDiff(e.bestDiff ?? 0)}</td>
-      </tr>`,
-    )
-    .join("");
-
-  const loyaltyRows = lb.loyalty
-    .slice(0, 25)
-    .map(
-      (e) => `<tr>
-        <td class="dim">${e.rank}</td>
-        <td>${addrCell(e.address)}</td>
-        <td>${fmtInt(e.blocks ?? 0)}</td>
-      </tr>`,
+      (e: LeaderboardEntry) =>
+        `<tr><td class="dim">${e.rank}</td><td>${addrCell(e.address)}</td><td>${fmtDiff(e.bestDiff ?? 0)}</td></tr>`,
     )
     .join("");
 
   const body = `
-<h1>Miners &amp; Bravocados 🥑</h1>
-<p class="lead">Live from Parasite's leaderboards. Auto-refreshes every 45s.</p>
+<h1>Bravocados 🥑</h1>
+<p class="lead">When each Bravocado dropped, and who's in the 10T+ club this round. Auto-refreshes every 45s.</p>
 
-<h2>🥑 Bravocado board — 10T+ club</h2>
+${cados}
+
+<h2>10T+ club &amp; top difficulties — current round</h2>
 <div class="stale" style="background:#0d1408;border-color:#33501f;color:#c7f59a">
   Land a big share on Parasite and you earn a <strong>Bravocado</strong> — an
   <a href="https://ordinalmaxibiz.wiki/bravocados" target="_blank" rel="noopener">OMB companion ordinal</a>
-  (1,002 on-chain avocados; the first 100 go one-at-a-time to miners who hit, in order, from the dispensary wallet).
-  Browse the collection on the <a href="https://ordinalmaxibiz.wiki/bravocados" target="_blank" rel="noopener">Bravocados wiki</a>
-  and the <a href="https://ordinalmaxibiz.wiki/explorer" target="_blank" rel="noopener">OMB explorer</a>.
+  (1,002 on-chain avocados; the first 100 go one-at-a-time to miners who hit, in order). Browse the
+  <a href="https://ordinalmaxibiz.wiki/bravocados" target="_blank" rel="noopener">Bravocados wiki</a> ·
+  <a href="https://ordinalmaxibiz.wiki/explorer" target="_blank" rel="noopener">OMB explorer</a>.
 </div>
-<p class="muted-note">Every miner whose best difficulty this round is 10T or higher. 🥑 10T+ · 🏠 21T+ (homeminers). Best-diff per miner is what Parasite exposes; per-miner hit counts aren't public (the share feed is anonymised).</p>
-<table>
-  <tr><th>#</th><th>Address</th><th>Best difficulty</th><th>Tier</th></tr>
-  ${bravoRows}
-</table>
 
-<h2>Top difficulties (current round)</h2>
-<table>
-  <tr><th>#</th><th>Address</th><th>Best diff</th></tr>
-  ${diffRows}
-</table>
+<div class="board2col">
+  <div class="btable">
+    <h3>🥑 Bravocado Board — 10T+ club</h3>
+    <table>
+      <tr><th>#</th><th>Address</th><th>Best diff</th><th>Tier</th></tr>
+      ${bravoRows}
+    </table>
+  </div>
+  <div class="btable">
+    <h3>Top difficulties — current round</h3>
+    <table>
+      <tr><th>#</th><th>Address</th><th>Best diff</th></tr>
+      ${diffRows}
+    </table>
+  </div>
+</div>
 
-<h2>Top loyalty (blocks participated)</h2>
-<table>
-  <tr><th>#</th><th>Address</th><th>Blocks</th></tr>
-  ${loyaltyRows}
-</table>
+<p class="muted-note" style="margin-top:16px">Every miner whose best difficulty this round is 10T+. 🥑 10T+ · 🏠 21T+ (homeminers). Leaderboard addresses are masked by Parasite; per-miner hit counts aren't public. Not financial advice.</p>
 
-<p class="muted-note">Leaderboard addresses are masked by Parasite. Not financial advice.</p>
+<style>
+.board2col{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:8px}
+@media(max-width:820px){.board2col{grid-template-columns:1fr}}
+.board2col .btable h3{margin:0 0 8px;font-size:15px;color:#fff;text-transform:uppercase;letter-spacing:1px}
+.board2col table{margin:0}
+.board2col th,.board2col td{padding:6px 9px;font-size:13px}
+.board2col th{font-size:11px}
+</style>
 <script>setTimeout(function(){location.reload();},45000);</script>
 `;
 
-  return renderPage({ title: "Miners & Bravocados", active: "bravocados", body });
+  return renderPage({ title: "Bravocados", active: "bravocados", body });
 }

@@ -414,8 +414,21 @@ interface AccountApi {
   account?: { total_diff?: number; metadata?: { block_count?: number } } | null;
 }
 
+/**
+ * Short-TTL cache for /address lookups. Each getUserStats() call fans out to 4
+ * upstream endpoints, so we memoize per-address for a few seconds to stop a
+ * refresh/scrape from multiplying that fan-out. TTL is deliberately small so the
+ * page still feels live.
+ */
+const USER_STATS_TTL_MS = 45_000;
+const userStatsCache = new Map<string, { v: UserStats; exp: number }>();
+
 export async function getUserStats(address: string): Promise<UserStats> {
   if (config.mockData) return mockUserStats(address);
+
+  const now = Date.now();
+  const cachedUser = userStatsCache.get(address);
+  if (cachedUser && cachedUser.exp > now) return cachedUser.v;
 
   // Confirmed real shapes (parasite.space):
   //   /api/user/<addr>            → hashrate(H/s), workers, bestDifficulty("906G"), workerData[]
@@ -427,7 +440,7 @@ export async function getUserStats(address: string): Promise<UserStats> {
     fetchJson<UserApi>(`${base()}/api/user/${encoded}`).catch(() => ({}) as UserApi),
     fetchJson<AccountApi>(`${base()}/api/account/${encoded}`).catch(() => ({}) as AccountApi),
     fetchJson<HighestDiffRow[]>(
-      `${base()}/api/highest-diff?address=${encoded}&type=user-diffs&limit=500`,
+      `${base()}/api/highest-diff?address=${encoded}&type=user-diffs&limit=100`,
     ).catch(() => [] as HighestDiffRow[]),
     getRouterOrders().catch(() => [] as Array<RefineryOrder & { address: string }>),
   ]);
@@ -444,7 +457,7 @@ export async function getUserStats(address: string): Promise<UserStats> {
     }))
     .sort((a, b) => b.hashratePhs - a.hashratePhs);
 
-  return {
+  const result: UserStats = {
     address,
     hashratePhs: Number(user.hashrate ?? 0) / H_PER_PH,
     bestDifficulty,
@@ -455,6 +468,8 @@ export async function getUserStats(address: string): Promise<UserStats> {
     blockCount: account.account?.metadata?.block_count,
     uptime: user.uptime,
   };
+  userStatsCache.set(address, { v: result, exp: now + USER_STATS_TTL_MS });
+  return result;
 }
 
 // ── freshness ─────────────────────────────────────────────────────────────────

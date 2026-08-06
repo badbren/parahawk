@@ -33,7 +33,7 @@ const CARDS: WikiCard[] = [
 export async function renderWiki(): Promise<string> {
   const cards = CARDS.map(
     (c) => `
-    <a class="wcard" href="/leaving?url=${encodeURIComponent(c.url)}">
+    <a class="wcard" href="${esc(c.url)}" target="_blank" rel="noopener noreferrer">
       <span class="whead">${esc(c.title)}</span>
       <span class="wimg"><img class="${c.pixel ? "pixel" : ""}" src="${esc(c.img)}" alt="${esc(c.alt)}"/></span>
       <span class="wgo">visit wiki ↗</span>
@@ -42,13 +42,14 @@ export async function renderWiki(): Promise<string> {
 
   const body = `
 <h1>Mr.V Wiki 📚</h1>
-<p class="lead">Two cracking wikis Mr.V built for the community. Click an image to head over — we'll warn you before leaving Parahawk.</p>
+<p class="lead">Two cracking wikis Mr.V built for the community. Click an image to head over.</p>
 
 <div class="wgrid">
   ${cards}
 </div>
 
-<p class="muted-note" style="margin-top:26px">External sites, not affiliated with Parahawk. Big thanks to Mr.V 🙏</p>
+<p class="muted-note" style="margin-top:26px">External sites, not affiliated with Parahawk.</p>
+<p class="muted-note">💚 <strong>Thank Mr.V by donating</strong> to support his site: <span style="color:var(--green);word-break:break-all">bc1qfrt77mfrcrvjxcq7ahcgtm7w4czl6eftk4jk2c</span></p>
 
 <style>
 .wgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:26px;margin-top:10px}

@@ -1,4 +1,6 @@
 import express from "express";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { config } from "../config.js";
 import { renderOverview } from "./pages/overview.js";
 import { renderHistory } from "./pages/history.js";
@@ -8,7 +10,6 @@ import { renderWiki } from "./pages/wiki.js";
 import { renderLeaving } from "./pages/leaving.js";
 import { renderBoard } from "./pages/board.js";
 import { renderOrderBooks } from "./pages/order-books.js";
-import { renderCados } from "./pages/cados.js";
 import { renderAddress } from "./pages/address.js";
 import { getOverview } from "../services/overview.js";
 import { getPoolStatsSeries, type PoolWindow } from "../data/parasite.js";
@@ -56,7 +57,9 @@ function page(render: () => Promise<string>) {
     try {
       res.type("html").send(await render());
     } catch (err) {
-      res.status(500).type("text").send(`error: ${(err as Error).message}`);
+      // Log server-side; never echo err.message (it can leak upstream URLs).
+      console.error("[page] render failed:", err);
+      res.status(500).type("text").send("internal error");
     }
   };
 }
@@ -65,13 +68,60 @@ export function createServer(): express.Express {
   const app = express();
   app.disable("x-powered-by");
 
+  // Security headers (finding #3). CSP is set explicitly rather than using
+  // helmet's strict default because the pages rely on inline <script>/<style>
+  // and the Chart.js CDN. Finding #1's jsonForScript is the real XSS fix; this
+  // CSP is defense-in-depth.
+  // TODO: tighten to nonces / self-host chart.js so we can drop 'unsafe-inline'
+  // and the jsdelivr allowance.
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        useDefaults: false,
+        directives: {
+          "default-src": ["'self'"],
+          "img-src": ["'self'", "data:"],
+          "style-src": ["'self'", "'unsafe-inline'"],
+          "script-src": ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+          "connect-src": ["'self'"],
+          "frame-ancestors": ["'none'"],
+          "base-uri": ["'self'"],
+        },
+      },
+      // X-Content-Type-Options: nosniff (helmet default), Referrer-Policy, deny
+      // framing, and HSTS (a no-op until behind TLS, safe to include).
+      referrerPolicy: { policy: "no-referrer" },
+      frameguard: { action: "deny" },
+      hsts: { maxAge: 15552000 },
+    }),
+  );
+
+  // Rate limiting (finding #2): a generous global cap plus a tighter cap on the
+  // upstream-fanning /address and /api/* routes.
+  const globalLimiter = rateLimit({
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+  });
+  const upstreamLimiter = rateLimit({
+    windowMs: 60_000,
+    limit: 30,
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+  });
+  app.use(globalLimiter);
+  app.use("/address", upstreamLimiter);
+  app.use("/api", upstreamLimiter);
+
   // Static assets (wiki images, etc.) served from ./public at /assets.
   app.use("/assets", express.static("public", { maxAge: "1h" }));
 
   app.get("/", page(renderOverview));
   app.get("/board", page(renderBoard));
   app.get("/order-books", page(renderOrderBooks));
-  app.get("/cados", page(renderCados));
+  // Awards merged into the Bravocados board — redirect old links.
+  app.get("/cados", (_req, res) => res.redirect(301, "/board"));
   app.get("/history", page(renderHistory));
   app.get("/potmath", page(renderPotMath));
   // /luck and /calc folded into /potmath — redirect old links.
@@ -83,7 +133,8 @@ export function createServer(): express.Express {
     try {
       res.type("html").send(await renderLeaving(String(req.query.url ?? "")));
     } catch (err) {
-      res.status(500).type("text").send(`error: ${(err as Error).message}`);
+      console.error("[/leaving] failed:", err);
+      res.status(500).type("text").send("internal error");
     }
   });
 
@@ -91,7 +142,8 @@ export function createServer(): express.Express {
     try {
       res.type("html").send(await renderAddress(req.params.addr));
     } catch (err) {
-      res.status(500).type("text").send(`error: ${(err as Error).message}`);
+      console.error("[/address] failed:", err);
+      res.status(500).type("text").send("internal error");
     }
   });
 
@@ -100,7 +152,8 @@ export function createServer(): express.Express {
     try {
       res.json(await getOverview());
     } catch (err) {
-      res.status(500).json({ error: (err as Error).message });
+      console.error("[/api/overview] failed:", err);
+      res.status(500).json({ error: "internal error" });
     }
   });
 
@@ -111,7 +164,8 @@ export function createServer(): express.Express {
       const window = String(req.query.window ?? "1d");
       res.json(await getPoolHistory(metric, window));
     } catch (err) {
-      res.status(500).json({ error: (err as Error).message });
+      console.error("[/api/pool-history] failed:", err);
+      res.status(500).json({ error: "internal error" });
     }
   });
 

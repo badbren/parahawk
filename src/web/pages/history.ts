@@ -1,7 +1,7 @@
 import { renderPage } from "../layout.js";
 import { getHistory } from "../../services/history.js";
 import { getPoolStatsSeries, type PoolSeries } from "../../data/parasite.js";
-import { fmtInt, fmtDiff, esc } from "../format.js";
+import { fmtInt, fmtDiff, esc, jsonForScript } from "../format.js";
 
 function maskAddr(a: string): string {
   if (a.includes("...") || a.includes("…")) return a;
@@ -80,7 +80,7 @@ export async function renderHistory(): Promise<string> {
     when: new Date(x.ts).toLocaleString("en-US"),
   }));
 
-  const data = JSON.stringify({
+  const data = jsonForScript({
     hrLabels,
     hrVals,
     hpLabels,

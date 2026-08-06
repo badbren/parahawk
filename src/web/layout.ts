@@ -24,12 +24,11 @@ const NAV_GROUPS: Array<Array<[string, string]>> = [
     ["/history", "pool"],
   ],
   [
-    ["/potmath", "pot math"],
+    ["/potmath", "calculator"],
     ["/order-books", "order books"],
   ],
   [
     ["/board", "bravocados"],
-    ["/cados", "awards"],
     ["/wiki", "mr.v wiki"],
   ],
   [["/about", "about"]],
@@ -54,9 +53,7 @@ header.top{border-bottom:1px solid var(--line); padding:20px 0; position:sticky;
 header.top .wrap{display:flex; align-items:center; gap:28px; flex-wrap:wrap}
 .brand{display:inline-flex; align-items:center; gap:10px; border:0; line-height:0}
 .brand .phlogo{display:block}
-nav{display:flex; gap:24px; flex-wrap:wrap; align-items:center}
-.navgroup{display:inline-flex; gap:24px; flex-wrap:wrap; align-items:center}
-.navsep{color:#3a3a3a; user-select:none; font-size:30px}
+nav{display:flex; gap:26px; flex-wrap:wrap; align-items:center}
 nav a{
   border:0; color:var(--dim); text-transform:uppercase;
   font-family:Impact,"Arial Narrow","Arial Black",sans-serif; font-weight:900;
@@ -64,7 +61,7 @@ nav a{
   filter:url(#nav-rough);
 }
 nav a.active,nav a:hover{color:#fff}
-.addrsearch{display:flex; gap:0; flex:0 0 auto; width:250px; align-self:center; margin-left:8px}
+.addrsearch{display:flex; gap:0; flex:1 1 260px; min-width:220px; align-self:center; margin-left:8px}
 .addrsearch input{background:#0a0a0a; border:1px solid var(--line); border-right:0; color:var(--fg); padding:8px 12px; width:100%; font-size:14px}
 .addrsearch input::placeholder{color:#5a5a5a}
 .addrsearch button{background:#0a0a0a; border:1px solid var(--line); color:var(--dim); padding:0 12px; cursor:pointer; font-size:16px; text-transform:none; letter-spacing:0}
@@ -104,15 +101,12 @@ footer.bot img{image-rendering:pixelated}
 `;
 
 export async function renderPage(opts: PageOpts): Promise<string> {
-  const nav = NAV_GROUPS.map(
-    (group) =>
-      `<span class="navgroup">${group
-        .map(
-          ([href, key]) =>
-            `<a href="${href}" class="${opts.active === key ? "active" : ""}">${key}</a>`,
-        )
-        .join("")}</span>`,
-  ).join(`<span class="navsep" aria-hidden="true">·</span>`);
+  const nav = NAV_GROUPS.flat()
+    .map(
+      ([href, key]) =>
+        `<a href="${href}" class="${opts.active === key ? "active" : ""}">${key}</a>`,
+    )
+    .join("");
 
   const qr = await tipQrDataUrl();
   const addr = config.lightningAddress;

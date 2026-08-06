@@ -3,7 +3,7 @@ import { getOverview } from "../../services/overview.js";
 import { potMathFromOverview } from "../../services/potmath.js";
 import { potMathCard } from "../potmath-card.js";
 import { getLuckAudit, type LuckCell } from "../../services/luck.js";
-import { fmtInt, fmtPhd, timeAgo } from "../format.js";
+import { fmtInt, fmtPhd, timeAgo, jsonForScript } from "../format.js";
 import {
   RATE_10T_PHD,
   RATE_21T_PHD,
@@ -62,7 +62,7 @@ export async function renderPotMath(): Promise<string> {
       `<span class="pmk" style="left:${((d / PBAR_MAX_DEPTH) * 100).toFixed(1)}%"><i></i><b>${label}</b></span>`,
   ).join("");
 
-  const consts = JSON.stringify({
+  const consts = jsonForScript({
     RATE_10T_PHD,
     RATE_21T_PHD,
     RATE_BLOCK_PHD,
@@ -128,8 +128,8 @@ export async function renderPotMath(): Promise<string> {
   }
 
   const body = `
-<h1>Pot Math</h1>
-<p class="lead">The four numbers that describe the current round — depth, rarity, share price, and expected wait — from live pool data, refreshed every 30s. Scorekeeping, never a forecast.</p>
+<h1>Calculator</h1>
+<p class="lead">The four numbers that describe the current round — depth, rarity, share price, and expected wait — from live pool data, plus a what-if calculator. Scorekeeping, never a forecast.</p>
 
 ${potMathCard(pm)}
 
@@ -314,8 +314,8 @@ table.heat td.cell{width:26px;height:20px;border:1px solid #000}
 `;
 
   return renderPage({
-    title: "Pot Math",
-    active: "pot math",
+    title: "Calculator",
+    active: "calculator",
     body,
     staleBanner: pm.stale
       ? `Upstream data looks stale (pool last ok ${timeAgo(pm.lastSuccess)}). Showing last-good values.`

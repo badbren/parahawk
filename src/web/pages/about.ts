@@ -20,14 +20,14 @@ export async function renderAbout(): Promise<string> {
         ${qr ? `<img src="${qr}" width="180" height="180" alt="tip QR"/>` : ""}
         <div>
           <div style="font-size:16px;color:#fff">⚡ Tip the hawk</div>
-          <p class="muted-note">Parahawk is free and always will be — no ads, no paywalls, no tracking. Tips cover the $5/mo VPS.</p>
+          <p class="muted-note">Parahawk is free and always will be — no ads, no paywalls, no tracking. Tips keep it running.</p>
           <div class="addr" style="font-size:15px">${esc(addr)}</div>
         </div>
       </div>`
     : `<p class="muted-note">⚡ The maintainer hasn't set a Lightning tip address yet (set <code>LIGHTNING_ADDRESS</code>).</p>`;
 
   const body = `
-<h1>About Parahawk 🦅</h1>
+<h1>About Parahawk</h1>
 <p class="lead">A free, tip-funded stats &amp; alerts platform for the <a href="https://parasite.space" target="_blank" rel="noopener">Parasite Pool</a> bitcoin mining community.</p>
 
 <h2>What it does</h2>

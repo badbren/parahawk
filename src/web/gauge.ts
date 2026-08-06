@@ -56,22 +56,27 @@ function arc(r: number, a0: number, a1: number): string {
   return `M ${f(s.x)} ${f(s.y)} A ${r} ${r} 0 ${large} 1 ${f(e.x)} ${f(e.y)}`;
 }
 
-/** Round `x` up to the next 1/2/2.5/5 ×10ⁿ "nice" number. */
-function niceCeil(x: number): number {
-  const exp = Math.floor(Math.log10(x));
-  const base = Math.pow(10, exp);
-  const frac = x / base; // in [1, 10)
-  const step = frac <= 1 ? 1 : frac <= 2 ? 2 : frac <= 2.5 ? 2.5 : frac <= 5 ? 5 : 10;
-  return step * base;
+/** Round to 2 significant figures, for clean full-scale numbers. */
+function round2sig(x: number): number {
+  if (x <= 0) return 0;
+  const mag = Math.pow(10, Math.floor(Math.log10(x)) - 1);
+  return Math.round(x / mag) * mag;
 }
 
 /**
- * The "nice" full-scale value the dial auto-scales to for a given reading:
- * a round 1/2/2.5/5 ×10ⁿ number ~1.6× the value, so the needle sits mid-dial
- * with headroom and the scale grows in clean steps as hashrate climbs.
+ * Full-scale value for the dial: 5× the current reading, but "sticky" so it
+ * doesn't jitter every refresh. The value range is tiled into bands of
+ * [centre·0.75, centre·1.25] with centres at 100·(5/3)ᵏ, anchored so that a
+ * reading of 100 PH/s → a 500 full-scale that holds until the reading drops
+ * below 75 or rises above 125, then re-anchors to the next band (5× the new
+ * centre). Stateless & deterministic — the same reading always yields the same
+ * scale, so it survives serverless (no server-side memory needed).
  */
-export function niceGaugeMax(value: number): number {
-  return value > 0 ? niceCeil(value * 1.6) : 100;
+const GAUGE_BAND_RATIO = 5 / 3;
+export function gaugeScaleFor(value: number): number {
+  if (!(value > 0)) return 100;
+  const k = Math.floor(Math.log(value / 75) / Math.log(GAUGE_BAND_RATIO));
+  return round2sig(500 * Math.pow(GAUGE_BAND_RATIO, k));
 }
 
 /** Format a scale label: whole numbers when the step is >= 1, else 1 dp. */
@@ -92,7 +97,7 @@ function fmtTick(v: number, step: number): string {
  */
 export function hashrateGauge(opts: GaugeOpts): string {
   const value = opts.value;
-  const max = opts.max ?? niceGaugeMax(value);
+  const max = opts.max ?? gaugeScaleFor(value);
   const unit = opts.unit ?? "PH/s";
   const size = opts.size ?? 340;
   const id = opts.id ?? "gauge";
