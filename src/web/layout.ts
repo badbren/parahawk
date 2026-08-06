@@ -73,8 +73,8 @@ nav a.active,nav a:hover{color:#fff}
 main{padding:38px 0 80px}
 h1{font-size:34px; margin:0 0 8px; color:#fff}
 h2{font-size:24px; margin:48px 0 16px; color:#fff; text-transform:uppercase; letter-spacing:1.5px; border-bottom:1px solid var(--line); padding-bottom:10px}
-h3{font-size:19px}
-p.lead{color:var(--dim); margin:0 0 28px; font-size:22px}
+h3{font-size:19px; margin:28px 0 12px; color:#fff}
+p.lead{color:var(--dim); margin:0 0 28px; font-size:22px; max-width:74ch; line-height:1.5}
 .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:18px}
 .card{border:1px solid var(--line); padding:22px; background:#0a0a0a}
 .card .k{color:var(--dim); font-size:15px; text-transform:uppercase; letter-spacing:1px}
@@ -100,7 +100,7 @@ footer.bot .wrap{display:flex; gap:40px; align-items:center; flex-wrap:wrap; jus
 footer.bot img{image-rendering:pixelated}
 .tip{display:flex; gap:20px; align-items:center}
 .tip .addr{color:var(--green); word-break:break-all}
-.muted-note{color:var(--dim); font-size:16px}
+.muted-note{color:var(--dim); font-size:16px; max-width:82ch; line-height:1.55}
 `;
 
 export async function renderPage(opts: PageOpts): Promise<string> {

@@ -33,9 +33,9 @@ export async function renderAbout(): Promise<string> {
 <h2>What it does</h2>
 <ul>
   <li><strong>Live overview</strong> — pot age, pool hashrate, Refinery hashprice, network difficulty, BTC price, users/workers.</li>
-  <li><strong>History</strong> — charts from Parahawk's own time series: hashrate, hashprice, and every completed pot cycle.</li>
-  <li><strong>Luck audit</strong> — the myth-buster: hits-per-PHd bucketed by hour and weekday, from collected data.</li>
-  <li><strong>Calculator</strong> — your odds of a 10T/21T share or a block for any amount of work.</li>
+  <li><strong>Pool history</strong> — charts with 1H/4H/1D/1W timeframes: hashrate, hashprice, users/workers, and every completed pot cycle.</li>
+  <li><strong>Pot Math</strong> — round depth, rarity, share price and expected wait, the luck audit (hits-per-PHd by hour &amp; weekday), and a what-if / rental-odds calculator.</li>
+  <li><strong>Order Books</strong> — the live Refinery rental order book.</li>
   <li><strong>Discord bot</strong> — block alerts plus <code>/pot</code>, <code>/price</code>, <code>/odds</code>, <code>/odometer</code>, <code>/watch</code>.</li>
 </ul>
 
@@ -56,7 +56,7 @@ export async function renderAbout(): Promise<string> {
   <tr><td>🏠 homeminers (21T+)</td><td>~${RATE_21T_PHD} PHd</td><td>one 21T+ share expected per ${RATE_21T_PHD} PHd</td></tr>
   <tr><td>🎰 Block</td><td>~${RATE_BLOCK_PHD} PHd</td><td>one block expected per ${RATE_BLOCK_PHD} PHd at ~127T difficulty</td></tr>
 </table>
-<p class="muted-note">1 PHd = ${(PHD_TO_DIFF / 1e9).toFixed(1)}G difficulty units. A miner's best difficulty typically lands around 1–1.5× their total accumulated work. Try the <a href="/calc">calculator</a>.</p>
+<p class="muted-note">1 PHd = ${(PHD_TO_DIFF / 1e9).toFixed(1)}G difficulty units. A miner's best difficulty typically lands around 1–1.5× their total accumulated work. Try the <a href="/potmath">Pot Math calculator</a>.</p>
 
 <h2>Support</h2>
 ${tip}
