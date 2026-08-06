@@ -65,6 +65,15 @@ function niceCeil(x: number): number {
   return step * base;
 }
 
+/**
+ * The "nice" full-scale value the dial auto-scales to for a given reading:
+ * a round 1/2/2.5/5 ×10ⁿ number ~1.6× the value, so the needle sits mid-dial
+ * with headroom and the scale grows in clean steps as hashrate climbs.
+ */
+export function niceGaugeMax(value: number): number {
+  return value > 0 ? niceCeil(value * 1.6) : 100;
+}
+
 /** Format a scale label: whole numbers when the step is >= 1, else 1 dp. */
 function fmtTick(v: number, step: number): string {
   if (Math.abs(v) < 1e-9) return "0";
@@ -83,7 +92,7 @@ function fmtTick(v: number, step: number): string {
  */
 export function hashrateGauge(opts: GaugeOpts): string {
   const value = opts.value;
-  const max = opts.max ?? (value > 0 ? niceCeil(value * 1.6) : 100);
+  const max = opts.max ?? niceGaugeMax(value);
   const unit = opts.unit ?? "PH/s";
   const size = opts.size ?? 340;
   const id = opts.id ?? "gauge";

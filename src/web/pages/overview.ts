@@ -3,7 +3,7 @@ import { getOverview } from "../../services/overview.js";
 import { potMathFromOverview } from "../../services/potmath.js";
 import { getLeaderboard } from "../../data/parasite.js";
 import { getRecentBlocks, renderBlocksStrip } from "../../data/blocks.js";
-import { hashrateGauge } from "../gauge.js";
+import { hashrateGauge, niceGaugeMax } from "../gauge.js";
 import type { LeaderboardEntry } from "../../data/types.js";
 import {
   fmtHashrate,
@@ -64,6 +64,9 @@ export async function renderOverview(): Promise<string> {
   const pot = o.potAge;
   const potClass = pot.verdict === "fresh" ? "green" : pot.verdict === "aging" ? "amber" : "red";
   const powerPct = (o.pool.poolHashratePhs / GAUGE_MAX) * 100;
+  // Dial auto-scales to a nice round number above the current reading, so the
+  // needle sits mid-dial and the scale grows in clean steps as hashrate climbs.
+  const gaugeMax = niceGaugeMax(o.pool.poolHashratePhs);
   const highestPctOfBlock = (o.pool.highestDiffSinceBlock / o.pool.networkDifficulty) * 100;
 
   const body = `
@@ -89,7 +92,8 @@ ${renderBlocksStrip(blocks)}
 <div class="grid" style="grid-template-columns:minmax(320px,1fr) minmax(320px,1.4fr); align-items:stretch">
   <div class="card" style="text-align:center">
     <div class="k" style="text-align:left">Pool hashrate</div>
-    <div style="margin:6px auto 0">${hashrateGauge({ value: o.pool.poolHashratePhs, max: GAUGE_MAX, unit: "PH/s", size: 320 })}</div>
+    <div style="margin:6px auto 0">${hashrateGauge({ value: o.pool.poolHashratePhs, max: gaugeMax, unit: "PH/s", size: 320 })}</div>
+    <div class="dim" style="font-size:13px;margin-top:2px">auto-scaling indicator</div>
   </div>
   <div class="card">
     <div class="k">Historic hashrate</div>

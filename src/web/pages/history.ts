@@ -1,5 +1,6 @@
 import { renderPage } from "../layout.js";
 import { getHistory } from "../../services/history.js";
+import { getPoolStatsSeries, type PoolSeries } from "../../data/parasite.js";
 import { fmtInt, fmtDiff, esc } from "../format.js";
 
 function maskAddr(a: string): string {
@@ -19,15 +20,52 @@ function labelOf(ms: number): string {
   const mo = d.toLocaleString("en-US", { month: "short" });
   const day = d.getDate();
   const hh = String(d.getHours()).padStart(2, "0");
-  return `${mo} ${day} ${hh}:00`;
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${mo} ${day} ${hh}:${mm}`;
+}
+
+/** Small button group rendered at the top-right of a chart card header. */
+function toggle(metric: string, active: "1h" | "4h" | "1d" | "1w"): string {
+  const windows: Array<["1h" | "4h" | "1d" | "1w", string]> = [
+    ["1h", "1H"],
+    ["4h", "4H"],
+    ["1d", "1D"],
+    ["1w", "1W"],
+  ];
+  return `<div class="tf-group" data-metric="${metric}">${windows
+    .map(
+      ([w, lbl]) =>
+        `<button data-window="${w}"${w === active ? ' class="active"' : ""}>${lbl}</button>`,
+    )
+    .join("")}</div>`;
 }
 
 export async function renderHistory(): Promise<string> {
   const h = await getHistory(7);
 
-  const timeLabels = h.hashrate.map((p) => labelOf(p.t));
-  const hashrateVals = h.hashrate.map((p) => Math.round(p.v * 10) / 10);
-  const hashpriceVals = h.hashprice.map((p) => Math.round(p.v));
+  // Default-window seeds for the live parasite series (1D for hashrate/users/
+  // workers). Falls back to Parahawk's own store if the upstream call fails so
+  // the page still renders.
+  let pool: PoolSeries;
+  try {
+    pool = await getPoolStatsSeries("1d");
+  } catch {
+    pool = { hashrate: h.hashrate, users: h.users, workers: [] };
+  }
+
+  // Pool hashrate (default 1D) — from parasite.space historical series.
+  const hrLabels = pool.hashrate.map((p) => labelOf(p.t));
+  const hrVals = pool.hashrate.map((p) => Math.round(p.v * 10) / 10);
+
+  // Refinery hashprice (default 1W) — thin, from Parahawk's own store.
+  const hpLabels = h.hashprice.map((p) => labelOf(p.t));
+  const hpVals = h.hashprice.map((p) => Math.round(p.v));
+
+  // Users / workers online (default 1D).
+  const uwLabels = pool.users.map((p) => labelOf(p.t));
+  const usersVals = pool.users.map((p) => Math.round(p.v));
+  const workersVals = pool.workers.map((p) => Math.round(p.v));
+
   const potLabels = h.potLengths.map((p) => `#${p.height}`);
   const potHours = h.potLengths.map((p) => Math.round(p.durationHours * 10) / 10);
   const potPhd = h.potLengths.map((p) => Math.round(p.estPhd));
@@ -42,7 +80,20 @@ export async function renderHistory(): Promise<string> {
     when: new Date(x.ts).toLocaleString("en-US"),
   }));
 
-  const data = JSON.stringify({ timeLabels, hashrateVals, hashpriceVals, potLabels, potHours, potPhd, hitPoints, hitMeta });
+  const data = JSON.stringify({
+    hrLabels,
+    hrVals,
+    hpLabels,
+    hpVals,
+    uwLabels,
+    usersVals,
+    workersVals,
+    potLabels,
+    potHours,
+    potPhd,
+    hitPoints,
+    hitMeta,
+  });
 
   const hitsTable =
     h.hits.length === 0
@@ -68,14 +119,44 @@ export async function renderHistory(): Promise<string> {
         </table>`;
 
   const body = `
+<style>
+.chartbox { border:1px solid #222; border-radius:6px; padding:14px 16px 8px; margin:18px 0; background:#0d0d0d; }
+.chartbox-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:6px; flex-wrap:wrap; }
+.chartbox-head h2 { margin:0; font-size:14px; border:0; padding:0; }
+.chartbox .cap { margin:2px 0 8px; }
+.tf-group { display:inline-flex; gap:4px; }
+.tf-group button { font-family:Consolas,monospace; font-size:11px; padding:3px 9px; background:#141414; color:#8a8a8a; border:1px solid #222; border-radius:4px; cursor:pointer; letter-spacing:.5px; transition:.12s; }
+.tf-group button:hover { color:#ccc; border-color:#333; }
+.tf-group button.active { background:rgba(143,209,79,.15); color:#8fd14f; border-color:#8fd14f; }
+</style>
+
 <h1>Pool history</h1>
 <p class="lead">Charts built from Parahawk's own time series — last ${h.rangeDays} days · ${fmtInt(h.sampleCount)} samples · ${h.potLengths.length} completed pot cycles.</p>
 
-<h2>Pool hashrate (PH/s)</h2>
-<canvas id="c_hashrate" height="90"></canvas>
+<div class="chartbox">
+  <div class="chartbox-head">
+    <h2>Pool hashrate (PH/s)</h2>
+    ${toggle("hashrate", "1d")}
+  </div>
+  <canvas id="c_hashrate" height="90"></canvas>
+</div>
 
-<h2>Refinery hashprice (sats/PHd)</h2>
-<canvas id="c_hashprice" height="90"></canvas>
+<div class="chartbox">
+  <div class="chartbox-head">
+    <h2>Refinery hashprice (sats/PHd)</h2>
+    ${toggle("hashprice", "1w")}
+  </div>
+  <p class="muted-note cap">Hashprice history is collected by Parahawk and deepens over time — it only moves at difficulty retargets, so short windows may look flat or sparse.</p>
+  <canvas id="c_hashprice" height="90"></canvas>
+</div>
+
+<div class="chartbox">
+  <div class="chartbox-head">
+    <h2>Users / workers online</h2>
+    ${toggle("usersworkers", "1d")}
+  </div>
+  <canvas id="c_usersworkers" height="90"></canvas>
+</div>
 
 <h2>🔴 Top diffs per block — 10T+ pop out</h2>
 <p class="muted-note">The best share found each block. Grey = sub-10T (the norm), 🔴 red = 10T+ (Bravocado), 🟠 amber = 21T+ (homeminers). Hover a dot for the miner (masked by Parasite), difficulty, and block. See the <a href="/board">Bravocado board</a> for the 10T+ club.</p>
@@ -106,16 +187,66 @@ const baseOpts = (yTitle) => ({
   },
   elements:{ point:{ radius:0 }, line:{ borderWidth:1.5, tension:.25 } }
 });
-new Chart(document.getElementById("c_hashrate"), {
+
+// Client-side twin of the server labelOf (short date + time).
+function jsLabel(ms){
+  const d = new Date(ms);
+  const mo = d.toLocaleString("en-US",{month:"short"});
+  const pad = (n)=>String(n).padStart(2,"0");
+  return mo+" "+d.getDate()+" "+pad(d.getHours())+":"+pad(d.getMinutes());
+}
+
+const CHARTS = {};
+CHARTS.hashrate = new Chart(document.getElementById("c_hashrate"), {
   type:"line",
-  data:{ labels:D.timeLabels, datasets:[{ data:D.hashrateVals, borderColor:GREEN, backgroundColor:"rgba(143,209,79,.08)", fill:true }] },
+  data:{ labels:D.hrLabels, datasets:[{ data:D.hrVals, borderColor:GREEN, backgroundColor:"rgba(143,209,79,.08)", fill:true }] },
   options: baseOpts("PH/s")
 });
-new Chart(document.getElementById("c_hashprice"), {
+CHARTS.hashprice = new Chart(document.getElementById("c_hashprice"), {
   type:"line",
-  data:{ labels:D.timeLabels, datasets:[{ data:D.hashpriceVals, borderColor:AMBER, backgroundColor:"rgba(245,196,81,.08)", fill:true }] },
+  data:{ labels:D.hpLabels, datasets:[{ data:D.hpVals, borderColor:AMBER, backgroundColor:"rgba(245,196,81,.08)", fill:true }] },
   options: baseOpts("sats/PHd")
 });
+CHARTS.usersworkers = new Chart(document.getElementById("c_usersworkers"), {
+  type:"line",
+  data:{ labels:D.uwLabels, datasets:[
+    { label:"Users", data:D.usersVals, borderColor:GREEN, backgroundColor:"rgba(143,209,79,.06)", fill:false },
+    { label:"Workers", data:D.workersVals, borderColor:AMBER, backgroundColor:"rgba(245,196,81,.06)", fill:false }
+  ]},
+  options:{ ...baseOpts("online"), plugins:{ legend:{ display:true } } }
+});
+
+// Timeframe toggles: fetch the selected window and swap the chart's data.
+document.querySelectorAll(".tf-group").forEach((group) => {
+  group.addEventListener("click", async (e) => {
+    const btn = e.target.closest("button[data-window]");
+    if (!btn) return;
+    const metric = group.getAttribute("data-metric");
+    const win = btn.getAttribute("data-window");
+    group.querySelectorAll("button").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    try {
+      if (metric === "usersworkers") {
+        const [u, w] = await Promise.all([
+          fetch("/api/pool-history?metric=users&window="+win).then((r)=>r.json()),
+          fetch("/api/pool-history?metric=workers&window="+win).then((r)=>r.json())
+        ]);
+        const c = CHARTS.usersworkers;
+        c.data.labels = u.points.map((p)=>jsLabel(p.t));
+        c.data.datasets[0].data = u.points.map((p)=>p.v);
+        c.data.datasets[1].data = w.points.map((p)=>p.v);
+        c.update();
+      } else {
+        const res = await fetch("/api/pool-history?metric="+metric+"&window="+win).then((r)=>r.json());
+        const c = CHARTS[metric];
+        c.data.labels = res.points.map((p)=>jsLabel(p.t));
+        c.data.datasets[0].data = res.points.map((p)=>p.v);
+        c.update();
+      }
+    } catch (err) { /* leave the current view in place on fetch error */ }
+  });
+});
+
 const RED = "#ff5c5c", DIMDOT = "#4a4a4a";
 const dotColor = (t) => t==="21T" ? AMBER : t==="10T" ? RED : DIMDOT;
 new Chart(document.getElementById("c_hits"), {

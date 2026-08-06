@@ -11,7 +11,44 @@ import { renderOrderBooks } from "./pages/order-books.js";
 import { renderCados } from "./pages/cados.js";
 import { renderAddress } from "./pages/address.js";
 import { getOverview } from "../services/overview.js";
+import { getPoolStatsSeries, type PoolWindow } from "../data/parasite.js";
+import { getHistory, type Point } from "../services/history.js";
 import { POTMATH_CLIENT_JS } from "./potmath-client.js";
+
+/** Keep only the points inside a window; fall back to all if the slice is empty. */
+function sliceByWindow(points: Point[], window: PoolWindow): Point[] {
+  const spanMs =
+    window === "1h" ? 3_600_000 : window === "4h" ? 4 * 3_600_000 : window === "1w" ? 7 * 86_400_000 : 86_400_000;
+  const cutoff = Date.now() - spanMs;
+  const kept = points.filter((p) => p.t >= cutoff);
+  return kept.length ? kept : points;
+}
+
+/**
+ * Historical series for one /history chart metric over a selectable window.
+ * hashrate/users/workers come from parasite.space; hashprice from Parahawk's
+ * own store (thin — only moves at difficulty retargets).
+ */
+async function getPoolHistory(
+  metric: string,
+  window: string,
+): Promise<{ points: Point[]; unit: string; label: string }> {
+  const w: PoolWindow = (["1h", "4h", "1d", "1w"] as const).includes(window as PoolWindow)
+    ? (window as PoolWindow)
+    : "1d";
+
+  if (metric === "hashprice") {
+    const h = await getHistory(w === "1w" ? 7 : 1);
+    const points = sliceByWindow(h.hashprice, w).map((p) => ({ t: p.t, v: Math.round(p.v) }));
+    return { points, unit: "sats/PHd", label: "Refinery hashprice" };
+  }
+
+  const series = await getPoolStatsSeries(w);
+  if (metric === "users") return { points: series.users, unit: "users", label: "Users online" };
+  if (metric === "workers") return { points: series.workers, unit: "workers", label: "Workers online" };
+  const points = series.hashrate.map((p) => ({ t: p.t, v: Math.round(p.v * 10) / 10 }));
+  return { points, unit: "PH/s", label: "Pool hashrate" };
+}
 
 /** Wrap an async page renderer with error handling. */
 function page(render: () => Promise<string>) {
@@ -62,6 +99,17 @@ export function createServer(): express.Express {
   app.get("/api/overview", async (_req, res) => {
     try {
       res.json(await getOverview());
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  // Historical series for the /history per-chart timeframe toggles.
+  app.get("/api/pool-history", async (req, res) => {
+    try {
+      const metric = String(req.query.metric ?? "hashrate");
+      const window = String(req.query.window ?? "1d");
+      res.json(await getPoolHistory(metric, window));
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
     }

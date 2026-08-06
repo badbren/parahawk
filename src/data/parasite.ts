@@ -132,6 +132,95 @@ export async function getPoolStats(): Promise<PoolStats> {
   }
 }
 
+// ── pool stats time series (for the /history per-chart timeframe toggles) ──────
+
+export type PoolWindow = "1h" | "4h" | "1d" | "1w";
+
+export interface SeriesPoint {
+  t: number; // unix ms
+  v: number;
+}
+
+export interface PoolSeries {
+  hashrate: SeriesPoint[]; // PH/s
+  users: SeriesPoint[];
+  workers: SeriesPoint[];
+}
+
+/** Full historical row (all fields we chart). hashrateXX are H/s. */
+interface HistoricalRowFull {
+  timestamp: number; // unix SECONDS
+  users?: number;
+  workers?: number;
+  hashrate15m?: number;
+}
+
+/** Points per window and the sampling step, used for the mock synthesizer. */
+function windowSpec(window: PoolWindow): { points: number; stepMs: number } {
+  switch (window) {
+    case "1h":
+      return { points: 12, stepMs: 5 * 60_000 };
+    case "4h":
+      return { points: 48, stepMs: 5 * 60_000 };
+    case "1d":
+      return { points: 288, stepMs: 5 * 60_000 };
+    case "1w":
+      return { points: 168, stepMs: 60 * 60_000 };
+  }
+}
+
+/**
+ * Historical hashrate / users / workers over a selectable window.
+ *   1H → last 12 pts of period=1d&interval=5m   (5-min resolution)
+ *   4H → last 48 pts of period=1d&interval=5m
+ *   1D → all 288 pts of period=1d&interval=5m
+ *   1W → period=7d&interval=1h                   (168 hourly pts)
+ * Hashrate uses hashrate15m (H/s → PH/s). Timestamps seconds → ms.
+ */
+export async function getPoolStatsSeries(window: PoolWindow): Promise<PoolSeries> {
+  if (config.mockData) return mockPoolSeries(window);
+
+  const isWeek = window === "1w";
+  const period = isWeek ? "7d" : "1d";
+  const interval = isWeek ? "1h" : "5m";
+  let rows = await fetchJson<HistoricalRowFull[]>(
+    `${base()}/api/pool-stats/historical?period=${period}&interval=${interval}`,
+  );
+  if (!Array.isArray(rows)) rows = [];
+
+  const tail = window === "1h" ? 12 : window === "4h" ? 48 : 0;
+  if (tail > 0 && rows.length > tail) rows = rows.slice(-tail);
+
+  const map = (sel: (r: HistoricalRowFull) => number | undefined): SeriesPoint[] =>
+    rows
+      .filter((r) => r && r.timestamp)
+      .map((r) => ({ t: r.timestamp * 1000, v: Number(sel(r) ?? 0) }));
+
+  return {
+    hashrate: map((r) => (r.hashrate15m !== undefined ? r.hashrate15m / H_PER_PH : undefined)),
+    users: map((r) => r.users),
+    workers: map((r) => r.workers),
+  };
+}
+
+/** Mock-mode fallback: a smooth deterministic series around the pinned snapshot. */
+function mockPoolSeries(window: PoolWindow): PoolSeries {
+  const { points, stepMs } = windowSpec(window);
+  const now = Date.now();
+  const snap = mockPoolStats(now);
+  const hashrate: SeriesPoint[] = [];
+  const users: SeriesPoint[] = [];
+  const workers: SeriesPoint[] = [];
+  for (let i = points - 1; i >= 0; i--) {
+    const t = now - i * stepMs;
+    const w = Math.sin((t / (6 * 3_600_000)) * 2 * Math.PI);
+    hashrate.push({ t, v: Math.round(snap.poolHashratePhs * (1 + 0.08 * w) * 10) / 10 });
+    users.push({ t, v: Math.round(snap.users * (1 + 0.04 * w)) });
+    workers.push({ t, v: Math.round(snap.workers * (1 + 0.05 * w)) });
+  }
+  return { hashrate, users, workers };
+}
+
 // ── hits (highest-diff feed) ──────────────────────────────────────────────────
 
 interface HighestDiffRow {
