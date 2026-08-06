@@ -53,15 +53,15 @@ header.top{border-bottom:1px solid var(--line); padding:20px 0; position:sticky;
 header.top .wrap{display:flex; align-items:center; gap:28px; flex-wrap:wrap}
 .brand{display:inline-flex; align-items:center; gap:10px; border:0; line-height:0}
 .brand .phlogo{display:block}
-nav{display:flex; gap:26px; flex-wrap:wrap; align-items:center}
+nav{display:flex; gap:16px; flex-wrap:wrap; align-items:center}
 nav a{
   border:0; color:var(--dim); text-transform:uppercase;
   font-family:Impact,"Arial Narrow","Arial Black",sans-serif; font-weight:900;
-  font-size:32px; letter-spacing:1px; line-height:1;
+  font-size:25px; letter-spacing:1px; line-height:1;
   filter:url(#nav-rough);
 }
 nav a.active,nav a:hover{color:#fff}
-.addrsearch{display:flex; gap:0; flex:1 1 260px; min-width:220px; align-self:center; margin-left:8px}
+.addrsearch{display:flex; gap:0; flex:1 1 150px; min-width:140px; align-self:center; margin-left:8px}
 .addrsearch input{background:#0a0a0a; border:1px solid var(--line); border-right:0; color:var(--fg); padding:8px 12px; width:100%; font-size:14px}
 .addrsearch input::placeholder{color:#5a5a5a}
 .addrsearch button{background:#0a0a0a; border:1px solid var(--line); color:var(--dim); padding:0 12px; cursor:pointer; font-size:16px; text-transform:none; letter-spacing:0}
