@@ -1,6 +1,7 @@
 import { config } from "../config.js";
 import { tipQrDataUrl } from "./qr.js";
 import { esc } from "./format.js";
+import { parahawkLogo } from "./logo.js";
 
 export interface PageOpts {
   title: string;
@@ -13,14 +14,24 @@ export interface PageOpts {
   staleBanner?: string | null;
 }
 
-const NAV: Array<[string, string]> = [
-  ["/", "overview"],
-  ["/board", "board"],
-  ["/cados", "cados"],
-  ["/history", "history"],
-  ["/luck", "luck"],
-  ["/calc", "calc"],
-  ["/about", "about"],
+/**
+ * Nav grouped by theme so Parasite-pool stats and Bravocado culture read as
+ * distinct sections: [pool stats] · [bravocados] · [tools].
+ */
+const NAV_GROUPS: Array<Array<[string, string]>> = [
+  [
+    ["/", "overview"],
+    ["/history", "pool"],
+    ["/luck", "luck"],
+  ],
+  [
+    ["/board", "bravocados"],
+    ["/cados", "awards"],
+  ],
+  [
+    ["/calc", "calc"],
+    ["/about", "about"],
+  ],
 ];
 
 const STYLE = `
@@ -40,11 +51,18 @@ a:hover{color:#c7f59a}
 .wrap{max-width:1760px; margin:0 auto; padding:0 40px}
 header.top{border-bottom:1px solid var(--line); padding:20px 0; position:sticky; top:0; background:var(--bg); z-index:5}
 header.top .wrap{display:flex; align-items:center; gap:28px; flex-wrap:wrap}
-.brand{font-weight:700; font-size:26px; color:#fff; border:0}
-.brand .hawk{color:var(--green)}
-nav{display:flex; gap:22px; flex-wrap:wrap}
-nav a{border:0; color:var(--dim); text-transform:uppercase; font-size:17px; letter-spacing:1.5px}
-nav a.active,nav a:hover{color:var(--fg)}
+.brand{display:inline-flex; align-items:center; gap:10px; border:0; line-height:0}
+.brand .phlogo{display:block}
+nav{display:flex; gap:24px; flex-wrap:wrap; align-items:center}
+.navgroup{display:inline-flex; gap:24px; flex-wrap:wrap; align-items:center}
+.navsep{color:#3a3a3a; user-select:none; font-size:30px}
+nav a{
+  border:0; color:var(--dim); text-transform:uppercase;
+  font-family:Impact,"Arial Narrow","Arial Black",sans-serif; font-weight:900;
+  font-size:32px; letter-spacing:1px; line-height:1;
+  filter:url(#nav-rough);
+}
+nav a.active,nav a:hover{color:#fff}
 main{padding:38px 0 80px}
 h1{font-size:34px; margin:0 0 8px; color:#fff}
 h2{font-size:24px; margin:48px 0 16px; color:#fff; text-transform:uppercase; letter-spacing:1.5px; border-bottom:1px solid var(--line); padding-bottom:10px}
@@ -79,10 +97,15 @@ footer.bot img{image-rendering:pixelated}
 `;
 
 export async function renderPage(opts: PageOpts): Promise<string> {
-  const nav = NAV.map(
-    ([href, key]) =>
-      `<a href="${href}" class="${opts.active === key ? "active" : ""}">${key}</a>`,
-  ).join("");
+  const nav = NAV_GROUPS.map(
+    (group) =>
+      `<span class="navgroup">${group
+        .map(
+          ([href, key]) =>
+            `<a href="${href}" class="${opts.active === key ? "active" : ""}">${key}</a>`,
+        )
+        .join("")}</span>`,
+  ).join(`<span class="navsep" aria-hidden="true">·</span>`);
 
   const qr = await tipQrDataUrl();
   const addr = config.lightningAddress;
@@ -106,8 +129,14 @@ export async function renderPage(opts: PageOpts): Promise<string> {
 ${opts.head ?? ""}
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <filter id="nav-rough" x="-20%" y="-20%" width="140%" height="140%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.02 0.06" numOctaves="2" seed="11" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="4" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</defs></svg>
 <header class="top"><div class="wrap">
-  <a class="brand" href="/">para<span class="hawk">hawk</span> 🦅</a>
+  <a class="brand" href="/" aria-label="Parahawk home">${parahawkLogo({ height: 80 })}</a>
   <nav>${nav}</nav>
 </div></header>
 <main><div class="wrap">

@@ -26,6 +26,22 @@ export interface PoolStats {
   hashpriceSatsPerPhd: number;
   /** Total work accumulated since the last found block, in difficulty units. */
   workSinceLastBlockDiff?: number;
+
+  // ── Pot Math inputs, in the dashboard's own units ──────────────────────────
+  // These mirror fields above in the exact units parasite.space displays, so the
+  // Pot Math formulas (math/potmath.ts) can consume W, D and the projected next
+  // difficulty directly. W and D are both in T (trillions of difficulty units);
+  // depth/luck/rarity are just functions of their ratio.
+  /** W — "Total Work Since Last Block", in T. Resets to 0 when a block is found. */
+  totalWorkSinceBlockT?: number;
+  /** D — "Minimum Needed Diff" (network difficulty), in T. */
+  minNeededDiffT?: number;
+  /** Projected network difficulty at the next retarget, in T (dashboard "→ 127T"). */
+  nextDiffT?: number;
+  /** Highest share difficulty seen since the last block, in T. */
+  highestDiffSinceBlockT?: number;
+  /** Bitcoin height of Parasite's last found block (pot-math alias of lastFoundHeight). */
+  lastBlockFoundHeight?: number;
 }
 
 export type OrderStatus = "active" | "fulfilled" | "expired";

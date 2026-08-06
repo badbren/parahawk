@@ -15,7 +15,30 @@ import type {
  */
 
 const START_HEIGHT = 900_000;
-const NETWORK_DIFFICULTY = 127e12;
+
+/**
+ * Pinned "today" snapshot (2026-08-05) taken straight from the parasite.space
+ * dashboard, so the Pot Math card reproduces the hand math exactly:
+ *   depth 1.46× · luck 68.7% · rarity 23% · 1,155 sats/G · ~63d wait.
+ * A deep pot (W = 1.46·D) is also an OLD pot, so pot age comes out stale — the
+ * chain height sits ~depth·expectedDays·144 blocks past the last found block,
+ * keeping the "deep" and "overdue" stories consistent.
+ */
+const TODAY = {
+  lastFoundHeight: 958_527,
+  chainHeight: 971_833, // 13,306 blocks (~92d) since the last block — a deep, stale pot
+  workSinceBlockT: 184, // W
+  networkDiffT: 126.4, // D (dashboard rounds to "126T")
+  nextDiffT: 127, // projected next retarget ("126T → 127T")
+  highestDiffSinceBlockT: 63.3,
+  gaugePhs: 99, // live hashrate gauge
+  avg1dPhs: 111,
+  avg6dPhs: 144,
+  avg9dPhs: 205,
+  btcPriceUsd: 64_472,
+  users: 512,
+  workers: 1_840,
+} as const;
 
 /** Full pot cycle length for the mock (1 hour) — a block is "found" each wrap. */
 const CYCLE_MS = 60 * 60 * 1000;
@@ -44,33 +67,39 @@ export function mockBtcPrice(now: number): number {
   return Math.round(98_000 + 1_500 * wobble(now, 90 * 60 * 1000));
 }
 
-export function mockPoolStats(now: number = Date.now()): PoolStats {
-  const base = 85;
-  const hashrate = base + 15 * wobble(now, 20 * 60 * 1000) + 4 * wobble(now, 7 * 60 * 1000, 1.3);
-  const pb = potBlocks(now);
+/**
+ * Live pool snapshot. Pinned to the TODAY fixture (see above) so the Pot Math
+ * card matches the dashboard exactly. hashpriceSatsPerPhd is left at 0 so the
+ * overview service derives it from difficulty + block subsidy (the real path).
+ */
+export function mockPoolStats(_now: number = Date.now()): PoolStats {
   return {
-    poolHashratePhs: round1(hashrate),
-    avg1dPhs: round1(base + 12 * wobble(now, 60 * 60 * 1000)),
-    avg6dPhs: round1(base + 6 * wobble(now, 6 * 60 * 60 * 1000)),
-    avg9dPhs: round1(base + 4 * wobble(now, 9 * 60 * 60 * 1000)),
-    lastFoundHeight: mockLastFoundHeight(now),
-    // best diff since block climbs with pot age, plus a little wobble
-    highestDiffSinceBlock: Math.round(
-      (pb / MAX_POT_BLOCKS) * 90e12 + 8e12 * (0.5 + 0.5 * wobble(now, 11 * 60 * 1000)),
-    ),
-    networkDifficulty: NETWORK_DIFFICULTY,
-    users: Math.round(420 + 30 * wobble(now, 45 * 60 * 1000)),
-    workers: Math.round(1300 + 90 * wobble(now, 45 * 60 * 1000)),
-    btcPriceUsd: mockBtcPrice(now),
-    hashpriceSatsPerPhd: Math.round(52_000 + 4_000 * wobble(now, 37 * 60 * 1000)),
+    poolHashratePhs: TODAY.gaugePhs,
+    avg1dPhs: TODAY.avg1dPhs,
+    avg6dPhs: TODAY.avg6dPhs,
+    avg9dPhs: TODAY.avg9dPhs,
+    lastFoundHeight: TODAY.lastFoundHeight,
+    highestDiffSinceBlock: TODAY.highestDiffSinceBlockT * 1e12,
+    networkDifficulty: TODAY.networkDiffT * 1e12,
+    users: TODAY.users,
+    workers: TODAY.workers,
+    btcPriceUsd: TODAY.btcPriceUsd,
+    hashpriceSatsPerPhd: 0,
+    workSinceLastBlockDiff: TODAY.workSinceBlockT * 1e12,
+    // pot-math-native mirrors
+    totalWorkSinceBlockT: TODAY.workSinceBlockT,
+    minNeededDiffT: TODAY.networkDiffT,
+    nextDiffT: TODAY.nextDiffT,
+    highestDiffSinceBlockT: TODAY.highestDiffSinceBlockT,
+    lastBlockFoundHeight: TODAY.lastFoundHeight,
   };
 }
 
-export function mockChainTip(now: number = Date.now()): ChainTip {
+export function mockChainTip(_now: number = Date.now()): ChainTip {
   return {
-    height: mockChainHeight(now),
-    difficulty: NETWORK_DIFFICULTY,
-    btcPriceUsd: mockBtcPrice(now),
+    height: TODAY.chainHeight,
+    difficulty: TODAY.networkDiffT * 1e12,
+    btcPriceUsd: TODAY.btcPriceUsd,
   };
 }
 

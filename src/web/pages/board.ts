@@ -140,5 +140,5 @@ export async function renderBoard(): Promise<string> {
 <script>setTimeout(function(){location.reload();},45000);</script>
 `;
 
-  return renderPage({ title: "Miners & Bravocados", active: "board", body });
+  return renderPage({ title: "Miners & Bravocados", active: "bravocados", body });
 }

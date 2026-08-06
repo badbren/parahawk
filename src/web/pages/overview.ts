@@ -1,5 +1,7 @@
 import { renderPage } from "../layout.js";
 import { getOverview } from "../../services/overview.js";
+import { potMathFromOverview } from "../../services/potmath.js";
+import { potMathCard } from "../potmath-card.js";
 import {
   fmtHashrate,
   fmtDiff,
@@ -27,9 +29,16 @@ export async function renderOverview(): Promise<string> {
         ? "aging — pot is filling up"
         : "stale — many wait for the reset before renting";
 
+  const pm = potMathFromOverview(o);
+
   const body = `
 <h1>Live overview</h1>
 <p class="lead">Real-time Parasite Pool vitals. Auto-refreshes every 30s.</p>
+
+${potMathCard(pm)}
+<p class="muted-note" style="margin:-8px 0 26px">
+  Play with the inputs on the <a href="/calc">pot-math calculator →</a> · see the depth in context on <a href="/luck">the luck page →</a>
+</p>
 
 <div class="big">
   <div class="k">Pot age</div>

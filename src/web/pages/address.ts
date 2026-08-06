@@ -4,11 +4,17 @@ import { getOverview } from "../../services/overview.js";
 import { getStore } from "../../db/index.js";
 import { computeOdometer } from "../../math/work.js";
 import { oddsForWork } from "../../math/odds.js";
+import { potMathFromOverview } from "../../services/potmath.js";
+import { stakeValue } from "../../math/potmath.js";
+import { PHD_TO_DIFF } from "../../math/constants.js";
 import {
   fmtHashrate,
   fmtDiff,
   fmtPhd,
   fmtPct,
+  fmtInt,
+  fmtUsd,
+  fmtDuration,
   esc,
 } from "../format.js";
 
@@ -58,6 +64,14 @@ export async function renderAddress(addressRaw: string): Promise<string> {
   ]);
   const odo = computeOdometer(u.totalWorkDiff, u.bestDifficulty, o.pool.networkDifficulty);
   const odds = oddsForWork(odo.lifetimePhd);
+
+  // Your stake in the CURRENT pot: work banked since the last block × share price.
+  // We don't get per-round work directly, so estimate it from live hashrate × pot age.
+  const pm = potMathFromOverview(o);
+  const userPhdThisRound = u.hashratePhs * o.potAge.days;
+  const userWorkGThisRound = (userPhdThisRound * PHD_TO_DIFF) / 1e9;
+  const stakeSats = stakeValue(userWorkGThisRound, pm.W);
+  const stakeUsd = o.pool.btcPriceUsd > 0 ? (stakeSats / 1e8) * o.pool.btcPriceUsd : 0;
   const luck = odo.luckRatio >= 1.1 ? "🍀 luckier than expected" : odo.luckRatio <= 0.9 ? "🥲 below expectation" : "≈ on expectation";
   const luckClass = odo.luckRatio >= 1.1 ? "green" : odo.luckRatio <= 0.9 ? "red" : "amber";
 
@@ -70,6 +84,13 @@ export async function renderAddress(addressRaw: string): Promise<string> {
   <div class="card"><div class="k">Live hashrate</div><div class="v">${fmtHashrate(u.hashratePhs)}</div></div>
   <div class="card"><div class="k">Best difficulty</div><div class="v">${fmtDiff(odo.bestDiff)}</div><div class="sub">${fmtPct(odo.bestDiffBlockPercent, 3)} of a block</div></div>
   <div class="card"><div class="k">Luck</div><div class="v ${luckClass}">${odo.luckRatio.toFixed(2)}×</div><div class="sub">${luck}</div></div>
+</div>
+
+<h2>Your stake in this pot</h2>
+<div class="card" style="border-color:#33501f;background:#0d1408">
+  <div class="k green">💰 Projected payout if the pot cracked right now</div>
+  <div class="v green">${fmtInt(stakeSats)} sats${stakeUsd > 0 ? ` <span class="dim" style="font-size:20px">≈ ${fmtUsd(stakeUsd)}</span>` : ""}</div>
+  <div class="sub">~${fmtInt(userWorkGThisRound)} G banked this round (${fmtHashrate(u.hashratePhs)} × ${fmtDuration(o.potAge.hours)} pot age) × ${fmtInt(pm.satsPerG)} sats/G — subsidy only, estimated from live hashrate. <a href="/luck">what's a pot's depth? →</a></div>
 </div>
 
 <h2>Badge progress</h2>

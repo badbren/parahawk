@@ -1,5 +1,6 @@
 import { renderPage } from "../layout.js";
 import { getOverview } from "../../services/overview.js";
+import { potMathFromOverview } from "../../services/potmath.js";
 import {
   RATE_10T_PHD,
   RATE_21T_PHD,
@@ -13,6 +14,57 @@ export async function renderCalc(): Promise<string> {
   const hashprice = o?.pool.hashpriceSatsPerPhd ?? 50_000;
   const btc = o?.pool.btcPriceUsd ?? 0;
 
+  // Live Pot Math inputs to prefill the interactive card (fallbacks if data is down).
+  const pm = o ? potMathFromOverview(o) : null;
+  const seedW = pm?.W ?? 184;
+  const seedD = pm?.D ?? 126.4;
+  const seedH = pm?.hGauge ?? 99;
+
+  const potMathSection = `
+<h2 style="margin-top:8px">🧮 Pot Math — this round</h2>
+<p class="muted-note">Enter the pot's work (W), network difficulty (D), and pool hashrate (H) — today's live values are prefilled. Then drop in <strong>your own banked work this round</strong> to see your cut if the pot cracked right now.</p>
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr))">
+  <div class="card"><div class="k">W — work since last block (T)</div><input type="number" id="pm_w" value="${seedW}" step="0.1" min="0"/></div>
+  <div class="card"><div class="k">D — minimum needed diff (T)</div><input type="number" id="pm_d" value="${seedD}" step="0.1" min="0"/></div>
+  <div class="card"><div class="k">H — pool hashrate (PH/s)</div><input type="number" id="pm_h" value="${seedH}" step="1" min="0"/></div>
+  <div class="card" style="border-color:#33501f;background:#0d1408"><div class="k green">Your work this round (G)</div><input type="number" id="pm_g" placeholder="e.g. 500" step="1" min="0"/></div>
+</div>
+<div class="grid" style="margin-top:14px">
+  <div class="card"><div class="k">Round depth</div><div class="v" id="pm_depth">–</div><div class="sub" id="pm_depth_c">W / D</div></div>
+  <div class="card"><div class="k">Round rarity</div><div class="v" id="pm_rarity">–</div><div class="sub">P(round ≥ W) = e^(−W/D)</div></div>
+  <div class="card"><div class="k">Share price</div><div class="v green" id="pm_sats">–</div><div class="sub">212,500 / W · subsidy only</div></div>
+  <div class="card"><div class="k">Expected wait</div><div class="v" id="pm_wait">–</div><div class="sub" id="pm_wait_c">at H</div></div>
+  <div class="card" style="border-color:#33501f;background:#0d1408"><div class="k green">💰 Your stake in this pot</div><div class="v green" id="pm_stake">–</div><div class="sub" id="pm_stake_c">enter your work (G) to see your cut</div></div>
+</div>
+<script src="/potmath.js"></script>
+<script>
+(function(){
+  var P = window.PotMath, $ = function(id){return document.getElementById(id);};
+  function fmtInt(n){return Math.round(n).toLocaleString("en-US");}
+  function fmtDur(days){ if(!isFinite(days)||days<=0) return "—"; var h=days*24; if(h<24) return h.toFixed(1)+"h"; var d=Math.floor(h/24), r=Math.round(h-d*24); return r>0? d+"d "+r+"h" : d+"d"; }
+  function recompute(){
+    var W=parseFloat($("pm_w").value)||0, D=parseFloat($("pm_d").value)||0, H=parseFloat($("pm_h").value)||0, g=parseFloat($("pm_g").value);
+    var m=P.computePotMath(W,D,H);
+    $("pm_depth").textContent = (W>0&&D>0)? m.depth.toFixed(2)+"×" : "–";
+    $("pm_depth_c").textContent = (W>0&&D>0)? Math.round(m.luckPct)+"% luck (W / D)" : "W / D";
+    $("pm_rarity").textContent = (D>0)? Math.round(m.rarity*100)+"%" : "–";
+    $("pm_sats").textContent = (W>0)? fmtInt(m.satsPerG)+" sats/G" : "–";
+    $("pm_wait").textContent = fmtDur(m.expectedDays);
+    $("pm_wait_c").textContent = "at "+(H||0)+" PH/s";
+    if(!isNaN(g) && $("pm_g").value!=="" && W>0){
+      $("pm_stake").textContent = fmtInt(P.stakeValue(g,W))+" sats";
+      $("pm_stake_c").textContent = g+" G × "+fmtInt(m.satsPerG)+" sats/G — payout if the pot cracked now (subsidy only)";
+    } else {
+      $("pm_stake").textContent = "–";
+      $("pm_stake_c").textContent = "enter your work (G) to see your cut";
+    }
+  }
+  ["pm_w","pm_d","pm_h","pm_g"].forEach(function(id){$(id).addEventListener("input",recompute);});
+  recompute();
+})();
+</script>
+`;
+
   const consts = JSON.stringify({
     RATE_10T_PHD,
     RATE_21T_PHD,
@@ -24,8 +76,13 @@ export async function renderCalc(): Promise<string> {
   });
 
   const body = `
-<h1>Rental strategy &amp; odds calculator</h1>
-<p class="lead">How much hash, for how long, at what cost — and what are your real odds? Live hashprice: <span class="green">${Math.round(hashprice).toLocaleString("en-US")} sats/PHd</span>. All client-side.</p>
+<h1>Calculators</h1>
+<p class="lead">Pot Math for the current round, plus a rental strategy &amp; odds tool. All client-side, sharing Parahawk's one math module.</p>
+
+${potMathSection}
+
+<h2>Rental strategy &amp; odds</h2>
+<p class="muted-note" style="margin-bottom:20px">How much hash, for how long, at what cost — and what are your real odds? Live hashprice: <span class="green">${Math.round(hashprice).toLocaleString("en-US")} sats/PHd</span>.</p>
 
 <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
   <div class="card">

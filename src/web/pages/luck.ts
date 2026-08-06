@@ -1,7 +1,18 @@
 import { renderPage } from "../layout.js";
 import { getLuckAudit, type LuckCell } from "../../services/luck.js";
+import { getOverview } from "../../services/overview.js";
+import { potMathFromOverview } from "../../services/potmath.js";
 import { fmtInt, fmtPhd } from "../format.js";
 import { RATE_10T_PHD } from "../../math/constants.js";
+
+/** Depth (= −ln p) at which an average round has rarity p, for the percentile bar. */
+const PBAR_MAX_DEPTH = 3.5;
+const PBAR_MARKERS: Array<[number, string]> = [
+  [0.6931, "50%"],
+  [1.4697, "23%"],
+  [2.3026, "10%"],
+  [2.9957, "5%"],
+];
 
 const RATE_10T_LABEL = `${RATE_10T_PHD} PHd`;
 
@@ -21,9 +32,75 @@ function cellColor(c: LuckCell | undefined): string {
 }
 
 export async function renderLuck(): Promise<string> {
-  const audit = await getLuckAudit();
+  const [audit, o] = await Promise.all([getLuckAudit(), getOverview().catch(() => null)]);
+  const pm = o ? potMathFromOverview(o) : null;
+  const seedW = pm?.W ?? 184;
+  const seedD = pm?.D ?? 126.4;
+
   const map = new Map<string, LuckCell>();
   for (const c of audit.cells) map.set(`${c.dayOfWeek}:${c.hourOfDay}`, c);
+
+  const markerSpans = PBAR_MARKERS.map(
+    ([d, label]) =>
+      `<span class="pmk" style="left:${((d / PBAR_MAX_DEPTH) * 100).toFixed(1)}%"><i></i><b>${label}</b></span>`,
+  ).join("");
+
+  const potDepthSection = `
+<h2 style="margin-top:8px">Where this pot sits 📏</h2>
+<p class="muted-note">Round depth = W / D. Rarity = e<sup>−W/D</sup> — the share of average rounds that run at least this deep. Type the work banked so far this round to move the marker.</p>
+
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+  <div class="card"><div class="k">W — work so far this round (T)</div><input type="number" id="lk_w" value="${seedW}" step="0.1" min="0"/></div>
+  <div class="card"><div class="k">D — minimum needed diff (T)</div><input type="number" id="lk_d" value="${seedD}" step="0.1" min="0"/></div>
+  <div class="card"><div class="k">Round depth</div><div class="v" id="lk_depth">–</div><div class="sub" id="lk_luck">luck</div></div>
+  <div class="card"><div class="k">Round rarity</div><div class="v" id="lk_rarity">–</div><div class="sub" id="lk_rarity_c">1 in N rounds</div></div>
+</div>
+
+<div class="pbar">
+  <div class="pbar-fill" id="lk_fill"></div>
+  ${markerSpans}
+  <span class="pbar-here" id="lk_here"><b id="lk_here_lbl">you</b><i>▼</i></span>
+</div>
+<p class="muted-note" style="margin-top:6px">← shallower (found quick) &nbsp;·&nbsp; deeper (overdue) → &nbsp; markers show the depth at which only 50 / 23 / 10 / 5% of rounds run this long.</p>
+
+<div class="stale" style="background:#1a0d0d;border-color:#5c2b2b;color:#ffbcbc;margin-top:18px">
+  <strong>These numbers are SCOREKEEPING, not forecasting.</strong> Mining is memoryless: the pot being deep does <em>not</em> make the next block more likely. Anyone saying "we're due" is describing the past, not the future.
+</div>
+
+<script src="/potmath.js"></script>
+<script>
+(function(){
+  var P=window.PotMath, $=function(id){return document.getElementById(id);};
+  var MAX=${PBAR_MAX_DEPTH};
+  function recompute(){
+    var W=parseFloat($("lk_w").value)||0, D=parseFloat($("lk_d").value)||0;
+    var m=P.computePotMath(W,D,0);
+    var ok=W>0&&D>0;
+    $("lk_depth").textContent = ok? m.depth.toFixed(2)+"×" : "–";
+    $("lk_luck").textContent = ok? Math.round(m.luckPct)+"% luck" : "luck";
+    $("lk_rarity").textContent = ok? Math.round(m.rarity*100)+"%" : "–";
+    $("lk_rarity_c").textContent = ok? "~1 in "+Math.max(1,Math.round(1/m.rarity))+" rounds get this deep" : "1 in N rounds";
+    var pos=Math.max(0,Math.min(100,(m.depth/MAX)*100));
+    $("lk_fill").style.width=pos+"%";
+    $("lk_here").style.left=pos+"%";
+    $("lk_here_lbl").textContent = ok? m.depth.toFixed(2)+"×" : "you";
+  }
+  ["lk_w","lk_d"].forEach(function(id){$(id).addEventListener("input",recompute);});
+  recompute();
+})();
+</script>
+
+<style>
+.pbar{position:relative;height:34px;margin:26px 0 4px;background:linear-gradient(90deg,#0d1408,#1a0d0d);border:1px solid var(--line)}
+.pbar-fill{position:absolute;left:0;top:0;bottom:0;background:rgba(143,209,79,.16);border-right:2px solid var(--green)}
+.pbar .pmk{position:absolute;top:0;bottom:0;transform:translateX(-50%);color:var(--dim);font-size:13px}
+.pbar .pmk i{position:absolute;top:0;bottom:0;left:50%;width:1px;background:#333}
+.pbar .pmk b{position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-weight:400;white-space:nowrap}
+.pbar-here{position:absolute;top:0;transform:translateX(-50%);color:var(--green);text-align:center}
+.pbar-here b{position:absolute;bottom:-2px;left:50%;transform:translateX(-50%);font-size:13px;white-space:nowrap}
+.pbar-here i{position:absolute;top:2px;left:50%;transform:translateX(-50%);font-style:normal}
+</style>
+`;
 
   const headerCells = Array.from({ length: 24 }, (_, h) => `<th>${h}</th>`).join("");
   const rows = DAYS.map((label, dow) => {
@@ -40,9 +117,12 @@ export async function renderLuck(): Promise<string> {
   const smallSample = audit.totalSamples < 200;
 
   const body = `
-<h1>The luck audit 🔬</h1>
-<p class="lead">Does Parasite pay better at 3am? At the weekend? This page tests the myth against Parahawk's own collected data — no vibes, just the numbers.</p>
+<h1>Luck &amp; pot depth</h1>
+<p class="lead">How deep is this pot, how rare is that, and does Parasite pay better at 3am? Scorekeeping from the numbers — never a forecast.</p>
 
+${potDepthSection}
+
+<h2>The luck audit 🔬</h2>
 <div class="stale" style="background:#0d1408;border-color:#33501f;color:#c7f59a">
   <strong>The claim to beat:</strong> one 10T+ share is expected per <strong>~${RATE_10T_LABEL}</strong> of pool work, everywhere, at every hour.
   If any hour-of-day / day-of-week bucket <em>sustainedly</em> beats that, there's a method — and it'll glow below. Expectation is a flat, boring ~100%.

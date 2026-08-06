@@ -56,7 +56,7 @@ export async function renderHistory(): Promise<string> {
         </table>`;
 
   const body = `
-<h1>History</h1>
+<h1>Pool history</h1>
 <p class="lead">Charts built from Parahawk's own time series — last ${h.rangeDays} days · ${fmtInt(h.sampleCount)} samples · ${h.potLengths.length} completed pot cycles.</p>
 
 <h2>Pool hashrate (PH/s)</h2>
@@ -147,5 +147,5 @@ new Chart(document.getElementById("c_pots"), {
 </script>
 `;
 
-  return renderPage({ title: "History", active: "history", body });
+  return renderPage({ title: "History", active: "pool", body });
 }

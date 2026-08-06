@@ -107,5 +107,5 @@ new Chart(document.getElementById("c_dowC"), {
 </script>
 `;
 
-  return renderPage({ title: "Bravocado awards", active: "cados", body });
+  return renderPage({ title: "Bravocado awards", active: "awards", body });
 }

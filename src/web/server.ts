@@ -9,6 +9,7 @@ import { renderBoard } from "./pages/board.js";
 import { renderCados } from "./pages/cados.js";
 import { renderAddress } from "./pages/address.js";
 import { getOverview } from "../services/overview.js";
+import { POTMATH_CLIENT_JS } from "./potmath-client.js";
 
 /** Wrap an async page renderer with error handling. */
 function page(render: () => Promise<string>) {
@@ -48,6 +49,12 @@ export function createServer(): express.Express {
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
     }
+  });
+
+  // Shared Pot Math formulas for the client-side /calc widget (same source of
+  // truth as the server module — see potmath-client.ts).
+  app.get("/potmath.js", (_req, res) => {
+    res.type("application/javascript").set("cache-control", "no-cache").send(POTMATH_CLIENT_JS);
   });
 
   app.get("/healthz", (_req, res) => res.type("text").send("ok"));
