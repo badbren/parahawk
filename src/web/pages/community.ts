@@ -21,7 +21,7 @@ const CARDS: CommunityCard[] = [
     img: "/assets/community/bobby.png",
     alt: "Bobby's World",
     title: "Bobby's World",
-    tagline: "for all your home mining needs",
+    tagline: "for all your home mining needs · by Bobbyshakes",
     url: "https://bobbyshakesgit.github.io/bobbys-world/",
   },
   {
