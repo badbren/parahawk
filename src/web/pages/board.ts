@@ -3,6 +3,7 @@ import { getLeaderboard } from "../../data/parasite.js";
 import { renderCadosBody } from "./cados.js";
 import { getCadoData } from "../../services/cados.js";
 import { getCadoWinners, getAddressResolver } from "../../services/winners.js";
+import { getBravocadoFloor } from "../../services/bravocado.js";
 import { getStore } from "../../db/index.js";
 import { walletCell } from "../addr.js";
 import { fmtDiff, fmtInt, fmtDuration, timeAgo, esc } from "../format.js";
@@ -18,14 +19,23 @@ function bravoBadge(diff: number): string {
 }
 
 export async function renderBoard(): Promise<string> {
-  const [cados, cadoData, winners, lb, storedHits, resolve] = await Promise.all([
+  const [cados, cadoData, winners, lb, storedHits, resolve, floor] = await Promise.all([
     renderCadosBody().catch(() => ""),
     getCadoData().catch(() => null),
     getCadoWinners().catch(() => ({ winners: [], total: 0, matched: 0 })),
     getLeaderboard(),
     getStore().getHitsSince(0, 500).catch(() => [] as HitRow[]),
     getAddressResolver().catch(() => (() => null) as (m: string) => string | null),
+    getBravocadoFloor().catch(() => null),
   ]);
+
+  const floorCard = floor
+    ? `<div class="card"><div class="k">🥑 Bravocado floor</div><div class="v">${floor.floorBtc} <span class="dim" style="font-size:20px">BTC</span></div><div class="sub">${
+        floor.change7dPct !== null
+          ? `<span class="${floor.change7dPct >= 0 ? "green" : "red"}">${floor.change7dPct >= 0 ? "▲" : "▼"} ${Math.abs(floor.change7dPct).toFixed(1)}% 7d</span> · `
+          : ""
+      }via ${esc(floor.source)}</div></div>`
+    : "";
 
   const tenTHits = storedHits.filter((h) => h.difficulty >= TEN_T).sort((a, b) => b.ts - a.ts);
   // Authoritative all-time count: every 10T+ share that earned a Bravocado,
@@ -142,6 +152,7 @@ ${cados}
 <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
   <div class="card"><div class="k">All-time 10T+ winners</div><div class="v">${fmtInt(allTimeHits)}</div><div class="sub">miners with a best-ever share ≥10T — every one earned a Bravocado</div></div>
   <div class="card"><div class="k">Openable wallets</div><div class="v">${fmtInt(winners.matched)}<span class="dim" style="font-size:20px"> / ${fmtInt(winners.total)}</span></div><div class="sub">matched to a full address via the rental order book — click to open their stats</div></div>
+  ${floorCard}
 </div>
 <div class="tscroll" style="margin-top:12px"><table>
   <thead><tr><th>#</th><th>Address</th><th>Best diff (all-time)</th><th>Blocks</th></tr></thead>

@@ -41,11 +41,16 @@ export async function renderAbout(): Promise<string> {
       <li><strong>Rental history &amp; spend</strong> — a wallet's Refinery orders with an estimated sats/USD spend and fill rate, pulled together in one place.</li>
       <li><strong>Per-wallet hashrate timeline</strong> — a 14-day chart Parasite doesn't publish; Parahawk builds it.</li>
       <li><strong>Best-share-per-block chart</strong> — see a miner's recent big shares against the 10T Bravocado line.</li>
-      <li><strong>Cados won, per wallet</strong> — how many Bravocados a miner has earned, read straight from their achievements.</li>
+      <li><strong>Cados won, per wallet</strong> — how many Bravocados a miner has earned, and what they're worth at the live Bravocado ordinal floor.</li>
+      <li><strong>"Is renting worth it right now?"</strong> — break-even hashprice vs the live Refinery price, so you know if renting is +EV before you spend.</li>
+      <li><strong>Odds of a block</strong> — the real probability the pool finds one within the next hour / 6h / day / week.</li>
     </ul>
     <ul>
       <li><strong>All-time cado winners board</strong> — the whole 10T+ club ranked, with winners matched to openable wallets.</li>
       <li><strong>Badges tab</strong> — every Parasite achievement, how to earn it, who holds it, and a "most badges" leaderboard.</li>
+      <li><strong>Rental market intelligence</strong> — how much of the pool is rented right now, the biggest active renters, and their estimated spend.</li>
+      <li><strong>Pool luck &amp; Hall of Fame</strong> — is the pool running lucky lately? Plus the longest droughts and biggest pots ever.</li>
+      <li><strong>Cado velocity</strong> — how the current dry spell compares to the usual pace, and a live feed of recent big shares.</li>
       <li><strong>The luck audit</strong> — hits-per-PHd by hour &amp; weekday, to test "is any time luckier?" (spoiler: it isn't).</li>
       <li><strong>Rental odds calculator</strong> — hash × hours → your real odds of a 10T / 21T / block, and steady-vs-moonshot variance.</li>
       <li><strong>Live overview at a glance</strong> — pot age, an auto-scaling hashrate gauge, hashprice, difficulty, BTC price, users/workers.</li>

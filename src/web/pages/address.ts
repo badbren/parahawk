@@ -6,6 +6,7 @@ import { computeOdometer } from "../../math/work.js";
 import { integratePhd } from "../../math/pot.js";
 import { oddsForWork } from "../../math/odds.js";
 import { potMathFromOverview } from "../../services/potmath.js";
+import { getBravocadoFloor } from "../../services/bravocado.js";
 import { stakeValue } from "../../math/potmath.js";
 import { PHD_TO_DIFF } from "../../math/constants.js";
 import { BADGE_DEFS } from "../../data/badges.js";
@@ -66,11 +67,12 @@ export async function renderAddress(addressRaw: string): Promise<string> {
     });
   }
 
-  const [o, u, hits, snaps] = await Promise.all([
+  const [o, u, hits, snaps, floor] = await Promise.all([
     getOverview(),
     getUserStats(address),
     getStore().getHitsForAddress(address, 25).catch(() => []),
     getStore().getAddressSnapshots(address, 500).catch(() => [] as AddressSnapshot[]),
+    getBravocadoFloor().catch(() => null),
   ]);
 
   // Record a snapshot of this visit so the hashrate timeline builds up over time
@@ -95,6 +97,15 @@ export async function renderAddress(addressRaw: string): Promise<string> {
   const odds = oddsForWork(odo.lifetimePhd);
   const pm = potMathFromOverview(o);
   const btc = o.pool.btcPriceUsd;
+
+  // Value of this wallet's cados at the live Bravocado ordinal floor (Satflow).
+  const cadosWon = u.cadosWon ?? 0;
+  const cadoValueBtc = floor && cadosWon > 0 ? cadosWon * floor.floorBtc : 0;
+  const cadoValueUsd = btc > 0 ? cadoValueBtc * btc : 0;
+  const cadoSub =
+    cadosWon > 0 && floor
+      ? `≈ ${cadoValueBtc.toFixed(4)} BTC${cadoValueUsd > 0 ? ` (~${fmtUsd(cadoValueUsd)})` : ""} at ${floor.floorBtc} BTC floor`
+      : "10T+ shares that earned a Bravocado";
 
   // Your stake in the CURRENT pot = (your work this round / pool work this round)
   // × pot. Parasite exposes no per-wallet round work, so we MEASURE it: integrate
@@ -181,7 +192,7 @@ export async function renderAddress(addressRaw: string): Promise<string> {
 <p class="muted-note">Parasite badges this wallet has earned. Highlighted = earned (with count); dim = not yet. <a href="/board">See who holds the most →</a></p>
 
 <div class="grid statrow" style="margin-top:22px">
-  <div class="card"><div class="k">🥑 Cados won</div><div class="v green">${fmtInt(u.cadosWon ?? 0)}</div><div class="sub">10T+ shares that earned a Bravocado</div></div>
+  <div class="card"><div class="k">🥑 Cados won</div><div class="v green">${fmtInt(cadosWon)}</div><div class="sub">${cadoSub}</div></div>
   <div class="card"><div class="k">🥇 Blocks found</div><div class="v">${fmtInt(u.blocksFound ?? 0)}</div><div class="sub">shares that solved a block</div></div>
   <div class="card"><div class="k">⛏️ Blocks contributed</div><div class="v">${fmtInt(u.blocksParticipated ?? 0)}</div><div class="sub">${u.blockCount ? `${fmtInt(u.blockCount)} lifetime shares` : "blocks landed a share in"}</div></div>
   <div class="card"><div class="k">🏭 Rental orders</div><div class="v">${fmtInt(lifetimeOrders)}</div><div class="sub">${activeOrders ? `${activeOrders} active now` : "lifetime Refinery orders"}</div></div>

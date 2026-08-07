@@ -59,6 +59,10 @@ const RELEASES: Release[] = [
         text: "Bravocados shows cado velocity (how the current dry spell compares to the usual pace) and a live feed of recent big shares.",
       },
       {
+        tag: "New",
+        text: "Bravocado floor value — the live floor price (from Satflow) on the Bravocados board, and on wallet pages your cados are valued at floor in BTC & USD.",
+      },
+      {
         tag: "Fixed",
         text: "The wallet 'stake in this pot' now measures your actual work this round from tracked hashrate (instead of a wildly-high live-hashrate × pot-age guess), with honest coverage — Parasite doesn't publish per-wallet round work, so Parahawk measures it itself.",
       },
