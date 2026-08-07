@@ -54,7 +54,7 @@ export async function renderCommunity(): Promise<string> {
 
   const body = `
 <h1>Community 🌐</h1>
-<p class="lead">The people and resources behind Parasite Pool &amp; the OMB Bravocados. Click a card to head over.</p>
+<p class="lead">Community created resources behind the OMB &amp; Parasite movement. Click a card to head over.</p>
 
 <div class="cgrid">
   ${cards}
