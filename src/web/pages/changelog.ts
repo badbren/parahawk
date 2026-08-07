@@ -84,7 +84,23 @@ const RELEASES: Release[] = [
       },
       {
         tag: "Improved",
-        text: "Browser tab now simply reads “Parahawk”.",
+        text: "Browser tab now shows the Parahawk hawk icon next to the name.",
+      },
+      {
+        tag: "New",
+        text: "Achievement badges on wallet pages are clickable — open a badge to see the exact blocks that wallet is in (with mempool links) or its Refinery orders.",
+      },
+      {
+        tag: "New",
+        text: "Renters get a live current-round stake estimate on their wallet, from the delivered work on their active Refinery orders — a real figure even before a round baseline exists.",
+      },
+      {
+        tag: "Improved",
+        text: "Pot age is now pinned to the exact last-block time from mempool (it used to assume 10 minutes per block).",
+      },
+      {
+        tag: "Improved",
+        text: "The Parasite Power bar's glow now sweeps only across the filled power, and the tabs are centered with more breathing room.",
       },
       {
         tag: "New",

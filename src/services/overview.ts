@@ -1,5 +1,5 @@
 import { getPoolStats, poolFreshness } from "../data/parasite.js";
-import { getChainTip, chainFreshness } from "../data/mempool.js";
+import { getChainTip, chainFreshness, getBlockTimestamp } from "../data/mempool.js";
 import { computePotAge, type PotAge } from "../math/pot.js";
 import { evaluateHashprice, hashpriceSatsPerPhd, type HashpriceEval } from "../math/hashprice.js";
 import { getStore } from "../db/index.js";
@@ -35,7 +35,10 @@ export async function getOverview(): Promise<OverviewSnapshot> {
     pool.hashpriceSatsPerPhd = hashpriceSatsPerPhd(pool.networkDifficulty, chain.height);
   }
 
-  const potAge = computePotAge(chain.height, pool.lastFoundHeight);
+  // Pin pot age to the real last-block time from mempool (exact), falling back
+  // to the 10-min-per-block approximation if that lookup fails.
+  const lastBlockTimeMs = await getBlockTimestamp(pool.lastFoundHeight).catch(() => null);
+  const potAge = computePotAge(chain.height, pool.lastFoundHeight, lastBlockTimeMs ?? undefined);
   const hashprice = evaluateHashprice(pool.hashpriceSatsPerPhd, pool.btcPriceUsd);
   const latestHit = await getStore().getLatestHit().catch(() => null);
   const pf = poolFreshness();

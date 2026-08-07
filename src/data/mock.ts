@@ -173,6 +173,8 @@ export function mockUserStats(address: string, _now: number = Date.now()): UserS
     refineryOrderCount: orders.length + (seed % 60),
     lnAddress: `${(seed % 1e6).toString(16)}@sati.pro`,
     diffHistory,
+    blockHeights: Array.from({ length: seed % 12 }, (_, i) => 958000 - i * 137 - (seed % 90)),
+    blockWinnerHeights: seed % 7 === 0 ? [958500 - (seed % 200)] : [],
     badges: {
       ...(cadosWon ? { bravocado: cadosWon } : {}),
       ...(seed % 7 === 0 ? { block_winner: 1 } : {}),

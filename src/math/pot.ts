@@ -18,9 +18,15 @@ export interface PotAge {
 export function computePotAge(
   currentChainHeight: number,
   lastFoundHeight: number,
+  /** Exact unix-ms time of the last-found block. When given, pot age is measured
+   *  from the real block time instead of blocks × 10 min. */
+  lastBlockTimeMs?: number,
 ): PotAge {
   const blocks = Math.max(0, currentChainHeight - lastFoundHeight);
-  const minutes = blocks * MINUTES_PER_BLOCK;
+  const minutes =
+    lastBlockTimeMs && lastBlockTimeMs > 0
+      ? Math.max(0, (Date.now() - lastBlockTimeMs) / 60_000)
+      : blocks * MINUTES_PER_BLOCK;
   const hours = minutes / 60;
   const days = hours / 24;
   let verdict: PotVerdict;

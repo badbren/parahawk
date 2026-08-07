@@ -102,6 +102,10 @@ export interface UserStats {
   lnAddress?: string;
   /** All Parasite achievement/badge counts by type key (bravocado, block, …). */
   badges?: Record<string, number>;
+  /** Bitcoin heights of blocks this wallet landed a share in. */
+  blockHeights?: number[];
+  /** Bitcoin heights of blocks this wallet personally found. */
+  blockWinnerHeights?: number[];
   /** Per-block best-share history (recent), newest first: {height, diff, ts}. */
   diffHistory?: Array<{ height: number; diff: number; ts: number }>;
 }

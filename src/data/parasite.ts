@@ -438,6 +438,7 @@ interface UserApi {
 interface BadgeType {
   total?: number;
   bucket?: { count?: number };
+  unique?: Array<{ blockheight?: number }>;
 }
 interface AccountApi {
   account?: {
@@ -503,6 +504,8 @@ export async function getUserStats(address: string): Promise<UserStats> {
     const n = badgeCount(v);
     if (n > 0) badges[k] = n;
   }
+  const heightsOf = (k: string): number[] =>
+    (badgeTypes[k]?.unique ?? []).map((u) => Number(u.blockheight ?? 0)).filter((h) => h > 0).sort((a, b) => b - a);
   const diffHistory = (diffs ?? [])
     .map((d) => ({ height: Number(d.block_height ?? 0), diff: Number(d.difficulty ?? 0), ts: Number(d.block_timestamp ?? 0) * 1000 }))
     .filter((d) => d.height > 0)
@@ -525,6 +528,8 @@ export async function getUserStats(address: string): Promise<UserStats> {
     lnAddress: account.account?.ln_address,
     diffHistory,
     badges,
+    blockHeights: heightsOf("block"),
+    blockWinnerHeights: heightsOf("block_winner"),
   };
   userStatsCache.set(address, { v: result, exp: now + USER_STATS_TTL_MS });
   return result;

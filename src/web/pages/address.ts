@@ -126,20 +126,59 @@ export async function renderAddress(addressRaw: string): Promise<string> {
   const stakeUsd = btc > 0 ? (stakeSats / 1e8) * btc : 0;
   const coverageHours = baseline ? (Date.now() - baseline.ts) / 3_600_000 : 0;
   const lowCoverage = !haveBaseline || coverageHours < o.potAge.hours * 0.5;
+
+  // Rental-based estimate: delivered work on this wallet's ACTIVE Refinery orders
+  // (running now = this round). A data-grounded figure for renters that works
+  // even before a total_diff baseline exists.
+  const rentalRoundPhd = u.orders
+    .filter((ord) => ord.status === "active")
+    .reduce((s, ord) => s + (ord.deliveredPhd ?? (ord.requestedPhd * ord.progressPercent) / 100), 0);
+  const rentalStakeSats = stakeValue((rentalRoundPhd * PHD_TO_DIFF) / 1e9, pm.W);
+  const rentalStakeUsd = btc > 0 ? (rentalStakeSats / 1e8) * btc : 0;
   const luck = odo.luckRatio >= 1.1 ? "🍀 luckier than expected" : odo.luckRatio <= 0.9 ? "🥲 below expectation" : "≈ on expectation";
   const luckClass = odo.luckRatio >= 1.1 ? "green" : odo.luckRatio <= 0.9 ? "red" : "amber";
 
   // ── achievements row ─────────────────────────────────────────────────────────
+  // Earned badges that have detail on this page link to it (click to view).
+  const BADGE_LINK: Record<string, string> = {
+    refinery: "#rentals",
+    block: "#blocks",
+    block_winner: "#blocks",
+    bravocado: "#hits",
+  };
   const badges = u.badges ?? {};
   const badgeCells = BADGE_DEFS.map((b) => {
     const n = badges[b.key] ?? 0;
     const earned = n > 0;
-    return `<div class="badge ${earned ? "on" : "off"}" title="${esc(b.name)} — ${esc(b.howto)}">
+    const href = earned ? BADGE_LINK[b.key] : undefined;
+    const inner = `
       <div class="badge-ic">${b.emoji}</div>
       <div class="badge-nm">${esc(b.name)}</div>
-      <div class="badge-ct">${earned ? (n > 1 ? `×${fmtInt(n)}` : "✓") : "—"}</div>
-    </div>`;
+      <div class="badge-ct">${earned ? (n > 1 ? `×${fmtInt(n)}` : "✓") : "—"}${href ? ` <span class="badge-go">view →</span>` : ""}</div>`;
+    const cls = `badge ${earned ? "on" : "off"}${href ? " link" : ""}`;
+    const title = `${esc(b.name)} — ${esc(b.howto)}`;
+    return href
+      ? `<a class="${cls}" href="${href}" title="${title}">${inner}</a>`
+      : `<div class="${cls}" title="${title}">${inner}</div>`;
   }).join("");
+
+  // Blocks this wallet is in (from account badges' unique heights).
+  const blockWinner = u.blockWinnerHeights ?? [];
+  const blockPart = u.blockHeights ?? [];
+  const winnerSet = new Set(blockWinner);
+  const allBlocks = [...new Set([...blockWinner, ...blockPart])].sort((a, b) => b - a);
+  const blocksSection =
+    allBlocks.length > 0
+      ? `
+<h2 id="blocks">🧱 Blocks this wallet is in</h2>
+<p class="muted-note">${blockWinner.length ? `🥇 Found <strong>${blockWinner.length}</strong> block${blockWinner.length === 1 ? "" : "s"} outright. ` : ""}Landed a share in <strong>${blockPart.length}</strong> block${blockPart.length === 1 ? "" : "s"}. Click a height to open it on mempool.space.</p>
+<div class="blockchips">${allBlocks
+          .map(
+            (h) =>
+              `<a class="bchip${winnerSet.has(h) ? " won" : ""}" href="https://mempool.space/block/${h}" target="_blank" rel="noopener">${winnerSet.has(h) ? "🥇 " : ""}#${fmtInt(h)}</a>`,
+          )
+          .join("")}</div>`
+      : "";
 
   // ── rental spend ─────────────────────────────────────────────────────────────
   const hashprice = o.pool.hashpriceSatsPerPhd || 0;
@@ -213,6 +252,11 @@ export async function renderAddress(addressRaw: string): Promise<string> {
 ${lowCoverage
       ? `<p class="muted-note">⚠ <strong>Still filling in.</strong> We compute this exactly — work this round = your <code>total_diff</code> (lifetime work counter) now minus its value at the last block — but Parahawk has only had this wallet's baseline for <strong>${fmtDuration(coverageHours)}</strong> of the ${fmtDuration(o.potAge.hours)} pot, so it counts only the work since we started watching. It becomes exact once we've tracked a wallet from one block to the next — and every wallet you search gets tracked from then on.</p>`
       : `<p class="muted-note">Computed exactly from the growth in your lifetime work (<code>total_diff</code>) since the last block — your share of the pool's total round work (${fmtDiff(pm.W * 1e12)}) × the pot. <a href="/potmath">what's a pot's depth? →</a></p>`}
+${rentalRoundPhd > 0
+      ? `<div class="card" style="margin-top:12px"><div class="k">🏭 Rental-based estimate <span class="dim">· from your active orders</span></div><div class="v">~${fmtInt(rentalStakeSats)} sats${rentalStakeUsd > 0 ? ` <span class="dim" style="font-size:18px">≈ ${fmtUsd(rentalStakeUsd)}</span>` : ""}</div><div class="sub">from <strong>${fmtPhd(rentalRoundPhd)}</strong> delivered on your active Refinery orders this round — works without a baseline, but counts only rented work (not organic hashing).</div></div>`
+      : ""}
+
+${blocksSection}
 
 <h2>📈 Hashrate — last 14 days</h2>
 <div class="card">
@@ -229,7 +273,7 @@ ${lowCoverage
     : `<p class="muted-note" style="margin:6px 0">No recent per-block shares reported for this wallet.</p>`}
 </div>
 
-<h2>🏭 Rental history &amp; spend</h2>
+<h2 id="rentals">🏭 Rental history &amp; spend</h2>
 <div class="grid statrow">
   <div class="card"><div class="k">Estimated spend</div><div class="v">${fmtSats(spendSats)}</div><div class="sub">${spendUsd > 0 ? `≈ ${fmtUsd(spendUsd)} · ` : ""}~${Math.round(totalDeliveredPhd).toLocaleString("en-US")} PHd delivered @ live hashprice</div></div>
   <div class="card"><div class="k">Work ordered</div><div class="v">${Math.round(totalRequestedPhd).toLocaleString("en-US")}<small class="dim" style="font-size:15px"> PHd</small></div><div class="sub">${fmtInt(u.orders.length)} orders shown · ${fmtInt(lifetimeOrders)} lifetime</div></div>
@@ -259,7 +303,7 @@ ${
     : ""
 }
 
-<h2>🔴 10T+ hits <span class="dim" style="font-size:13px">· observed by Parahawk</span></h2>
+<h2 id="hits">🔴 10T+ hits <span class="dim" style="font-size:13px">· observed by Parahawk</span></h2>
 ${
   hits.length === 0
     ? `<p class="muted-note">No 10T+ hits recorded live for this wallet yet — the Cados-won badge above is the authoritative all-time count.</p>`
@@ -305,6 +349,13 @@ ${
 .badge.off .badge-nm{color:var(--dim)}
 .badge-ct{font-size:15px;color:#fff;margin-top:2px}
 .badge.off .badge-ct{color:var(--dim)}
+.badge.link{cursor:pointer;text-decoration:none;display:block}
+.badge.link:hover{border-color:var(--green);background:#0f1a09}
+.badge-go{color:var(--green);font-size:11px;white-space:nowrap}
+.blockchips{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.bchip{border:1px solid var(--line);background:#0a0a0a;color:#b7c9a6;padding:5px 10px;font-size:13px;text-decoration:none}
+.bchip:hover{border-color:var(--green);color:#fff}
+.bchip.won{border-color:#33501f;color:var(--green)}
 .statrow{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
 .statrow .card .v{font-size:34px}
 .tscroll{max-height:520px;overflow:auto;border:1px solid var(--line)}

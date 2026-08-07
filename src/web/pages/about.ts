@@ -41,6 +41,7 @@ export async function renderAbout(): Promise<string> {
       <li><strong>Rental history &amp; spend</strong> — a wallet's Refinery orders with an estimated sats/USD spend and fill rate, pulled together in one place.</li>
       <li><strong>Per-wallet hashrate timeline</strong> — a 14-day chart Parasite doesn't publish; Parahawk builds it.</li>
       <li><strong>Best-share-per-block chart</strong> — see a miner's recent big shares against the 10T Bravocado line.</li>
+      <li><strong>Drill into achievements</strong> — click a badge to view the exact blocks a wallet is in (with mempool links) or its Refinery orders.</li>
       <li><strong>Cados won, per wallet</strong> — how many Bravocados a miner has earned, and what they're worth at the live Bravocado ordinal floor.</li>
       <li><strong>"Is renting worth it right now?"</strong> — break-even hashprice vs the live Refinery price, so you know if renting is +EV before you spend.</li>
       <li><strong>Odds of a block</strong> — the real probability the pool finds one within the next hour / 6h / day / week.</li>

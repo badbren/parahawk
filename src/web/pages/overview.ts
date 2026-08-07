@@ -134,12 +134,13 @@ ${renderBlocksStrip(blocks)}
 .power{margin:22px 0 26px}
 .power-hd{display:flex;justify-content:space-between;color:var(--dim);font-size:15px;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px}
 .power-bar{height:14px;background:#0a0a0a;border:1px solid var(--line);position:relative;overflow:hidden}
-.power-bar>span{position:absolute;left:0;top:0;bottom:0;background:repeating-linear-gradient(90deg,#8fd14f 0,#8fd14f 3px,#0a0a0a 3px,#0a0a0a 6px)}
-/* A green pulse that sweeps left→right every 5s, like the pool is charging up. */
-.power-bar::after{content:"";position:absolute;top:0;bottom:0;left:0;width:100%;pointer-events:none;
-  background:linear-gradient(90deg,transparent 0%,rgba(143,209,79,0) 38%,rgba(143,209,79,.55) 50%,rgba(143,209,79,0) 62%,transparent 100%);
-  transform:translateX(-100%);animation:powerflow 5s linear infinite}
-@keyframes powerflow{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+.power-bar>span{position:absolute;left:0;top:0;bottom:0;overflow:hidden;background:repeating-linear-gradient(90deg,#8fd14f 0,#8fd14f 3px,#0a0a0a 3px,#0a0a0a 6px)}
+/* A bright pulse that sweeps left→right across ONLY the filled power every few
+   seconds, so the current green lights up like it's charging. */
+.power-bar>span::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(90deg,transparent 0%,rgba(215,255,170,.9) 50%,transparent 100%);
+  transform:translateX(-100%);animation:powerflow 4s ease-in-out infinite}
+@keyframes powerflow{0%{transform:translateX(-100%)}60%,100%{transform:translateX(100%)}}
 .hrgauge{max-width:100%;height:auto}
 </style>
 `;

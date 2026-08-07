@@ -46,3 +46,31 @@ export async function getChainTip(): Promise<ChainTip> {
 export function chainFreshness(): Freshness {
   return cache.freshness();
 }
+
+/** Block timestamps are immutable, so cache them forever by height. */
+const blockTimeCache = new Map<number, number>();
+
+/**
+ * Exact unix-ms timestamp of a bitcoin block by height, from mempool.space
+ * (height → hash → block.timestamp). Used to pin pot age / round-start to the
+ * real block time instead of the 10-min-per-block approximation. Returns null in
+ * mock mode or on any failure (callers fall back to the approximation).
+ */
+export async function getBlockTimestamp(height: number): Promise<number | null> {
+  if (config.mockData || !(height > 0)) return null;
+  const cached = blockTimeCache.get(height);
+  if (cached) return cached;
+  const base = config.mempool.baseUrl.replace(/\/$/, "");
+  try {
+    const hash = (await fetchText(`${base}/block-height/${height}`)).trim();
+    if (!hash) return null;
+    const block = await fetchJson<{ timestamp?: number }>(`${base}/block/${hash}`);
+    const ts = Number(block.timestamp ?? 0);
+    if (!(ts > 0)) return null;
+    const ms = ts * 1000;
+    blockTimeCache.set(height, ms);
+    return ms;
+  } catch {
+    return null;
+  }
+}

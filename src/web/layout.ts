@@ -57,7 +57,7 @@ header.top{border-bottom:1px solid var(--line); padding:18px 0; position:sticky;
 .toprow{display:flex; align-items:center; gap:24px; flex-wrap:wrap}
 .brand{display:inline-flex; align-items:center; gap:10px; border:0; line-height:0}
 .brand .phlogo{display:block}
-nav{display:flex; gap:26px; flex-wrap:wrap; align-items:center; margin-top:14px}
+nav{display:flex; gap:36px; flex-wrap:wrap; align-items:center; justify-content:center; margin-top:16px}
 nav a{
   border:0; color:var(--dim); text-transform:uppercase;
   font-family:Impact,"Arial Narrow","Arial Black",sans-serif; font-weight:900;
@@ -129,6 +129,8 @@ export async function renderPage(opts: PageOpts): Promise<string> {
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
+<link rel="icon" type="image/png" href="/assets/community/hawk.png"/>
+<link rel="apple-touch-icon" href="/assets/community/hawk.png"/>
 <title>Parahawk</title>
 <style>${STYLE}</style>
 ${opts.head ?? ""}

@@ -60,7 +60,7 @@ export async function renderCommunity(): Promise<string> {
   ${cards}
 </div>
 
-<p class="muted-note" style="margin-top:26px"><strong>Bobby</strong> helps run the Parasite side of things — <a href="https://bobbyshakesgit.github.io/bobbys-world/" target="_blank" rel="noopener">Bobby's World</a> is his home-mining shop (miners, PSUs and more).</p>
+<p class="muted-note" style="margin-top:26px"><a href="https://bobbyshakesgit.github.io/bobbys-world/" target="_blank" rel="noopener">Bobby's World</a> is his home-mining shop (miners, PSUs and more).</p>
 <p class="muted-note">The <strong>OMB</strong> and <strong>Bravocados</strong> wikis are built and maintained by <strong>Mr.V</strong>. 💚 Thank him with a donation: <span style="color:var(--green);word-break:break-all">bc1qfrt77mfrcrvjxcq7ahcgtm7w4czl6eftk4jk2c</span></p>
 <p class="muted-note">External sites, not affiliated with Parahawk.</p>
 
