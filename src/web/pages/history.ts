@@ -1,7 +1,9 @@
 import { renderPage } from "../layout.js";
 import { getHistory } from "../../services/history.js";
+import { getOverview } from "../../services/overview.js";
+import { computePoolHealth } from "../../services/poolhealth.js";
 import { getPoolStatsSeries, type PoolSeries } from "../../data/parasite.js";
-import { fmtInt, fmtDiff, esc, jsonForScript } from "../format.js";
+import { fmtInt, fmtDiff, fmtPhd, fmtDuration, esc, jsonForScript } from "../format.js";
 
 function maskAddr(a: string): string {
   if (a.includes("...") || a.includes("…")) return a;
@@ -40,6 +42,30 @@ function toggle(metric: string, active: "1h" | "4h" | "1d" | "1w"): string {
     .join("")}</div>`;
 }
 
+/** Luck as "1.24×", or an em-dash when there's nothing to score. */
+function fmtLuck(v: number | null): string {
+  return v == null ? "—" : `${v.toFixed(2)}×`;
+}
+
+/** One-line read on a luck verdict, keeping the scorekeeping tone. */
+function verdictText(verdict: "lucky" | "unlucky" | "even" | "none"): string {
+  switch (verdict) {
+    case "lucky":
+      return "running lucky — quicker than average";
+    case "unlucky":
+      return "running cold — slower than average";
+    case "even":
+      return "coin-flip even, as expected";
+    default:
+      return "no completed cycles yet";
+  }
+}
+
+/** Link a bitcoin block height to its explorer page. */
+function blockLink(height: number): string {
+  return `<a href="https://mempool.space/block/${height}" target="_blank" rel="noopener">#${fmtInt(height)}</a>`;
+}
+
 export async function renderHistory(): Promise<string> {
   const h = await getHistory(7);
 
@@ -52,6 +78,18 @@ export async function renderHistory(): Promise<string> {
   } catch {
     pool = { hashrate: h.hashrate, users: h.users, workers: [] };
   }
+
+  // Current network difficulty D (in T) — the single yardstick the luck index
+  // measures every completed cycle against. Falls back to the calibration
+  // constant (~127T) if the live overview call fails so the section still renders.
+  let dT = 127;
+  try {
+    const ov = await getOverview();
+    if (ov.pool.networkDifficulty > 0) dT = ov.pool.networkDifficulty / 1e12;
+  } catch {
+    /* keep the 127T fallback */
+  }
+  const health = computePoolHealth(h.potLengths, dT, 10);
 
   // Pool hashrate (default 1D) — from parasite.space historical series.
   const hrLabels = pool.hashrate.map((p) => labelOf(p.t));
@@ -80,6 +118,14 @@ export async function renderHistory(): Promise<string> {
     when: new Date(x.ts).toLocaleString("en-US"),
   }));
 
+  // Pot-length distribution: equal-width duration bins (hours) → bar chart.
+  const histLabels = health.histogram.map((b) =>
+    b.end > b.start
+      ? `${b.start.toFixed(1)}–${b.end.toFixed(1)}h`
+      : `${b.start.toFixed(1)}h`,
+  );
+  const histCounts = health.histogram.map((b) => b.count);
+
   const data = jsonForScript({
     hrLabels,
     hrVals,
@@ -93,6 +139,8 @@ export async function renderHistory(): Promise<string> {
     potPhd,
     hitPoints,
     hitMeta,
+    histLabels,
+    histCounts,
   });
 
   const hitsTable =
@@ -118,6 +166,36 @@ export async function renderHistory(): Promise<string> {
             .join("")}
         </table>`;
 
+  // ── Pool luck index ────────────────────────────────────────────────────────
+  const luckSection =
+    health.count === 0
+      ? `<p class="muted-note">No completed pot cycles collected yet — the luck index fills in as blocks are found.</p>`
+      : `<div class="grid">
+  <div class="card"><div class="k">Rolling luck · last ${health.rollingCount}</div><div class="v">${fmtLuck(health.rollingLuck)}</div><div class="sub">most recent cycles</div></div>
+  <div class="card"><div class="k">All ${health.count} cycles ${health.emoji}</div><div class="v">${fmtLuck(health.allLuck)}</div><div class="sub">${verdictText(health.verdict)}</div></div>
+  <div class="card"><div class="k">Avg block work</div><div class="v" style="font-size:22px">${fmtPhd(health.expectedPhd)}</div><div class="sub">phdNeededForBlock(${dT.toFixed(1)}T)</div></div>
+</div>`;
+
+  // ── Pot-length distribution stats ──────────────────────────────────────────
+  const distStats =
+    health.count === 0
+      ? ""
+      : `<div class="grid">
+  <div class="card"><div class="k">Median pot</div><div class="v">${fmtDuration(health.medianHours ?? 0)}</div><div class="sub">${health.count} cycles</div></div>
+  <div class="card"><div class="k">Shortest</div><div class="v">${fmtDuration(health.shortestHours ?? 0)}</div></div>
+  <div class="card"><div class="k">Longest</div><div class="v">${fmtDuration(health.longestHours ?? 0)}</div></div>
+</div>`;
+
+  // ── Hall of fame ───────────────────────────────────────────────────────────
+  const hallOfFame =
+    health.count === 0
+      ? `<p class="muted-note">Nothing enshrined yet — records appear once cycles are logged.</p>`
+      : `<div class="grid">
+  <div class="card"><div class="k">🏜️ Longest drought</div><div class="v">${fmtDuration(health.longestDrought!.durationHours)}</div><div class="sub">block ${blockLink(health.longestDrought!.height)} · ${fmtPhd(health.longestDrought!.estPhd)} banked</div></div>
+  <div class="card"><div class="k">⚡ Shortest pot</div><div class="v">${fmtDuration(health.shortestPot!.durationHours)}</div><div class="sub">block ${blockLink(health.shortestPot!.height)} · ${fmtPhd(health.shortestPot!.estPhd)} banked</div></div>
+  <div class="card"><div class="k">💰 Biggest pot</div><div class="v" style="font-size:22px">${fmtPhd(health.biggestPot!.estPhd)}</div><div class="sub">block ${blockLink(health.biggestPot!.height)} · ${fmtDuration(health.biggestPot!.durationHours)} to crack</div></div>
+</div>`;
+
   const body = `
 <style>
 .chartbox { border:1px solid #222; border-radius:6px; padding:14px 16px 8px; margin:18px 0; background:#0d0d0d; }
@@ -132,6 +210,22 @@ export async function renderHistory(): Promise<string> {
 
 <h1>Pool history</h1>
 <p class="lead">Charts built from Parahawk's own time series — last ${h.rangeDays} days · ${fmtInt(h.sampleCount)} samples · ${h.potLengths.length} completed pot cycles.</p>
+
+<h2>${health.emoji} Pool luck index</h2>
+<p class="muted-note">An average block takes ${fmtPhd(health.expectedPhd)} of work at today's difficulty (D=${dT.toFixed(1)}T). For each completed cycle, <strong>luck = expected ÷ actual banked work</strong> — above 1.00× means the pool cracked the pot quicker than an average block would take, below means it slogged. Pure scorekeeping: mining is memoryless, so a hot or cold run says nothing about the next block. (Every cycle is scored against <em>current</em> D, an approximation since difficulty drifts between retargets.)</p>
+${luckSection}
+
+<h2>Pot-length distribution</h2>
+<p class="muted-note">How long historical cycles ran, bucketed by duration (hours).</p>
+${distStats}
+<div class="chartbox">
+  <div class="chartbox-head"><h2>Duration histogram</h2></div>
+  <canvas id="c_hist" height="80"></canvas>
+</div>
+
+<h2>🏆 Hall of fame</h2>
+<p class="muted-note">Records across every visible cycle — the outliers, not the norm.</p>
+${hallOfFame}
 
 <div class="chartbox">
   <div class="chartbox-head">
@@ -274,6 +368,17 @@ new Chart(document.getElementById("c_hits"), {
     }
   }
 });
+if (D.histCounts && D.histCounts.length) {
+  new Chart(document.getElementById("c_hist"), {
+    type:"bar",
+    data:{ labels:D.histLabels, datasets:[{ label:"cycles", data:D.histCounts, backgroundColor:"rgba(143,209,79,.55)" }] },
+    options:{ responsive:true, maintainAspectRatio:true, plugins:{ legend:{ display:false } },
+      scales:{
+        x:{ title:{display:true,text:"pot duration (hours)"}, grid:{color:LINE} },
+        y:{ title:{display:true,text:"cycles"}, grid:{color:LINE}, beginAtZero:true, ticks:{precision:0} }
+      } }
+  });
+}
 new Chart(document.getElementById("c_pots"), {
   type:"bar",
   data:{ labels:D.potLabels, datasets:[

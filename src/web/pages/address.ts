@@ -3,6 +3,7 @@ import { getUserStats } from "../../data/parasite.js";
 import { getOverview } from "../../services/overview.js";
 import { getStore } from "../../db/index.js";
 import { computeOdometer } from "../../math/work.js";
+import { integratePhd } from "../../math/pot.js";
 import { oddsForWork } from "../../math/odds.js";
 import { potMathFromOverview } from "../../services/potmath.js";
 import { stakeValue } from "../../math/potmath.js";
@@ -95,11 +96,28 @@ export async function renderAddress(addressRaw: string): Promise<string> {
   const pm = potMathFromOverview(o);
   const btc = o.pool.btcPriceUsd;
 
-  // Your stake in the CURRENT pot (estimated from live hashrate × pot age).
-  const userPhdThisRound = u.hashratePhs * o.potAge.days;
-  const userWorkGThisRound = (userPhdThisRound * PHD_TO_DIFF) / 1e9;
-  const stakeSats = stakeValue(userWorkGThisRound, pm.W);
+  // Your stake in the CURRENT pot = (your work this round / pool work this round)
+  // × pot. Parasite exposes no per-wallet round work, so we MEASURE it: integrate
+  // this wallet's hashrate from Parahawk's own snapshots since the last block.
+  // Accurate for wallets we've tracked across the whole round; only partial (a
+  // floor) for freshly-seen ones — it fills in the longer we watch a wallet.
+  const lastBlockMs = Date.now() - o.potAge.hours * 3_600_000;
+  const roundSamples = snaps
+    .filter((s) => s.ts >= lastBlockMs)
+    .sort((a, b) => a.ts - b.ts)
+    .map((s) => ({ ts: s.ts, hashratePhs: s.hashrate }));
+  roundSamples.push({ ts: Date.now(), hashratePhs: u.hashratePhs });
+  const observedRoundPhd = integratePhd(roundSamples);
+  const coverageHours = roundSamples.length >= 2 ? (Date.now() - roundSamples[0]!.ts) / 3_600_000 : 0;
+  const roundG = (observedRoundPhd * PHD_TO_DIFF) / 1e9;
+  const stakeSats = stakeValue(roundG, pm.W);
   const stakeUsd = btc > 0 ? (stakeSats / 1e8) * btc : 0;
+  // Rough ceiling: if they'd run their current hashrate the WHOLE pot (capped at
+  // lifetime work). Shown when our measured coverage is thin.
+  const ceilPhd = Math.min(u.hashratePhs * o.potAge.days, odo.lifetimePhd);
+  const ceilSats = stakeValue((ceilPhd * PHD_TO_DIFF) / 1e9, pm.W);
+  const ceilUsd = btc > 0 ? (ceilSats / 1e8) * btc : 0;
+  const lowCoverage = coverageHours < o.potAge.hours * 0.5;
   const luck = odo.luckRatio >= 1.1 ? "🍀 luckier than expected" : odo.luckRatio <= 0.9 ? "🥲 below expectation" : "≈ on expectation";
   const luckClass = odo.luckRatio >= 1.1 ? "green" : odo.luckRatio <= 0.9 ? "red" : "amber";
 
@@ -176,12 +194,15 @@ export async function renderAddress(addressRaw: string): Promise<string> {
   <div class="card"><div class="k">Luck</div><div class="v ${luckClass}">${odo.luckRatio.toFixed(2)}×</div><div class="sub">${luck}</div></div>
 </div>
 
-<h2>Your stake in this pot</h2>
+<h2>Your stake in this pot <span class="dim" style="font-size:13px">· work measured this round</span></h2>
 <div class="card" style="border-color:#33501f;background:#0d1408">
-  <div class="k green">💰 Projected payout if the pot cracked right now</div>
-  <div class="v green">${fmtInt(stakeSats)} sats${stakeUsd > 0 ? ` <span class="dim" style="font-size:20px">≈ ${fmtUsd(stakeUsd)}</span>` : ""}</div>
-  <div class="sub">~${fmtInt(userWorkGThisRound)} G banked this round (${fmtHashrate(u.hashratePhs)} × ${fmtDuration(o.potAge.hours)} pot age) × ${fmtInt(pm.satsPerG)} sats/G — subsidy only, estimated from live hashrate. <a href="/potmath">what's a pot's depth? →</a></div>
+  <div class="k green">💰 Your cut if the pot cracked right now</div>
+  <div class="v green">~${fmtInt(stakeSats)} sats${stakeUsd > 0 ? ` <span class="dim" style="font-size:20px">≈ ${fmtUsd(stakeUsd)}</span>` : ""}</div>
+  <div class="sub">from <strong>${fmtPhd(observedRoundPhd)}</strong> of work Parahawk has measured for this wallet since the last block (${fmtDuration(coverageHours)} of the ${fmtDuration(o.potAge.hours)} pot) × ${fmtInt(pm.satsPerG)} sats/G — subsidy only.</div>
 </div>
+${lowCoverage
+      ? `<p class="muted-note">⚠ <strong>Still filling in.</strong> Parasite doesn't publish per-wallet round work, so Parahawk measures it by watching each wallet's hashrate — and it has only seen this one for <strong>${fmtDuration(coverageHours)}</strong> of the ${fmtDuration(o.potAge.hours)} pot, so the figure above counts just the work observed so far (it climbs the longer we track it, and is accurate once we've watched a full round). Ceiling if you ran your current hashrate the entire pot: <strong>~${fmtInt(ceilSats)} sats${ceilUsd > 0 ? ` ≈ ${fmtUsd(ceilUsd)}` : ""}</strong> (capped at your lifetime work).</p>`
+      : `<p class="muted-note">Measured from Parahawk's own hashrate samples since the last block. Your real cut is your share of the pool's total round work (${fmtDiff(pm.W * 1e12)}) × the pot. <a href="/potmath">what's a pot's depth? →</a></p>`}
 
 <h2>📈 Hashrate — last 14 days</h2>
 <div class="card">

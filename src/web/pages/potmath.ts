@@ -3,7 +3,7 @@ import { getOverview } from "../../services/overview.js";
 import { potMathFromOverview, getPotMathTrend } from "../../services/potmath.js";
 import { potMathCard } from "../potmath-card.js";
 import { getLuckAudit, type LuckCell } from "../../services/luck.js";
-import { fmtInt, fmtPhd, timeAgo, jsonForScript } from "../format.js";
+import { fmtInt, fmtPhd, fmtDuration, timeAgo, jsonForScript } from "../format.js";
 import {
   RATE_10T_PHD,
   RATE_21T_PHD,
@@ -11,6 +11,12 @@ import {
   PLEB_SHARE_EXPECTED_RETURN,
   PHD_TO_DIFF,
 } from "../../math/constants.js";
+import {
+  hashValuePerPhd,
+  breakEvenVerdict,
+  blockProbWithin,
+  BLOCK_SUBSIDY_SATS,
+} from "../../math/renting.js";
 
 /**
  * Pot Math — the single home for round scorekeeping AND the what-if tools.
@@ -50,6 +56,51 @@ export async function renderPotMath(): Promise<string> {
   const trend = await getPotMathTrend(pm).catch(() => null);
   const hashprice = o.pool.hashpriceSatsPerPhd ?? 50_000;
   const btc = o.pool.btcPriceUsd ?? 0;
+
+  // ── (new) renting break-even: raw hashvalue vs the live Refinery price ──────
+  const breakEvenSats = hashValuePerPhd(pm.D, BLOCK_SUBSIDY_SATS);
+  const be = breakEvenVerdict(hashprice, breakEvenSats);
+  const beStyle = {
+    cheap: {
+      border: "#33501f",
+      bg: "#0d1408",
+      cls: "green",
+      emoji: "🟢",
+      text: "renting is +EV — you pay less than the work is worth",
+    },
+    parity: {
+      border: "#5c4a1a",
+      bg: "#2a1a00",
+      cls: "amber",
+      emoji: "🟡",
+      text: "near parity — roughly fair value",
+    },
+    expensive: {
+      border: "#5c2b2b",
+      bg: "#1a0d0d",
+      cls: "red",
+      emoji: "🔴",
+      text: "overpaying — you pay more than the work is worth",
+    },
+  }[be.verdict];
+  const beRatioPct = Number.isFinite(be.ratio) ? Math.round(be.ratio * 100) : 0;
+
+  // ── (new) P(≥1 block within t) at the live expected wait ────────────────────
+  const probWindows: Array<[string, number]> = [
+    ["1 hour", 1 / 24],
+    ["6 hours", 6 / 24],
+    ["24 hours", 1],
+    ["3 days", 3],
+    ["7 days", 7],
+  ];
+  const probCards = probWindows
+    .map(([label, days]) => {
+      const p = blockProbWithin(days, pm.expectedDays) * 100;
+      const shown =
+        p >= 99.99 ? "≈100%" : p < 0.01 ? "<0.01%" : `${p.toFixed(p < 1 ? 2 : 1)}%`;
+      return `<div class="card"><div class="k">Within ${label}</div><div class="v">${shown}</div><div class="sub">P(≥1 block)</div></div>`;
+    })
+    .join("");
 
   // Prefill the calculator with live values (fallbacks if data is down).
   const seedW = pm.W.toFixed(2);
@@ -206,6 +257,55 @@ export async function renderPotMath(): Promise<string> {
 
 </div>
 </details>
+
+<h2>Is renting worth it right now? 💸</h2>
+<p class="muted-note">
+  Raw hashvalue: one PHd of pool work is worth <strong>${fmtInt(breakEvenSats)} sats</strong> — a block's reward (3.125 BTC subsidy, <em>no</em> tx fees) spread across the <strong>${fmtInt(pm.phdNeeded)} PHd</strong> it takes to find a block at today's difficulty (D=${pm.D.toFixed(1)}T). Hold that up against what the Refinery actually charges.
+</p>
+<div class="grid">
+  <div class="card"><div class="k">Break-even hashprice</div><div class="v">${fmtInt(breakEvenSats)}</div><div class="sub">sats/PHd · block reward ÷ work per block</div></div>
+  <div class="card"><div class="k">Live Refinery hashprice</div><div class="v">${fmtInt(hashprice)}</div><div class="sub">sats/PHd · what you pay right now</div></div>
+  <div class="card" style="border-color:${beStyle.border};background:${beStyle.bg}"><div class="k ${beStyle.cls}">Verdict ${beStyle.emoji}</div><div class="v ${beStyle.cls}">${beRatioPct}%</div><div class="sub">${beStyle.text} · live is ${beRatioPct}% of break-even</div></div>
+</div>
+<p class="muted-note" style="margin-top:8px">
+  This is the <strong>raw hashvalue</strong> — it ignores variance and pot-sharing, so it isn't your expected payout, just whether a PHd is priced above or below what it earns on average. Subsidy only; folding in mempool fees would nudge break-even up a little. Not financial advice.
+</p>
+
+<h2>Odds of a block within… ⏱</h2>
+<p class="muted-note">At the current expected wait of <strong>${fmtDuration(pm.expectedDays * 24)}</strong> per block (D=${pm.D.toFixed(1)}T, H=${pm.hGauge.toFixed(0)} PH/s), here's P(≥1 block) over each window = 1 − e<sup>−t/expected</sup>.</p>
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr))">
+  ${probCards}
+</div>
+<div class="stale" style="background:#1a0d0d;border-color:#5c2b2b;color:#ffbcbc;margin-top:14px">
+  Memoryless: these are <strong>probabilities, not predictions</strong>. A deep pot does <em>not</em> make the next block likelier — the odds above depend only on hashrate and difficulty, never on how long it's been. Scorekeeping, not forecasting.
+</div>
+
+<h2>Cado &amp; block pace at a hashrate ⚡</h2>
+<p class="muted-note">Drop in a hashrate to see the long-run pace it produces — 10T cados per day, blocks per day, and your slice of the pool this round. Prefilled with the live pool hashrate (${pm.hGauge.toFixed(0)} PH/s).</p>
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr))">
+  <div class="card"><div class="k">Hashrate (PH/s)</div><input type="number" id="pace_h" value="${pm.hGauge.toFixed(1)}" step="1" min="0"/></div>
+  <div class="card"><div class="k">🥑 10T cados / day</div><div class="v green" id="pace_cados">–</div><div class="sub">H ÷ ${RATE_10T_PHD} PHd per cado</div></div>
+  <div class="card"><div class="k">🎰 Blocks / day</div><div class="v red" id="pace_blocks">–</div><div class="sub">H ÷ ${RATE_BLOCK_PHD} PHd per block</div></div>
+  <div class="card"><div class="k">🏁 Your finder odds this round</div><div class="v" id="pace_finder">–</div><div class="sub">H ÷ pool ${pm.hGauge.toFixed(0)} PH/s</div></div>
+</div>
+<p class="muted-note" style="margin-top:8px">One PH/s sustained for one day is one PHd of work, so a day's pace is just PH/s ÷ the PHd-per-hit rate. Finder odds = your share of pool hashrate if a block landed while you're running. Long-run averages, not a schedule.</p>
+
+<script>
+(function(){
+  var $ = function(id){return document.getElementById(id);};
+  var poolH = ${pm.hGauge}, R10 = ${RATE_10T_PHD}, RBLK = ${RATE_BLOCK_PHD};
+  function fmtNum(n){ if(!isFinite(n)) return "—"; if(n>=100) return Math.round(n).toLocaleString("en-US"); if(n>=10) return n.toFixed(1); if(n>=1) return n.toFixed(2); return n.toFixed(3); }
+  function recomputePace(){
+    var H = parseFloat($("pace_h").value)||0;
+    $("pace_cados").textContent = H>0 ? fmtNum(H/R10)+" /day" : "–";
+    $("pace_blocks").textContent = H>0 ? fmtNum(H/RBLK)+" /day" : "–";
+    var finder = poolH>0 ? Math.min(1, H/poolH) : 0;
+    $("pace_finder").textContent = H>0 ? (finder*100>=99.95 ? "≈100%" : (finder*100).toFixed(finder*100<1?2:1)+"%") : "–";
+  }
+  $("pace_h").addEventListener("input", recomputePace);
+  recomputePace();
+})();
+</script>
 
 ${luckAudit}
 

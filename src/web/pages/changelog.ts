@@ -39,6 +39,30 @@ const RELEASES: Release[] = [
         text: "A Badges tab — every Parasite achievement with how to earn it, click a badge to see who holds it (the Bravocado list is complete), plus a 'most badges' leaderboard. It indexes wallets as winners are snapshotted and wallets are searched.",
       },
       {
+        tag: "New",
+        text: "Community tab (replaces Mr.V wiki) — Bobby's World home-mining shop alongside the OMB and Bravocados wikis, side by side.",
+      },
+      {
+        tag: "New",
+        text: "Calculator now answers 'is renting worth it right now?' (break-even hashprice vs the live Refinery price), shows the odds of a block within 1h/6h/24h/3d/7d, and a cado/block pace calculator for any hashrate.",
+      },
+      {
+        tag: "New",
+        text: "Order Books tab gained rental analytics — how much of the pool is rented right now, the biggest active renters (clickable) with estimated spend, and fill/flow stats.",
+      },
+      {
+        tag: "New",
+        text: "Pool tab gained a pool luck index (are we running lucky?), a pot-length distribution, and a Hall of Fame (longest droughts, biggest pots).",
+      },
+      {
+        tag: "New",
+        text: "Bravocados shows cado velocity (how the current dry spell compares to the usual pace) and a live feed of recent big shares.",
+      },
+      {
+        tag: "Fixed",
+        text: "The wallet 'stake in this pot' now measures your actual work this round from tracked hashrate (instead of a wildly-high live-hashrate × pot-age guess), with honest coverage — Parasite doesn't publish per-wallet round work, so Parahawk measures it itself.",
+      },
+      {
         tag: "Improved",
         text: "Wallet addresses across the site are now real links (hand cursor) wherever we can resolve them to a full address, so you can tell what's clickable.",
       },

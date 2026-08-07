@@ -5,7 +5,7 @@ import { getCadoData } from "../../services/cados.js";
 import { getCadoWinners, getAddressResolver } from "../../services/winners.js";
 import { getStore } from "../../db/index.js";
 import { walletCell } from "../addr.js";
-import { fmtDiff, fmtInt, esc } from "../format.js";
+import { fmtDiff, fmtInt, fmtDuration, timeAgo, esc } from "../format.js";
 import type { LeaderboardEntry } from "../../data/types.js";
 import type { HitRow } from "../../db/types.js";
 
@@ -65,6 +65,62 @@ export async function renderBoard(): Promise<string> {
           )
           .join("");
 
+  // ── cado velocity / dry-spell read ────────────────────────────────────────────
+  const velocity = (() => {
+    const lastTs = cadoData?.lastTs ?? null;
+    const medianGapHours = cadoData?.medianGapHours ?? null;
+    if (lastTs === null || medianGapHours === null) {
+      return `<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-top:12px">
+  <div class="card"><div class="k">Cado velocity</div><div class="v dim">—</div><div class="sub">not enough cado history yet to read a pace</div></div>
+</div>`;
+    }
+    const currentDrySpellHours = (Date.now() - lastTs) / 3.6e6;
+    const drySpellDays = currentDrySpellHours / 24;
+    const medianGapDays = medianGapHours / 24;
+    let verdict: string;
+    let vClass: string;
+    let vSub: string;
+    if (currentDrySpellHours < medianGapHours * 0.5) {
+      verdict = "🔥 cados dropping fast";
+      vClass = "green";
+      vSub = "current gap is well under the usual wait";
+    } else if (currentDrySpellHours > medianGapHours * 1.5) {
+      verdict = "🌵 dry spell";
+      vClass = "amber";
+      vSub = "current gap is running well over the usual wait";
+    } else {
+      verdict = "~ on pace";
+      vClass = "";
+      vSub = "current gap is about the usual wait";
+    }
+    return `<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-top:12px">
+  <div class="card"><div class="k">Days since last cado</div><div class="v">${drySpellDays.toFixed(1)}</div><div class="sub">${fmtDuration(currentDrySpellHours)} since the dispensary last sent one</div></div>
+  <div class="card"><div class="k">Median gap between cados</div><div class="v">${medianGapDays.toFixed(1)}d</div><div class="sub">the typical wait between drops (${fmtDuration(medianGapHours)})</div></div>
+  <div class="card"><div class="k">Pace</div><div class="v ${vClass}">${verdict}</div><div class="sub">${vSub}</div></div>
+</div>
+<p class="muted-note">Mining is memoryless: a long dry spell doesn't make the next Bravocado any more "due", and a fast streak doesn't make one less likely. This just reads the recent pace against the historical median — nothing more.</p>`;
+  })();
+
+  // ── recent big-share feed (10T+ hits Parahawk has observed live) ───────────────
+  const bigShareFeed = (() => {
+    const recent = tenTHits.slice(0, 25);
+    if (recent.length === 0) {
+      return `<p class="muted-note">None observed live yet — the winners board above is the authoritative all-time list.</p>`;
+    }
+    const rows = recent
+      .map(
+        (h) =>
+          `<tr><td class="dim">${timeAgo(h.ts)}</td><td>${walletCell(h.address, resolve)}</td><td>${fmtDiff(
+            h.difficulty,
+          )}</td><td>${bravoBadge(h.difficulty)}</td></tr>`,
+      )
+      .join("");
+    return `<div class="tscroll" style="margin-top:12px"><table>
+  <thead><tr><th>When</th><th>Address</th><th>Diff</th><th>Tier</th></tr></thead>
+  <tbody>${rows}</tbody>
+</table></div>`;
+  })();
+
   const diffRows = lb.difficulty
     .slice(0, 100)
     .map(
@@ -76,6 +132,9 @@ export async function renderBoard(): Promise<string> {
   const body = `
 <h1>Bravocados 🥑</h1>
 <p class="lead">When each Bravocado dropped, and who's in the 10T+ club this round. Auto-refreshes every 45s.</p>
+
+<h2>⏱️ Cado velocity <span class="dim" style="font-size:13px">· how the current dry spell compares to the usual pace</span></h2>
+${velocity}
 
 ${cados}
 
@@ -89,6 +148,9 @@ ${cados}
   <tbody>${winnerRows}</tbody>
 </table></div>
 <p class="muted-note">Ranked by best-ever share difficulty (from Parasite's all-time difficulty board). Parasite masks addresses, but any winner who has rented on the Refinery is matched back to their full address — those are <span class="green">clickable through to a full wallet stats page</span> (hashrate, rental history &amp; spend, hits). The rest stay masked. ${tenTHits.length ? `Parahawk has also directly observed ${fmtInt(tenTHits.length)} recent 10T+ hit${tenTHits.length === 1 ? "" : "s"} live.` : ""}</p>
+
+<h2>📡 Recent big shares <span class="dim" style="font-size:13px">· 10T+ hits Parahawk has observed live, newest first</span></h2>
+${bigShareFeed}
 
 <h2>10T+ club &amp; top difficulties — current round</h2>
 <div class="stale" style="background:#0d1408;border-color:#33501f;color:#c7f59a">
