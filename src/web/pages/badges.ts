@@ -28,11 +28,17 @@ export async function renderBadges(): Promise<string> {
 
   const cards = BADGE_DEFS.map((b) => {
     const n = idx.holders[b.key] ?? 0;
+    const complete = b.key === "bravocado";
+    const label = n
+      ? complete
+        ? `${fmtInt(n)} holders →`
+        : `${fmtInt(n)} indexed →`
+      : "view holders →";
     return `<a class="bcard" href="/badges/${encodeURIComponent(b.key)}">
       <div class="ic">${b.emoji}</div>
       <div>
         <div class="nm">${esc(b.name)}</div>
-        <div class="ct">${n ? `${fmtInt(n)} holder${n === 1 ? "" : "s"} →` : "view holders →"}</div>
+        <div class="ct">${label}</div>
         <div class="ht">${esc(b.howto)}</div>
       </div>
     </a>`;
@@ -60,7 +66,7 @@ export async function renderBadges(): Promise<string> {
 
 <h2>Achievements</h2>
 <div class="bgrid">${cards}</div>
-<p class="muted-note" style="margin-top:10px">The <strong>Bravocado</strong> holder list is complete (from the all-time 10T+ board). The others fill in as Parahawk indexes wallets — ${fmtInt(idx.indexedWallets)} indexed so far. Search a wallet to add it.</p>
+<p class="muted-note" style="margin-top:10px"><strong>How the counts work:</strong> <strong>Bravocado</strong> is complete (from the all-time 10T+ board). Every other count is <em>“indexed”, not all-time</em> — Parasite only exposes a full <code>bc1…</code> address for wallets in the <em>current</em> Refinery order book, wallets someone has searched, and cado winners, so those are the only ones Parahawk can look up badges for. So “${fmtInt(idx.holders.refinery ?? 0)} indexed” Refinery holders means the ones we can currently see, not everyone who has ever placed an order. It grows as the order book turns over and wallets get searched — ${fmtInt(idx.indexedWallets)} wallets indexed so far.</p>
 
 <h2>🏆 Most badges</h2>
 <div class="tscroll"><table>

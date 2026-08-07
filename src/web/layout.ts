@@ -70,7 +70,8 @@ nav a.active,nav a:hover{color:#fff}
 .addrsearch input::placeholder{color:#5a5a5a}
 .addrsearch button{background:#0a0a0a; border:1px solid var(--line); color:var(--dim); padding:0 12px; cursor:pointer; font-size:16px; text-transform:none; letter-spacing:0}
 .addrsearch button:hover{background:#141414; color:var(--fg)}
-@media(max-width:680px){.addrsearch{width:100%; margin-left:0}}
+.navtoggle{display:none; margin-left:auto; background:transparent; color:var(--green); border:1px solid var(--line); border-radius:5px; padding:8px 14px; font-size:22px; line-height:1; letter-spacing:0; text-transform:none; cursor:pointer}
+.navtoggle:hover{background:#0a0a0a; color:#c7f59a}
 main{padding:38px 0 80px}
 h1{font-size:34px; margin:0 0 8px; color:#fff}
 h2{font-size:24px; margin:48px 0 16px; color:#fff; text-transform:uppercase; letter-spacing:1.5px; border-bottom:1px solid var(--line); padding-bottom:10px}
@@ -102,6 +103,45 @@ footer.bot img{image-rendering:pixelated}
 .tip{display:flex; gap:20px; align-items:center}
 .tip .addr{color:var(--green); word-break:break-all}
 .muted-note{color:var(--dim); font-size:16px; max-width:82ch; line-height:1.55}
+img,svg,canvas{max-width:100%}
+h1,h2,h3,p,li,td,th,.v,.addr{overflow-wrap:anywhere}
+
+/* ── Mobile ─────────────────────────────────────────────────────────────── */
+@media(max-width:760px){
+  body{font-size:17px; letter-spacing:0}
+  .wrap{padding:0 16px}
+  main{padding:22px 0 56px}
+  header.top{padding:12px 0}
+  .brand svg{height:52px; width:auto}
+  .toprow{gap:12px}
+  .navtoggle{display:inline-flex; align-items:center; gap:8px}
+  .addrsearch{order:3; width:100%; margin-left:0; min-width:0}
+  nav{display:none; flex-direction:column; gap:0; margin-top:12px; width:100%; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:#070707}
+  nav.open{display:flex}
+  nav a{width:100%; text-align:left; font-size:21px; padding:14px 16px; border-bottom:1px solid var(--line); filter:none; letter-spacing:.5px}
+  nav a:last-child{border-bottom:0}
+  nav a.active{background:#0d1408; color:var(--green)}
+  h1{font-size:25px}
+  h2{font-size:18px; margin:32px 0 12px; letter-spacing:1px}
+  h3{font-size:16px}
+  p.lead{font-size:18px; margin-bottom:20px}
+  .card{padding:16px}
+  .card .v{font-size:30px}
+  .card .k{font-size:13px}
+  .big{padding:22px}
+  .big .v{font-size:52px}
+  table{display:block; overflow-x:auto; -webkit-overflow-scrolling:touch}
+  th,td{padding:9px 10px; font-size:14px; white-space:nowrap}
+  .stale{font-size:15px; padding:11px 14px}
+  footer.bot{padding:28px 0}
+  footer.bot .wrap{gap:22px}
+  .tip{gap:14px}
+}
+@media(max-width:400px){
+  .brand svg{height:44px}
+  h1{font-size:22px}
+  .card .v{font-size:26px}
+}
 `;
 
 export async function renderPage(opts: PageOpts): Promise<string> {
@@ -145,12 +185,13 @@ ${opts.head ?? ""}
 <header class="top"><div class="wrap">
   <div class="toprow">
     <a class="brand" href="/" aria-label="Parahawk home">${parahawkLogo({ height: 80 })}</a>
+    <button class="navtoggle" type="button" aria-label="Toggle menu" aria-controls="nav" aria-expanded="false" onclick="var n=document.getElementById('nav');var o=n.classList.toggle('open');this.setAttribute('aria-expanded',o);this.querySelector('.nticon').textContent=o?'✕':'☰';"><span class="nticon">☰</span> Menu</button>
     <form class="addrsearch" role="search" onsubmit="var v=this.q.value.trim(); if(v){window.location.href='/address/'+encodeURIComponent(v);} return false;">
       <input name="q" type="text" placeholder="search any wallet… (bc1…)" autocomplete="off" spellcheck="false" aria-label="Look up a wallet address"/>
       <button type="submit" aria-label="Search">⌕</button>
     </form>
   </div>
-  <nav>${nav}</nav>
+  <nav id="nav">${nav}</nav>
 </div></header>
 <main><div class="wrap">
 ${stale}

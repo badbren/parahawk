@@ -30,7 +30,9 @@ const FEATURES: Array<{ e: string; t: string; d: string }> = [
   { e: "🔬", t: "The luck audit", d: `Hits-per-PHd by hour &amp; weekday, to test "is any time luckier?" (spoiler: it isn't).` },
   { e: "🧾", t: "Rental odds calculator", d: "Hash × hours → your real odds of a 10T / 21T / block, and steady-vs-moonshot variance." },
   { e: "📟", t: "Live overview", d: "Pot age, an auto-scaling hashrate gauge, hashprice, difficulty, BTC price, users/workers." },
+  { e: "🗓️", t: "Pool history charts", d: "Hashrate, hashprice and users/workers over time (1H/4H/1D/1W), plus every completed pot cycle." },
   { e: "🧱", t: "Mempool block strip", d: "Recent blocks, each with its top Parasite miner." },
+  { e: "🌐", t: "Community hub", d: "Bobby's World home-mining shop and the OMB / Bravocados wikis, all in one place." },
 ];
 
 export async function renderAbout(): Promise<string> {
@@ -112,7 +114,7 @@ export async function renderAbout(): Promise<string> {
   <li>🧮 The Pot Math lives in <code>src/math/</code> and is covered by the test suite, so the numbers you see are the numbers the code proves.</li>
   <li>🖥️ Run your own copy with <code>npm run dev</code> — it boots in mock mode with zero credentials.</li>
 </ul>
-<p class="muted-note">Found a bug or want a feature? <a href="https://github.com/badbren/parahawk/issues" target="_blank" rel="noopener">Open an issue on GitHub</a> — see the <a href="/changelog">changelog</a> for what's shipped.</p>
+<p class="muted-note">Found a bug or want a feature? <a href="https://discord.com/users/1097991369986932828" target="_blank" rel="noopener">Message me on Discord</a> — see the <a href="/changelog">changelog</a> for what's shipped.</p>
 
 <h2>Support</h2>
 ${tip}

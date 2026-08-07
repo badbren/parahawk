@@ -116,6 +116,22 @@ const RELEASES: Release[] = [
       },
       {
         tag: "New",
+        text: "The Pool page's luck index, pot-length distribution and Hall of Fame now backfill real completed cycles from Parasite instead of starting empty.",
+      },
+      {
+        tag: "Improved",
+        text: "Mobile makeover — a proper hamburger menu and a responsive layout so the whole site reads cleanly on a phone.",
+      },
+      {
+        tag: "Improved",
+        text: "Snappier navigation — pages are briefly edge-cached, so moving between them is much faster.",
+      },
+      {
+        tag: "Improved",
+        text: "Badges page is clearer that non-Bravocado holder counts are “indexed” (wallets we can currently look up), not all-time totals.",
+      },
+      {
+        tag: "New",
         text: "24-hour trend indicators on the Calculator's Pot Math — round depth, rarity, share price, expected wait and the raw W / D / H inputs each show a green ▲ / red ▼ pill with the change vs ~24h ago, so you can tell at a glance if a number is trending up or down.",
       },
       {
@@ -215,13 +231,13 @@ export async function renderChangelog(): Promise<string> {
   <div class="cl-now-note">
     Parahawk is open source — read every change in full on
     <a href="https://github.com/badbren/parahawk" target="_blank" rel="noopener">GitHub</a>,
-    or <a href="https://github.com/badbren/parahawk/issues" target="_blank" rel="noopener">suggest the next one</a>.
+    or <a href="https://discord.com/users/1097991369986932828" target="_blank" rel="noopener">suggest the next one on Discord</a>.
   </div>
 </div>
 
 ${entries}
 
-<p class="muted-note" style="margin-top:30px">Versions are informal during beta. Spotted something broken or missing? <a href="https://github.com/badbren/parahawk/issues" target="_blank" rel="noopener">Open an issue</a> — it might be in the next release.</p>
+<p class="muted-note" style="margin-top:30px">Versions are informal during beta. Spotted something broken or missing? <a href="https://discord.com/users/1097991369986932828" target="_blank" rel="noopener">Message me on Discord</a> — it might be in the next release.</p>
 
 <style>
 .cl-now{display:flex;gap:28px;align-items:center;flex-wrap:wrap;border:2px solid var(--green);background:#0b1206;padding:20px 24px;margin:0 0 30px}

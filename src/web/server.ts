@@ -60,6 +60,11 @@ async function getPoolHistory(
 function page(render: () => Promise<string>) {
   return async (_req: express.Request, res: express.Response) => {
     try {
+      // Let Vercel's edge CDN serve the rendered page for ~20s (and stale for a
+      // bit while revalidating), so navigating between pages is instant and cold
+      // serverless instances don't re-fetch upstream on every hit. All pages are
+      // public and their own scripts refresh live bits client-side.
+      res.set("Cache-Control", "public, s-maxage=20, stale-while-revalidate=60");
       res.type("html").send(await render());
     } catch (err) {
       // Log server-side; never echo err.message (it can leak upstream URLs).
