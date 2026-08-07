@@ -115,6 +115,8 @@ export async function renderMarketplace(session: Session | null = null): Promise
 <h1>Marketplace</h1>
 <p class="lead">Every hashrate rental venue, one price. Parahawk normalizes each to <strong>sats/PHd</strong> so you can see — at a glance — who's cheapest, then rent from your own account and point it straight at Parasite. We're a price router, never a wallet. Auto-refreshes every 60s.</p>
 
+<p style="margin:-8px 0 18px"><a href="/order-books">📖 Live Refinery order book →</a> <span class="dim">— see who's renting into the pot right now.</span></p>
+
 <div class="promise">🔒 <strong>Non-custodial, always.</strong> Parahawk never holds your funds. You rent from your own venue account with your own balance; we just find you the best price and help you aim it at the pot.</div>
 
 ${headline}
