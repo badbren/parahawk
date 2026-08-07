@@ -53,11 +53,11 @@ body{
 a{color:var(--accent); text-decoration:none; border-bottom:1px dotted #4a5a33}
 a:hover{color:#c7f59a}
 .wrap{max-width:1760px; margin:0 auto; padding:0 40px}
-header.top{border-bottom:1px solid var(--line); padding:20px 0; position:sticky; top:0; background:var(--bg); z-index:5}
-header.top .wrap{display:flex; align-items:center; gap:28px; flex-wrap:wrap}
+header.top{border-bottom:1px solid var(--line); padding:18px 0; position:sticky; top:0; background:var(--bg); z-index:5}
+.toprow{display:flex; align-items:center; gap:24px; flex-wrap:wrap}
 .brand{display:inline-flex; align-items:center; gap:10px; border:0; line-height:0}
 .brand .phlogo{display:block}
-nav{display:flex; gap:16px; flex-wrap:wrap; align-items:center}
+nav{display:flex; gap:26px; flex-wrap:wrap; align-items:center; margin-top:14px}
 nav a{
   border:0; color:var(--dim); text-transform:uppercase;
   font-family:Impact,"Arial Narrow","Arial Black",sans-serif; font-weight:900;
@@ -65,7 +65,7 @@ nav a{
   filter:url(#nav-rough);
 }
 nav a.active,nav a:hover{color:#fff}
-.addrsearch{display:flex; gap:0; flex:1 1 150px; min-width:140px; align-self:center; margin-left:8px}
+.addrsearch{display:flex; gap:0; margin-left:auto; width:min(360px,42vw); min-width:200px}
 .addrsearch input{background:#0a0a0a; border:1px solid var(--line); border-right:0; color:var(--fg); padding:8px 12px; width:100%; font-size:14px}
 .addrsearch input::placeholder{color:#5a5a5a}
 .addrsearch button{background:#0a0a0a; border:1px solid var(--line); color:var(--dim); padding:0 12px; cursor:pointer; font-size:16px; text-transform:none; letter-spacing:0}
@@ -141,11 +141,14 @@ ${opts.head ?? ""}
   </filter>
 </defs></svg>
 <header class="top"><div class="wrap">
-  <a class="brand" href="/" aria-label="Parahawk home">${parahawkLogo({ height: 80 })}</a>
-  <nav>${nav}<form class="addrsearch" role="search" onsubmit="var v=this.q.value.trim(); if(v){window.location.href='/address/'+encodeURIComponent(v);} return false;">
-    <input name="q" type="text" placeholder="wallet address… (bc1…)" autocomplete="off" spellcheck="false" aria-label="Look up a wallet address"/>
-    <button type="submit" aria-label="Search">⌕</button>
-  </form></nav>
+  <div class="toprow">
+    <a class="brand" href="/" aria-label="Parahawk home">${parahawkLogo({ height: 80 })}</a>
+    <form class="addrsearch" role="search" onsubmit="var v=this.q.value.trim(); if(v){window.location.href='/address/'+encodeURIComponent(v);} return false;">
+      <input name="q" type="text" placeholder="search any wallet… (bc1…)" autocomplete="off" spellcheck="false" aria-label="Look up a wallet address"/>
+      <button type="submit" aria-label="Search">⌕</button>
+    </form>
+  </div>
+  <nav>${nav}</nav>
 </div></header>
 <main><div class="wrap">
 ${stale}

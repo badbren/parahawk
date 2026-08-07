@@ -67,6 +67,10 @@ const RELEASES: Release[] = [
         text: "Wallet addresses across the site are now real links (hand cursor) wherever we can resolve them to a full address, so you can tell what's clickable.",
       },
       {
+        tag: "Improved",
+        text: "Header tidy-up — the wallet search moved up next to the logo, giving the tabs their own row with room to breathe.",
+      },
+      {
         tag: "New",
         text: "24-hour trend indicators on the Calculator's Pot Math — round depth, rarity, share price, expected wait and the raw W / D / H inputs each show a green ▲ / red ▼ pill with the change vs ~24h ago, so you can tell at a glance if a number is trending up or down.",
       },
