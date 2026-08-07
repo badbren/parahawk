@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type express from "express";
 import { config } from "../config.js";
 
@@ -32,6 +32,17 @@ function secret(): string {
 const BC1_RE = /^bc1[a-z0-9]{20,87}$/;
 export function isValidAddress(addr: string): boolean {
   return BC1_RE.test(addr.trim().toLowerCase());
+}
+
+/**
+ * Addresses a wallet might sign in with — native segwit (bc1q), taproot (bc1p),
+ * and legacy/nested (1.../3...). Case is preserved for base58 (they're
+ * case-sensitive); the signature verify is the real gate. Used for auth, where
+ * the identity is whatever address the wallet controls.
+ */
+const SIGNABLE_RE = /^(bc1[a-z0-9]{20,87}|[13][a-km-zA-HJ-NP-Z1-9]{25,39})$/;
+export function isSignableAddress(addr: string): boolean {
+  return SIGNABLE_RE.test(addr.trim());
 }
 
 function b64url(buf: Buffer | string): string {
@@ -114,15 +125,54 @@ export function checkCsrf(address: string, token: string | undefined): boolean {
   return typeof token === "string" && safeEqual(token, csrfToken(address));
 }
 
+const NONCE_TTL_MS = 5 * 60 * 1000; // sign-in challenge good for 5 minutes
+
+/** The exact message the wallet signs. Server rebuilds it identically to verify. */
+export function buildSignInMessage(address: string, nonce: string): string {
+  return `Parahawk sign-in\nAddress: ${address}\nNonce: ${nonce}\n\nSigning proves you control this address. No funds move.`;
+}
+
+/** Issue a stateless, signed, short-lived sign-in nonce. */
+export function issueNonce(): { nonce: string; token: string } {
+  const nonce = randomBytes(16).toString("hex");
+  const payload = b64url(JSON.stringify({ nonce, exp: Date.now() + NONCE_TTL_MS }));
+  return { nonce, token: `${payload}.${sign(payload)}` };
+}
+
+/** Validate a nonce token (signature + expiry) and return the nonce, or null. */
+export function verifyNonce(token: string): string | null {
+  const dot = token.lastIndexOf(".");
+  if (dot < 0) return null;
+  const payload = token.slice(0, dot);
+  if (!safeEqual(token.slice(dot + 1), sign(payload))) return null;
+  try {
+    const { nonce, exp } = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    if (!nonce || !exp || exp < Date.now()) return null;
+    return nonce as string;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Verify a wallet signature over the connect nonce. Fails closed: in production
- * (MOCK_DATA=false) this throws until a real BIP-322 verifier is wired, so no
- * unauthenticated connect can ever succeed on a live site. In mock/dev it
- * accepts a well-formed address so the flow is testable without a wallet.
+ * Verify a wallet signature over the sign-in message. Fails closed: any error or
+ * a bad signature returns false, so no unauthenticated connect can succeed. Uses
+ * BIP-322 (what Xverse produces for segwit addresses). In mock/dev it accepts a
+ * well-formed address so the flow is testable without a wallet.
  */
-export function verifyWalletSignature(address: string, _message: string, _signature: string): boolean {
+export async function verifyWalletSignature(
+  address: string,
+  message: string,
+  signature: string,
+): Promise<boolean> {
   if (config.mockData) return isValidAddress(address);
-  // TODO(prod): verify `_signature` over `_message` for `address` via BIP-322
-  // (e.g. a bitcoinjs/bip322 verifier) before returning true.
-  throw new Error("wallet signature verification not yet implemented for production");
+  try {
+    // Lazy-load bip322-js so a native-module load issue on serverless can only
+    // ever break wallet sign-in, never the whole site's page rendering.
+    const { Verifier } = await import("bip322-js");
+    return Verifier.verifySignature(address, message, signature) === true;
+  } catch (err) {
+    console.error("[verifyWalletSignature] failed:", (err as Error).message);
+    return false;
+  }
 }

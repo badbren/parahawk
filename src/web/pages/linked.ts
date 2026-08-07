@@ -47,19 +47,66 @@ function flash(msg: string | undefined): string {
 
 /** The connect card, shown when there's no session. */
 function connectCard(): string {
-  const devNote = config.mockData
-    ? `<p class="muted-note">Dev mode: paste any <code>bc1…</code> address to simulate a connected wallet (no signature required locally).</p>`
-    : `<p class="muted-note">Connect with your bitcoin wallet — you'll sign a one-time message to prove the address is yours. Nothing is spent and no funds move.</p>`;
-  return `
+  if (config.mockData) {
+    return `
 <div class="card" style="max-width:640px">
   <h3>Connect your wallet</h3>
-  ${devNote}
+  <p class="muted-note">Dev mode: paste any <code>bc1…</code> address to simulate a connected wallet (no signature required locally).</p>
   <form method="POST" action="/account/connect" style="margin-top:12px">
     <input type="text" name="address" placeholder="bc1q…" autocomplete="off" spellcheck="false" required style="margin-bottom:12px"/>
     <button type="submit">Connect</button>
   </form>
   <p class="muted-note" style="margin-top:14px">Connecting is optional — the price board and wizard work without it. You only need it to link a venue key and place orders from your own account.</p>
 </div>`;
+  }
+
+  // Prod: connect via Xverse by signing a one-time nonce (BIP-322). No funds move.
+  return `
+<div class="card" style="max-width:640px">
+  <h3>Connect your wallet</h3>
+  <p class="muted-note">Connect with <strong>Xverse</strong> — you'll sign a one-time message to prove the address is yours. Nothing is spent and no funds move. Your wallet address becomes your Parahawk identity, so your linked venue keys belong only to you.</p>
+  <button type="button" id="xv-connect" style="margin-top:12px">Connect Xverse</button>
+  <div id="xv-status" class="muted-note" style="margin-top:12px"></div>
+  <p class="muted-note" style="margin-top:14px">Connecting is optional — the price board and wizard work without it. You only need it to link a venue key and place orders from your own account.</p>
+</div>
+<script>
+(function(){
+  var btn=document.getElementById('xv-connect'), st=document.getElementById('xv-status');
+  function say(m){ st.textContent=m; }
+  function provider(){ return (window.XverseProviders&&window.XverseProviders.BitcoinProvider)||window.BitcoinProvider||null; }
+  async function req(p,method,params){
+    // Xverse exposes request(method, params); tolerate both signatures.
+    try { return await p.request(method, params); }
+    catch(e){ return await p.request({ method:method, params:params }); }
+  }
+  btn.onclick=async function(){
+    var p=provider();
+    if(!p){ say('Xverse not detected. Install/enable the Xverse extension, then reload this page.'); return; }
+    btn.disabled=true; say('Opening Xverse…');
+    try {
+      // 1) get the wallet's payment address
+      var acc=await req(p,'getAddresses',{ purposes:['payment'], message:'Connect to Parahawk' });
+      var list=(acc&&acc.result&&acc.result.addresses)||(acc&&acc.addresses)||[];
+      var pay=list.find(function(a){return a.purpose==='payment';})||list[0];
+      if(!pay){ throw new Error('no address returned'); }
+      var address=pay.address;
+      say('Requesting signature for '+address.slice(0,10)+'…');
+      // 2) fetch a nonce + the exact message to sign
+      var chal=await fetch('/account/nonce?address='+encodeURIComponent(address)).then(function(r){return r.json();});
+      if(chal.error) throw new Error(chal.error);
+      // 3) sign it (BIP-322)
+      var sg=await req(p,'signMessage',{ address:address, message:chal.message, protocol:'BIP322' });
+      var signature=(sg&&sg.result&&sg.result.signature)||(sg&&sg.signature);
+      if(!signature) throw new Error('no signature returned');
+      // 4) hand it to the server to verify + open the session
+      var r=await fetch('/account/connect',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body:'address='+encodeURIComponent(address)+'&token='+encodeURIComponent(chal.token)+'&signature='+encodeURIComponent(signature)}).then(function(r){return r.json();});
+      if(r.ok){ say('Verified — signing you in…'); location.href='/account'; }
+      else throw new Error(r.error||'connect failed');
+    } catch(e){ say('Connect failed: '+((e&&e.message)||e)); btn.disabled=false; }
+  };
+})();
+</script>`;
 }
 
 function venueBlock(v: VenueMeta, linked: LinkedAccountView | undefined, csrf: string): string {

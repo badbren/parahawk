@@ -24,7 +24,11 @@ import {
   clearSession,
   verifyWalletSignature,
   isValidAddress,
+  isSignableAddress,
   checkCsrf,
+  issueNonce,
+  verifyNonce,
+  buildSignInMessage,
 } from "../services/auth.js";
 import { linkAccount, unlinkAccount, getCredentials, type Venue } from "../services/linked.js";
 import { isVaultReady } from "../services/vault.js";
@@ -195,19 +199,36 @@ export function createServer(): express.Express {
       res.status(500).type("text").send("internal error");
     }
   });
-  app.post("/account/connect", (req, res) => {
-    const address = String(req.body.address ?? "").trim().toLowerCase();
-    if (!sameOrigin(req)) return res.redirect(303, "/account?msg=err_addr");
-    if (!isValidAddress(address)) return res.redirect(303, "/account?msg=err_addr");
-    try {
-      const ok = verifyWalletSignature(address, String(req.body.message ?? ""), String(req.body.signature ?? ""));
-      if (!ok) return res.redirect(303, "/account?msg=err_addr");
+  // Issue a sign-in challenge for the wallet to sign (prod / BIP-322 flow).
+  app.get("/account/nonce", (req, res) => {
+    const address = String(req.query.address ?? "").trim();
+    if (!isSignableAddress(address)) return res.status(400).json({ error: "invalid address" });
+    const { nonce, token } = issueNonce();
+    res.json({ token, message: buildSignInMessage(address, nonce) });
+  });
+  app.post("/account/connect", async (req, res) => {
+    // Dev typed-address path lowercases bc1; prod uses the wallet's exact address
+    // (base58 is case-sensitive), gated by the signature check below.
+    if (config.mockData) {
+      const address = String(req.body.address ?? "").trim().toLowerCase();
+      if (!sameOrigin(req) || !isValidAddress(address)) return res.redirect(303, "/account?msg=err_addr");
       setSession(res, address);
-      res.redirect(303, "/account?msg=connected");
-    } catch {
-      // Prod path before BIP-322 verifier is wired: fail closed.
-      res.redirect(303, "/account?msg=err_auth");
+      return res.redirect(303, "/account?msg=connected");
     }
+    const address = String(req.body.address ?? "").trim();
+    if (!sameOrigin(req) || !isSignableAddress(address)) {
+      return res.status(400).json({ error: "invalid address" });
+    }
+    // Prod: verify a BIP-322 signature over our own nonce. The message is
+    // rebuilt server-side from the signed token, so the client can't alter it.
+    const nonce = verifyNonce(String(req.body.token ?? ""));
+    if (!nonce) return res.status(400).json({ error: "sign-in expired — please retry" });
+    const message = buildSignInMessage(address, nonce);
+    if (!(await verifyWalletSignature(address, message, String(req.body.signature ?? "")))) {
+      return res.status(400).json({ error: "signature did not verify" });
+    }
+    setSession(res, address);
+    res.json({ ok: true });
   });
   app.post("/account/disconnect", (_req, res) => {
     clearSession(res);
