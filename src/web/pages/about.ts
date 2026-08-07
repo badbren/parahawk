@@ -50,7 +50,7 @@ export async function renderAbout(): Promise<string> {
 
   const body = `
 <h1>About Parahawk</h1>
-<p class="lead">A free, tip-funded stats &amp; alerts platform for the <a href="https://parasite.space" target="_blank" rel="noopener">Parasite Pool</a> bitcoin mining community.</p>
+<p class="lead">A free stats &amp; alerts platform for the <a href="https://parasite.space" target="_blank" rel="noopener">Parasite Pool</a> bitcoin mining community.</p>
 
 <div class="whatis">
   <h2 style="margin-top:6px">What is Parahawk?</h2>
