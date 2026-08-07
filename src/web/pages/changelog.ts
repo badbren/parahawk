@@ -76,6 +76,18 @@ const RELEASES: Release[] = [
       },
       {
         tag: "New",
+        text: "Parahawk now indexes every wallet you search — plus the pool's known contributors it finds itself — so their achievements, stats and hashrate timelines build up automatically over time.",
+      },
+      {
+        tag: "Improved",
+        text: "Homepage Pool Hashrate gauge is bigger and refreshes on its own every 10s (no full-page reload), and the Parasite Power bar has a subtle left-to-right 'charging' shimmer.",
+      },
+      {
+        tag: "Improved",
+        text: "Browser tab now simply reads “Parahawk”.",
+      },
+      {
+        tag: "New",
         text: "24-hour trend indicators on the Calculator's Pot Math — round depth, rarity, share price, expected wait and the raw W / D / H inputs each show a green ▲ / red ▼ pill with the change vs ~24h ago, so you can tell at a glance if a number is trending up or down.",
       },
       {
