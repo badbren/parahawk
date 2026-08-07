@@ -103,6 +103,10 @@ const RELEASES: Release[] = [
         text: "The Parasite Power bar's glow now sweeps only across the filled power, and the tabs are centered with more breathing room.",
       },
       {
+        tag: "Improved",
+        text: "The About page's “What is Parahawk?” is now a clean card grid (matching this Changelog's look) instead of a wall of bullets.",
+      },
+      {
         tag: "New",
         text: "24-hour trend indicators on the Calculator's Pot Math — round depth, rarity, share price, expected wait and the raw W / D / H inputs each show a green ▲ / red ▼ pill with the change vs ~24h ago, so you can tell at a glance if a number is trending up or down.",
       },

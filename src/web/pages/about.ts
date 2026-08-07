@@ -11,6 +11,28 @@ import {
   PHD_TO_DIFF,
 } from "../../math/constants.js";
 
+/** "What is Parahawk?" feature cards (emoji, title, description). */
+const FEATURES: Array<{ e: string; t: string; d: string }> = [
+  { e: "🧮", t: "Pot Math, solved", d: "Round depth, rarity, share price and expected time-to-block — computed live so you don't have to." },
+  { e: "📈", t: "24-hour trends", d: "Every Pot Math number shows whether it's rising or falling vs a day ago. Not on Parasite." },
+  { e: "👛", t: "Click any wallet", d: "One scrollable stats page: achievements, cados won, blocks found, lifetime work, luck, live hashrate." },
+  { e: "🏭", t: "Rental history & spend", d: "A wallet's Refinery orders with estimated sats/USD spend and fill rate, all in one place." },
+  { e: "📉", t: "14-day hashrate timeline", d: "A per-wallet hashrate chart Parasite doesn't publish — Parahawk builds it." },
+  { e: "🏅", t: "Drill into achievements", d: "Click a badge to see the exact blocks a wallet is in (mempool links) or its Refinery orders." },
+  { e: "🥑", t: "Cados won + floor value", d: "How many Bravocados a wallet has earned, and what they're worth at the live ordinal floor." },
+  { e: "💰", t: "Is renting worth it?", d: "Break-even hashprice vs the live Refinery price, so you know if renting is +EV before you spend." },
+  { e: "🎲", t: "Odds of a block", d: "The real probability the pool finds one within the next hour, 6h, day or week." },
+  { e: "🏆", t: "All-time cado winners", d: "The whole 10T+ club ranked, with winners matched to openable wallet pages." },
+  { e: "🎖️", t: "Badges & most-badges", d: "Every Parasite achievement, how to earn it, who holds it, and a most-badges leaderboard." },
+  { e: "📊", t: "Rental market intel", d: "How much of the pool is rented right now, the biggest active renters, and their spend." },
+  { e: "🍀", t: "Pool luck & Hall of Fame", d: "Is the pool running lucky lately? Plus the longest droughts and biggest pots ever." },
+  { e: "⏱️", t: "Cado velocity", d: "How the current dry spell compares to the usual pace, plus a live feed of recent big shares." },
+  { e: "🔬", t: "The luck audit", d: `Hits-per-PHd by hour &amp; weekday, to test "is any time luckier?" (spoiler: it isn't).` },
+  { e: "🧾", t: "Rental odds calculator", d: "Hash × hours → your real odds of a 10T / 21T / block, and steady-vs-moonshot variance." },
+  { e: "📟", t: "Live overview", d: "Pot age, an auto-scaling hashrate gauge, hashprice, difficulty, BTC price, users/workers." },
+  { e: "🧱", t: "Mempool block strip", d: "Recent blocks, each with its top Parasite miner." },
+];
+
 export async function renderAbout(): Promise<string> {
   const qr = await tipQrDataUrl();
   const addr = config.lightningAddress;
@@ -32,34 +54,13 @@ export async function renderAbout(): Promise<string> {
 
 <div class="whatis">
   <h2 style="margin-top:6px">What is Parahawk?</h2>
-  <p>Parahawk turns Parasite Pool's raw numbers into things you can actually read and use — the math worked out for you, every wallet's stats gathered in one place, and views that simply don't exist on parasite.space or the OMB wikis. It's a companion, not a replacement: same data, made legible.</p>
-  <div class="whatis-cols">
-    <ul>
-      <li><strong>Pot Math, solved for you</strong> — round depth, rarity, share price and expected time-to-block, computed live from the pool so you don't have to.</li>
-      <li><strong>24-hour trends</strong> — every Pot Math number shows whether it's rising or falling vs a day ago. Not on Parasite.</li>
-      <li><strong>Click any wallet → full stats page</strong> — one scrollable template: achievements, cados won, blocks found, lifetime work, luck, live hashrate.</li>
-      <li><strong>Rental history &amp; spend</strong> — a wallet's Refinery orders with an estimated sats/USD spend and fill rate, pulled together in one place.</li>
-      <li><strong>Per-wallet hashrate timeline</strong> — a 14-day chart Parasite doesn't publish; Parahawk builds it.</li>
-      <li><strong>Best-share-per-block chart</strong> — see a miner's recent big shares against the 10T Bravocado line.</li>
-      <li><strong>Drill into achievements</strong> — click a badge to view the exact blocks a wallet is in (with mempool links) or its Refinery orders.</li>
-      <li><strong>Cados won, per wallet</strong> — how many Bravocados a miner has earned, and what they're worth at the live Bravocado ordinal floor.</li>
-      <li><strong>"Is renting worth it right now?"</strong> — break-even hashprice vs the live Refinery price, so you know if renting is +EV before you spend.</li>
-      <li><strong>Odds of a block</strong> — the real probability the pool finds one within the next hour / 6h / day / week.</li>
-    </ul>
-    <ul>
-      <li><strong>All-time cado winners board</strong> — the whole 10T+ club ranked, with winners matched to openable wallets.</li>
-      <li><strong>Badges tab</strong> — every Parasite achievement, how to earn it, who holds it, and a "most badges" leaderboard.</li>
-      <li><strong>Rental market intelligence</strong> — how much of the pool is rented right now, the biggest active renters, and their estimated spend.</li>
-      <li><strong>Pool luck &amp; Hall of Fame</strong> — is the pool running lucky lately? Plus the longest droughts and biggest pots ever.</li>
-      <li><strong>Cado velocity</strong> — how the current dry spell compares to the usual pace, and a live feed of recent big shares.</li>
-      <li><strong>The luck audit</strong> — hits-per-PHd by hour &amp; weekday, to test "is any time luckier?" (spoiler: it isn't).</li>
-      <li><strong>Rental odds calculator</strong> — hash × hours → your real odds of a 10T / 21T / block, and steady-vs-moonshot variance.</li>
-      <li><strong>Live overview at a glance</strong> — pot age, an auto-scaling hashrate gauge, hashprice, difficulty, BTC price, users/workers.</li>
-      <li><strong>Pool history charts</strong> — hashrate, hashprice, users/workers and every completed pot cycle (1H/4H/1D/1W).</li>
-      <li><strong>Mempool block strip</strong> — recent blocks with each one's top Parasite miner.</li>
-      <li><strong>Everything in plain English</strong> — clean numbers, captions, no jargon walls. Free, no ads, no tracking, <a href="https://github.com/badbren/parahawk" target="_blank" rel="noopener">open source</a>.</li>
-    </ul>
+  <p class="wi-lead">Parahawk turns Parasite Pool's raw numbers into things you can actually read and use — the math worked out for you, every wallet's stats gathered in one place, and views that simply don't exist on parasite.space or the OMB wikis. A companion, not a replacement: same data, made legible.</p>
+  <div class="wi-grid">
+    ${FEATURES.map(
+      (f) => `<div class="wi-card"><div class="wi-t"><span class="wi-e">${f.e}</span>${f.t}</div><div class="wi-d">${f.d}</div></div>`,
+    ).join("")}
   </div>
+  <p class="wi-foot">Everything in plain English — clean numbers, no jargon walls. Free, no ads, no tracking, <a href="https://github.com/badbren/parahawk" target="_blank" rel="noopener">open source</a>.</p>
 </div>
 
 <h2>What it does</h2>
@@ -73,11 +74,16 @@ export async function renderAbout(): Promise<string> {
 </ul>
 
 <style>
-.whatis{border:1px solid var(--line);background:#0a0a0a;padding:6px 22px 18px;margin:6px 0 30px}
-.whatis-cols{display:grid;grid-template-columns:1fr 1fr;gap:0 28px}
-@media(max-width:760px){.whatis-cols{grid-template-columns:1fr}}
-.whatis-cols ul{margin:6px 0;padding-left:22px}
-.whatis-cols li{margin:0 0 10px;line-height:1.5}
+.whatis{margin:6px 0 34px}
+.whatis h2{border:0;margin:0 0 6px;padding:0}
+.wi-lead{color:var(--dim);font-size:18px;line-height:1.5;max-width:80ch;margin:0 0 20px}
+.wi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.wi-card{border:1px solid var(--line);background:#0a0a0a;border-left:3px solid #33501f;padding:16px 18px;transition:border-color .12s,transform .12s}
+.wi-card:hover{border-color:var(--green);border-left-color:var(--green);transform:translateY(-2px)}
+.wi-t{color:#fff;font-size:17px;font-weight:600;display:flex;align-items:center;gap:10px}
+.wi-e{font-size:22px;line-height:1}
+.wi-d{color:#b7c9a6;font-size:14.5px;line-height:1.5;margin-top:8px}
+.wi-foot{color:var(--dim);font-size:15px;margin:18px 0 0}
 </style>
 
 <h2>How Parasite payouts work</h2>
