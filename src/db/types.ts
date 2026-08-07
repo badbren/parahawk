@@ -51,6 +51,13 @@ export interface HitRow {
   worker: string | null;
 }
 
+export interface AccountBadges {
+  address: string;
+  /** badge type → count (bravocado, block_winner, block, refinery, …). */
+  badges: Record<string, number>;
+  updatedAt: number; // unix ms
+}
+
 export interface LuckBucket {
   dayOfWeek: number; // 0=Sun..6=Sat
   hourOfDay: number; // 0..23
@@ -86,6 +93,11 @@ export interface Store {
   getLatestHit(): Promise<HitRow | null>;
 
   getLuckBuckets(): Promise<LuckBucket[]>;
+
+  /** Store a wallet's badge counts (indexed from account lookups). */
+  upsertAccountBadges(a: AccountBadges): Promise<void>;
+  /** All indexed wallets' badges, newest-updated first. */
+  getAccountBadges(limit: number): Promise<AccountBadges[]>;
 
   /** Aggregate + prune old raw samples. Safe to call periodically. */
   runMaintenance(): Promise<void>;

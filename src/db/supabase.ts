@@ -6,6 +6,7 @@ import type {
   BlockFound,
   WatchSubscription,
   AddressSnapshot,
+  AccountBadges,
   LuckBucket,
   HitRow,
 } from "./types.js";
@@ -265,6 +266,26 @@ export class SupabaseStore implements Store {
       .order("ts", { ascending: false })
       .limit(1);
     return data && data[0] ? this.rowToHit(data[0]) : null;
+  }
+
+  async upsertAccountBadges(a: AccountBadges): Promise<void> {
+    await this.db.from("account_badges").upsert(
+      { address: a.address, badges: a.badges, updated_at: iso(a.updatedAt) },
+      { onConflict: "address" },
+    );
+  }
+
+  async getAccountBadges(limit: number): Promise<AccountBadges[]> {
+    const { data } = await this.db
+      .from("account_badges")
+      .select("*")
+      .order("updated_at", { ascending: false })
+      .limit(limit);
+    return (data ?? []).map((r) => ({
+      address: r.address,
+      badges: (r.badges ?? {}) as Record<string, number>,
+      updatedAt: r.updated_at ? ms(r.updated_at) : 0,
+    }));
   }
 
   async runMaintenance(): Promise<void> {

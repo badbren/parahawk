@@ -73,8 +73,10 @@ export async function renderAddress(addressRaw: string): Promise<string> {
   ]);
 
   // Record a snapshot of this visit so the hashrate timeline builds up over time
-  // (Parasite has no historical per-address hashrate endpoint). Fire-and-forget.
-  void getStore()
+  // (Parasite has no historical per-address hashrate endpoint), and index this
+  // wallet's badges for the /badges tab. Fire-and-forget.
+  const store = getStore();
+  void store
     .insertAddressSnapshot({
       address,
       ts: Date.now(),
@@ -83,6 +85,9 @@ export async function renderAddress(addressRaw: string): Promise<string> {
       totalWork: u.totalWorkDiff,
     })
     .catch(() => {});
+  if (u.badges && Object.keys(u.badges).length > 0) {
+    void store.upsertAccountBadges({ address, badges: u.badges, updatedAt: Date.now() }).catch(() => {});
+  }
 
   const odo = computeOdometer(u.totalWorkDiff, u.bestDifficulty, o.pool.networkDifficulty);
   const odds = oddsForWork(odo.lifetimePhd);

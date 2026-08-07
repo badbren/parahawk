@@ -35,6 +35,10 @@ const RELEASES: Release[] = [
         text: "Achievements on wallet pages — the Parasite badges (Bravocado, Block Finder, Block Contributor, Refinery, Loyalty, and more) with counts and how to earn each one.",
       },
       {
+        tag: "New",
+        text: "A Badges tab — every Parasite achievement with how to earn it, click a badge to see who holds it (the Bravocado list is complete), plus a 'most badges' leaderboard. It indexes wallets as winners are snapshotted and wallets are searched.",
+      },
+      {
         tag: "Improved",
         text: "Wallet addresses across the site are now real links (hand cursor) wherever we can resolve them to a full address, so you can tell what's clickable.",
       },

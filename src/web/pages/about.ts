@@ -30,13 +30,49 @@ export async function renderAbout(): Promise<string> {
 <h1>About Parahawk</h1>
 <p class="lead">A free, tip-funded stats &amp; alerts platform for the <a href="https://parasite.space" target="_blank" rel="noopener">Parasite Pool</a> bitcoin mining community.</p>
 
+<div class="whatis">
+  <h2 style="margin-top:6px">What is Parahawk?</h2>
+  <p>Parahawk turns Parasite Pool's raw numbers into things you can actually read and use — the math worked out for you, every wallet's stats gathered in one place, and views that simply don't exist on parasite.space or the OMB wikis. It's a companion, not a replacement: same data, made legible.</p>
+  <div class="whatis-cols">
+    <ul>
+      <li><strong>Pot Math, solved for you</strong> — round depth, rarity, share price and expected time-to-block, computed live from the pool so you don't have to.</li>
+      <li><strong>24-hour trends</strong> — every Pot Math number shows whether it's rising or falling vs a day ago. Not on Parasite.</li>
+      <li><strong>Click any wallet → full stats page</strong> — one scrollable template: achievements, cados won, blocks found, lifetime work, luck, live hashrate.</li>
+      <li><strong>Rental history &amp; spend</strong> — a wallet's Refinery orders with an estimated sats/USD spend and fill rate, pulled together in one place.</li>
+      <li><strong>Per-wallet hashrate timeline</strong> — a 14-day chart Parasite doesn't publish; Parahawk builds it.</li>
+      <li><strong>Best-share-per-block chart</strong> — see a miner's recent big shares against the 10T Bravocado line.</li>
+      <li><strong>Cados won, per wallet</strong> — how many Bravocados a miner has earned, read straight from their achievements.</li>
+    </ul>
+    <ul>
+      <li><strong>All-time cado winners board</strong> — the whole 10T+ club ranked, with winners matched to openable wallets.</li>
+      <li><strong>Badges tab</strong> — every Parasite achievement, how to earn it, who holds it, and a "most badges" leaderboard.</li>
+      <li><strong>The luck audit</strong> — hits-per-PHd by hour &amp; weekday, to test "is any time luckier?" (spoiler: it isn't).</li>
+      <li><strong>Rental odds calculator</strong> — hash × hours → your real odds of a 10T / 21T / block, and steady-vs-moonshot variance.</li>
+      <li><strong>Live overview at a glance</strong> — pot age, an auto-scaling hashrate gauge, hashprice, difficulty, BTC price, users/workers.</li>
+      <li><strong>Pool history charts</strong> — hashrate, hashprice, users/workers and every completed pot cycle (1H/4H/1D/1W).</li>
+      <li><strong>Mempool block strip</strong> — recent blocks with each one's top Parasite miner.</li>
+      <li><strong>Everything in plain English</strong> — clean numbers, captions, no jargon walls. Free, no ads, no tracking, <a href="https://github.com/badbren/parahawk" target="_blank" rel="noopener">open source</a>.</li>
+    </ul>
+  </div>
+</div>
+
 <h2>What it does</h2>
 <ul>
   <li><strong>Live overview</strong> — pot age, pool hashrate, Refinery hashprice, network difficulty, BTC price, users/workers.</li>
   <li><strong>Pool history</strong> — charts with 1H/4H/1D/1W timeframes: hashrate, hashprice, users/workers, and every completed pot cycle.</li>
-  <li><strong>Pot Math</strong> — round depth, rarity, share price and expected wait, the luck audit (hits-per-PHd by hour &amp; weekday), and a what-if / rental-odds calculator.</li>
+  <li><strong>Calculator</strong> — round depth, rarity, share price and expected wait (with 24h trends), the luck audit, and a what-if / rental-odds calculator.</li>
+  <li><strong>Wallet stats</strong> — click any address for its achievements, cados won, rental history &amp; spend, and hashrate timeline.</li>
+  <li><strong>Bravocados &amp; Badges</strong> — the all-time cado winners board plus every Parasite achievement and who holds it.</li>
   <li><strong>Order Books</strong> — the live Refinery rental order book.</li>
 </ul>
+
+<style>
+.whatis{border:1px solid var(--line);background:#0a0a0a;padding:6px 22px 18px;margin:6px 0 30px}
+.whatis-cols{display:grid;grid-template-columns:1fr 1fr;gap:0 28px}
+@media(max-width:760px){.whatis-cols{grid-template-columns:1fr}}
+.whatis-cols ul{margin:6px 0;padding-left:22px}
+.whatis-cols li{margin:0 0 10px;line-height:1.5}
+</style>
 
 <h2>How Parasite payouts work</h2>
 <p>When the pool finds a block, the reward splits in two:</p>

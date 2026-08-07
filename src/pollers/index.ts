@@ -122,6 +122,9 @@ async function snapshotWinners(): Promise<void> {
         bestDifficulty: u.bestDifficulty,
         totalWork: u.totalWorkDiff,
       });
+      if (u.badges && Object.keys(u.badges).length > 0) {
+        await store.upsertAccountBadges({ address, badges: u.badges, updatedAt: Date.now() });
+      }
     } catch {
       /* one bad address shouldn't stop the rest */
     }

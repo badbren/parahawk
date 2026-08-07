@@ -7,6 +7,7 @@ import { hashrateGauge, gaugeScaleFor } from "./gauge.js";
 import { renderHistory } from "./pages/history.js";
 import { renderAbout } from "./pages/about.js";
 import { renderChangelog } from "./pages/changelog.js";
+import { renderBadges, renderBadgeHolders } from "./pages/badges.js";
 import { renderPotMath } from "./pages/potmath.js";
 import { potMathFromOverview, getPotMathTrend } from "../services/potmath.js";
 import { potMathCard } from "./potmath-card.js";
@@ -130,6 +131,15 @@ export function createServer(): express.Express {
     return hashrateGauge({ value: h, max: gaugeScaleFor(h), unit: "PH/s", size: 352 });
   }));
   app.get("/board", page(renderBoard));
+  app.get("/badges", page(renderBadges));
+  app.get("/badges/:type", async (req, res) => {
+    try {
+      res.type("html").send(await renderBadgeHolders(req.params.type));
+    } catch (err) {
+      console.error("[/badges/:type] failed:", err);
+      res.status(500).type("text").send("internal error");
+    }
+  });
   app.get("/order-books", page(renderOrderBooks));
   // Awards merged into the Bravocados board — redirect old links.
   app.get("/cados", (_req, res) => res.redirect(301, "/board"));

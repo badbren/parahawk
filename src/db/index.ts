@@ -1,7 +1,7 @@
 import { config, hasSupabase } from "../config.js";
 import { MemoryStore } from "./memory.js";
 import { SupabaseStore } from "./supabase.js";
-import { mockPoolStats, mockChainHeight, mockLastFoundHeight, mockHitsInRange } from "../data/mock.js";
+import { mockPoolStats, mockChainHeight, mockLastFoundHeight, mockHitsInRange, mockUserStats } from "../data/mock.js";
 import { integratePhd } from "../math/pot.js";
 import type { Store } from "./types.js";
 
@@ -84,6 +84,15 @@ export async function seedMockHistory(): Promise<void> {
   }
 
   await s.insertSamples(samples);
+
+  // Seed some account badges so the /badges tab shows a populated leaderboard.
+  for (let i = 0; i < 14; i++) {
+    const addr = `bc1qmockbadge${i.toString(36)}xxxxxxxxxxxxxxxxxxxxxxx`;
+    const mu = mockUserStats(addr, now);
+    if (mu.badges && Object.keys(mu.badges).length > 0) {
+      await s.upsertAccountBadges({ address: addr, badges: mu.badges, updatedAt: now - i * 3_600_000 });
+    }
+  }
 
   // Seed the 10T+ hit board so the chart + table are populated immediately.
   const hits = mockHitsInRange(start, now);

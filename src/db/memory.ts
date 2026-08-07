@@ -4,6 +4,7 @@ import type {
   BlockFound,
   WatchSubscription,
   AddressSnapshot,
+  AccountBadges,
   LuckBucket,
   HitRow,
 } from "./types.js";
@@ -20,6 +21,7 @@ export class MemoryStore implements Store {
   private watches: WatchSubscription[] = [];
   private snapshots: AddressSnapshot[] = [];
   private hits = new Map<string, HitRow>();
+  private accountBadges = new Map<string, AccountBadges>();
   private nextWatchId = 1;
 
   async insertSample(s: PollSample): Promise<void> {
@@ -119,6 +121,16 @@ export class MemoryStore implements Store {
     let latest: HitRow | null = null;
     for (const h of this.hits.values()) if (!latest || h.ts > latest.ts) latest = h;
     return latest;
+  }
+
+  async upsertAccountBadges(a: AccountBadges): Promise<void> {
+    this.accountBadges.set(a.address, a);
+  }
+
+  async getAccountBadges(limit: number): Promise<AccountBadges[]> {
+    return [...this.accountBadges.values()]
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, limit);
   }
 
   async runMaintenance(): Promise<void> {
