@@ -17,7 +17,6 @@ import {
   fmtInt,
   fmtUsd,
   fmtSats,
-  fmtDuration,
   jsonForScript,
   esc,
 } from "../format.js";
@@ -114,18 +113,34 @@ export async function renderAddress(addressRaw: string): Promise<string> {
   // We baseline each tracked wallet at round start; accurate for wallets tracked
   // since the last block, a floor for ones we've only just started watching.
   const lastBlockMs = Date.now() - o.potAge.hours * 3_600_000;
+  const roundMs = Math.max(1, Date.now() - lastBlockMs);
+  const wDiff = pm.W * 1e12; // pool's total round work, in difficulty units
   const inRound = snaps
     .filter((s) => s.ts >= lastBlockMs && s.totalWork > 0)
     .sort((a, b) => a.ts - b.ts);
-  const baseline = inRound[0] ?? null; // earliest total_diff we recorded this round
-  const haveBaseline = baseline !== null && u.totalWorkDiff >= baseline.totalWork;
-  const roundWorkDiff = haveBaseline ? Math.max(0, u.totalWorkDiff - baseline!.totalWork) : 0;
+  const baseline = inRound[0] ?? null;
+  // A baseline only helps if we captured it NEAR round start; otherwise it just
+  // marks when we began watching (mid-round) and would undercount badly.
+  const nearStart = baseline !== null && baseline.ts - lastBlockMs < 0.2 * roundMs;
+  let roundWorkDiff: number;
+  let assumedFull: boolean;
+  if (nearStart && u.totalWorkDiff >= baseline!.totalWork) {
+    // Exact: growth in total_diff since a round-start baseline.
+    roundWorkDiff = Math.max(0, u.totalWorkDiff - baseline!.totalWork);
+    assumedFull = false;
+  } else {
+    // No round-start baseline — treat this wallet's ALL-TIME work as this round's.
+    // Exact for anyone who started at/after the last block (most renters + new
+    // miners); an over-estimate for miners who ran in earlier rounds too. Capped
+    // at the pool's total round work as a sanity bound.
+    roundWorkDiff = Math.min(u.totalWorkDiff, wDiff);
+    assumedFull = true;
+  }
   const roundG = roundWorkDiff / 1e9;
   const roundPhd = roundWorkDiff / PHD_TO_DIFF;
+  const roundPct = wDiff > 0 ? (roundWorkDiff / wDiff) * 100 : 0;
   const stakeSats = stakeValue(roundG, pm.W);
   const stakeUsd = btc > 0 ? (stakeSats / 1e8) * btc : 0;
-  const coverageHours = baseline ? (Date.now() - baseline.ts) / 3_600_000 : 0;
-  const lowCoverage = !haveBaseline || coverageHours < o.potAge.hours * 0.5;
 
   // Rental-based estimate: delivered work on this wallet's ACTIVE Refinery orders
   // (running now = this round). A data-grounded figure for renters that works
@@ -241,17 +256,17 @@ export async function renderAddress(addressRaw: string): Promise<string> {
   <div class="card"><div class="k">Luck</div><div class="v ${luckClass}">${odo.luckRatio.toFixed(2)}×</div><div class="sub">${luck}</div></div>
 </div>
 
-<h2>Your stake in this pot <span class="dim" style="font-size:13px">· work measured this round</span></h2>
+<h2>Your stake in this pot <span class="dim" style="font-size:13px">· estimated cut this round</span></h2>
 <div class="card" style="border-color:#33501f;background:#0d1408">
   <div class="k green">💰 Your cut if the pot cracked right now</div>
   <div class="v green">~${fmtInt(stakeSats)} sats${stakeUsd > 0 ? ` <span class="dim" style="font-size:20px">≈ ${fmtUsd(stakeUsd)}</span>` : ""}</div>
-  <div class="sub">${haveBaseline
-      ? `your total work grew <strong>${fmtPhd(roundPhd)}</strong> since the last block (measured over ${fmtDuration(coverageHours)} of the ${fmtDuration(o.potAge.hours)} pot) — ${(pm.W > 0 ? (roundG / (pm.W * 1000)) * 100 : 0).toFixed(2)}% of the pool's round work, × the pot.`
-      : `no baseline yet — Parahawk just started tracking this wallet, so it can't measure this round's work until it has watched across a block.`}</div>
+  <div class="sub">${assumedFull
+      ? `your total work <strong>${fmtDiff(u.totalWorkDiff)}</strong> = ~<strong>${roundPct.toFixed(2)}%</strong> of the pool's round work (${fmtDiff(wDiff)}) × the pot.`
+      : `your work grew <strong>${fmtPhd(roundPhd)}</strong> since the last block = ~<strong>${roundPct.toFixed(2)}%</strong> of the pool's round work × the pot.`}</div>
 </div>
-${lowCoverage
-      ? `<p class="muted-note">⚠ <strong>Still filling in.</strong> We compute this exactly — work this round = your <code>total_diff</code> (lifetime work counter) now minus its value at the last block — but Parahawk has only had this wallet's baseline for <strong>${fmtDuration(coverageHours)}</strong> of the ${fmtDuration(o.potAge.hours)} pot, so it counts only the work since we started watching. It becomes exact once we've tracked a wallet from one block to the next — and every wallet you search gets tracked from then on.</p>`
-      : `<p class="muted-note">Computed exactly from the growth in your lifetime work (<code>total_diff</code>) since the last block — your share of the pool's total round work (${fmtDiff(pm.W * 1e12)}) × the pot. <a href="/potmath">what's a pot's depth? →</a></p>`}
+${assumedFull
+      ? `<p class="muted-note">ℹ️ Parasite doesn't publish per-wallet round work, so this counts your <strong>all-time</strong> work as this round's — <strong>spot-on if you started mining at or after the last block</strong> (as most renters &amp; new miners do), but an <strong>over-estimate if you were also mining in earlier rounds</strong>. Once Parahawk has a snapshot of your work from a block onward, it switches to measuring only this round, exactly.</p>`
+      : `<p class="muted-note">Measured exactly from the growth in your lifetime work (<code>total_diff</code>) since the last block. <a href="/potmath">what's a pot's depth? →</a></p>`}
 ${rentalRoundPhd > 0
       ? `<div class="card" style="margin-top:12px"><div class="k">🏭 Rental-based estimate <span class="dim">· from your active orders</span></div><div class="v">~${fmtInt(rentalStakeSats)} sats${rentalStakeUsd > 0 ? ` <span class="dim" style="font-size:18px">≈ ${fmtUsd(rentalStakeUsd)}</span>` : ""}</div><div class="sub">from <strong>${fmtPhd(rentalRoundPhd)}</strong> delivered on your active Refinery orders this round — works without a baseline, but counts only rented work (not organic hashing).</div></div>`
       : ""}

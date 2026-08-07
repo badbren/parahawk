@@ -107,6 +107,14 @@ const RELEASES: Release[] = [
         text: "The About page's “What is Parahawk?” is now a clean card grid (matching this Changelog's look) instead of a wall of bullets.",
       },
       {
+        tag: "Improved",
+        text: "The Pool page charts are redesigned — compact and side by side in tidy cards instead of giant stacked blocks.",
+      },
+      {
+        tag: "Fixed",
+        text: "Your stake in this pot now counts your total work as this round's when there's no round-start baseline — accurate if you started mining at/after the last block (most renters & new miners), instead of reading far too low.",
+      },
+      {
         tag: "New",
         text: "24-hour trend indicators on the Calculator's Pot Math — round depth, rarity, share price, expected wait and the raw W / D / H inputs each show a green ▲ / red ▼ pill with the change vs ~24h ago, so you can tell at a glance if a number is trending up or down.",
       },

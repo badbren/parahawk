@@ -198,10 +198,16 @@ export async function renderHistory(): Promise<string> {
 
   const body = `
 <style>
-.chartbox { border:1px solid #222; border-radius:6px; padding:14px 16px 8px; margin:18px 0; background:#0d0d0d; }
-.chartbox-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:6px; flex-wrap:wrap; }
-.chartbox-head h2 { margin:0; font-size:14px; border:0; padding:0; }
+.chartgrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(400px,1fr)); gap:16px; margin:14px 0; }
+.chartgrid .chartbox { margin:0; }
+.chartbox { border:1px solid #222; border-radius:6px; padding:14px 16px 12px; margin:18px 0; background:#0d0d0d; }
+.chartbox-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; flex-wrap:wrap; }
+.chartbox-head h2 { margin:0; font-size:14px; border:0; padding:0; color:#fff; text-transform:uppercase; letter-spacing:1px; }
+.chartbox-head h2 .unit { color:#8a8a8a; font-weight:400; font-size:11px; margin-left:6px; text-transform:none; letter-spacing:0; }
+.chartbox .cwrap { position:relative; height:230px; }
 .chartbox .cap { margin:2px 0 8px; }
+.sub-h { color:#8a8a8a; font-size:13px; font-weight:400; text-transform:none; letter-spacing:0; }
+.sub-hd { margin-top:18px; color:#fff; font-size:13px; text-transform:uppercase; letter-spacing:1px; }
 .tf-group { display:inline-flex; gap:4px; }
 .tf-group button { font-family:Consolas,monospace; font-size:11px; padding:3px 9px; background:#141414; color:#8a8a8a; border:1px solid #222; border-radius:4px; cursor:pointer; letter-spacing:.5px; transition:.12s; }
 .tf-group button:hover { color:#ccc; border-color:#333; }
@@ -215,53 +221,45 @@ export async function renderHistory(): Promise<string> {
 <p class="muted-note">An average block takes ${fmtPhd(health.expectedPhd)} of work at today's difficulty (D=${dT.toFixed(1)}T). For each completed cycle, <strong>luck = expected ÷ actual banked work</strong> — above 1.00× means the pool cracked the pot quicker than an average block would take, below means it slogged. Pure scorekeeping: mining is memoryless, so a hot or cold run says nothing about the next block. (Every cycle is scored against <em>current</em> D, an approximation since difficulty drifts between retargets.)</p>
 ${luckSection}
 
-<h2>Pot-length distribution</h2>
-<p class="muted-note">How long historical cycles ran, bucketed by duration (hours).</p>
+<h2>📊 Pool activity <span class="sub-h">live series · pick a timeframe</span></h2>
+<div class="chartgrid">
+  <div class="chartbox">
+    <div class="chartbox-head"><h2>Pool hashrate <span class="unit">PH/s</span></h2>${toggle("hashrate", "1d")}</div>
+    <div class="cwrap"><canvas id="c_hashrate"></canvas></div>
+  </div>
+  <div class="chartbox">
+    <div class="chartbox-head"><h2>Refinery hashprice <span class="unit">sats/PHd</span></h2>${toggle("hashprice", "1w")}</div>
+    <div class="cwrap"><canvas id="c_hashprice"></canvas></div>
+  </div>
+  <div class="chartbox">
+    <div class="chartbox-head"><h2>Users / workers online</h2>${toggle("usersworkers", "1d")}</div>
+    <div class="cwrap"><canvas id="c_usersworkers"></canvas></div>
+  </div>
+</div>
+<p class="muted-note" style="margin-top:2px">Hashprice is collected by Parahawk and deepens over time — it only moves at difficulty retargets, so short windows can look flat.</p>
+
+<h2>🔴 Top diffs per block <span class="sub-h">10T+ pop out</span></h2>
+<p class="muted-note">The best share found each block. Grey = sub-10T (the norm), 🔴 red = 10T+ (Bravocado), 🟠 amber = 21T+ (homeminers). Hover a dot for the miner (masked by Parasite), difficulty, and block. See the <a href="/board">Bravocado board</a> for the 10T+ club.</p>
+<div class="chartbox"><div class="cwrap" style="height:300px"><canvas id="c_hits"></canvas></div></div>
+<h3 class="sub-hd">Who hit it</h3>
+${hitsTable}
+
+<h2>⛏ Pot cycles <span class="sub-h">how long each pot ran</span></h2>
 ${distStats}
-<div class="chartbox">
-  <div class="chartbox-head"><h2>Duration histogram</h2></div>
-  <canvas id="c_hist" height="80"></canvas>
+<div class="chartgrid">
+  <div class="chartbox">
+    <div class="chartbox-head"><h2>Duration histogram</h2></div>
+    <div class="cwrap"><canvas id="c_hist"></canvas></div>
+  </div>
+  <div class="chartbox">
+    <div class="chartbox-head"><h2>Pot lengths per cycle</h2></div>
+    <div class="cwrap"><canvas id="c_pots"></canvas></div>
+  </div>
 </div>
 
 <h2>🏆 Hall of fame</h2>
 <p class="muted-note">Records across every visible cycle — the outliers, not the norm.</p>
 ${hallOfFame}
-
-<div class="chartbox">
-  <div class="chartbox-head">
-    <h2>Pool hashrate (PH/s)</h2>
-    ${toggle("hashrate", "1d")}
-  </div>
-  <canvas id="c_hashrate" height="90"></canvas>
-</div>
-
-<div class="chartbox">
-  <div class="chartbox-head">
-    <h2>Refinery hashprice (sats/PHd)</h2>
-    ${toggle("hashprice", "1w")}
-  </div>
-  <p class="muted-note cap">Hashprice history is collected by Parahawk and deepens over time — it only moves at difficulty retargets, so short windows may look flat or sparse.</p>
-  <canvas id="c_hashprice" height="90"></canvas>
-</div>
-
-<div class="chartbox">
-  <div class="chartbox-head">
-    <h2>Users / workers online</h2>
-    ${toggle("usersworkers", "1d")}
-  </div>
-  <canvas id="c_usersworkers" height="90"></canvas>
-</div>
-
-<h2>🔴 Top diffs per block — 10T+ pop out</h2>
-<p class="muted-note">The best share found each block. Grey = sub-10T (the norm), 🔴 red = 10T+ (Bravocado), 🟠 amber = 21T+ (homeminers). Hover a dot for the miner (masked by Parasite), difficulty, and block. See the <a href="/board">Bravocado board</a> for the 10T+ club.</p>
-<canvas id="c_hits" height="80"></canvas>
-
-<h3 style="margin-top:18px;color:#fff;font-size:13px;text-transform:uppercase;letter-spacing:1px">Who hit it</h3>
-${hitsTable}
-
-<h2>Pot lengths per cycle</h2>
-<p class="muted-note">Each completed cycle: duration (hours) and estimated PHd banked in the pot.</p>
-<canvas id="c_pots" height="90"></canvas>
 
 <p class="muted-note" style="margin-top:20px">${h.sampleCount < 24 ? "⚠ Small sample so far — charts fill in as the pollers collect data." : "Data auto-collects every ~45s; raw samples roll up hourly after 7 days."}</p>
 
@@ -273,7 +271,7 @@ Chart.defaults.color = DIM;
 Chart.defaults.borderColor = LINE;
 Chart.defaults.font.family = "Consolas, monospace";
 const baseOpts = (yTitle) => ({
-  responsive:true, maintainAspectRatio:true,
+  responsive:true, maintainAspectRatio:false,
   plugins:{ legend:{ display:false } },
   scales:{
     x:{ ticks:{ maxTicksLimit:8, autoSkip:true }, grid:{ color:LINE } },
@@ -353,7 +351,7 @@ new Chart(document.getElementById("c_hits"), {
     pointRadius:D.hitMeta.map(m => m.tier==="sub" ? 3 : 6),
     pointHoverRadius:8
   }]},
-  options:{ responsive:true,
+  options:{ responsive:true, maintainAspectRatio:false,
     plugins:{ legend:{display:false}, tooltip:{ callbacks:{
       label:(ctx)=>{ const m=D.hitMeta[ctx.dataIndex]||{}; return [
         m.tier+" hit — "+ctx.parsed.y+"T",
@@ -372,7 +370,7 @@ if (D.histCounts && D.histCounts.length) {
   new Chart(document.getElementById("c_hist"), {
     type:"bar",
     data:{ labels:D.histLabels, datasets:[{ label:"cycles", data:D.histCounts, backgroundColor:"rgba(143,209,79,.55)" }] },
-    options:{ responsive:true, maintainAspectRatio:true, plugins:{ legend:{ display:false } },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } },
       scales:{
         x:{ title:{display:true,text:"pot duration (hours)"}, grid:{color:LINE} },
         y:{ title:{display:true,text:"cycles"}, grid:{color:LINE}, beginAtZero:true, ticks:{precision:0} }
@@ -385,7 +383,7 @@ new Chart(document.getElementById("c_pots"), {
     { label:"Duration (h)", data:D.potHours, backgroundColor:"rgba(143,209,79,.5)", yAxisID:"y" },
     { label:"Est. PHd", data:D.potPhd, backgroundColor:"rgba(245,196,81,.5)", yAxisID:"y1" }
   ]},
-  options:{ responsive:true, plugins:{ legend:{ display:true } },
+  options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:true } },
     scales:{
       y:{ position:"left", title:{display:true,text:"hours"}, grid:{color:LINE} },
       y1:{ position:"right", title:{display:true,text:"PHd"}, grid:{drawOnChartArea:false} },
