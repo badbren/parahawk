@@ -127,7 +127,7 @@ export function mockUserStats(address: string, _now: number = Date.now()): UserS
   const bestDifficulty = Math.round(totalWorkDiff * (1.0 + frac * 0.5));
 
   const statuses: OrderStatus[] = ["active", "fulfilled", "expired"];
-  const orders: RefineryOrder[] = Array.from({ length: 2 + (seed % 3) }, (_, i) => {
+  const orders: RefineryOrder[] = Array.from({ length: 4 + (seed % 8) }, (_, i) => {
     const status = statuses[(seed + i) % statuses.length]!;
     const requestedPhd = 50 + ((seed >> (i + 1)) % 450);
     const progress =
@@ -136,13 +136,53 @@ export function mockUserStats(address: string, _now: number = Date.now()): UserS
       id: `ord_${(seed % 100000) + i}`,
       status,
       requestedPhd,
+      deliveredPhd: Math.round(requestedPhd * (progress / 100) * 10) / 10,
       hashratePhs: round1(0.5 + ((seed >> i) % 80) / 10),
       bestShare: Math.round(requestedPhd * PHD_TO_DIFF * (0.6 + ((seed >> i) % 100) / 100)),
       progressPercent: progress,
+      provider: (seed + i) % 2 === 0 ? "Refinery" : "UNKNOWN",
     };
   });
 
-  return { address, hashratePhs: hashrate, bestDifficulty, totalWorkDiff, orders };
+  // A per-block best-share history (recent), for the diff timeline chart.
+  const nowH = Math.floor(_now / (10 * 60 * 1000)) + 900_000; // ~chain height
+  const diffHistory = Array.from({ length: 40 }, (_, i) => {
+    const s = hashString(`${address}:diff:${i}`);
+    return {
+      height: nowH - i * 3,
+      diff: Math.round(bestDifficulty * (0.15 + (s % 90) / 100)),
+      ts: _now - i * 30 * 60 * 1000,
+    };
+  });
+
+  const cadosWon = bestDifficulty >= 10e12 ? 1 + (seed % 4) : 0;
+
+  return {
+    address,
+    hashratePhs: hashrate,
+    bestDifficulty,
+    totalWorkDiff,
+    orders,
+    workers: 1 + (seed % 6),
+    rigs: [],
+    blockCount: seed % 25000,
+    uptime: `${1 + (seed % 40)}d ${seed % 24}h`,
+    cadosWon,
+    blocksFound: seed % 7 === 0 ? 1 : 0,
+    blocksParticipated: seed % 12,
+    refineryOrderCount: orders.length + (seed % 60),
+    lnAddress: `${(seed % 1e6).toString(16)}@sati.pro`,
+    diffHistory,
+    badges: {
+      ...(cadosWon ? { bravocado: cadosWon } : {}),
+      ...(seed % 7 === 0 ? { block_winner: 1 } : {}),
+      ...(seed % 12 ? { block: seed % 12 } : {}),
+      refinery: orders.length + (seed % 60),
+      ...(seed % 3 === 0 ? { loyalty: 1 + (seed % 3) } : {}),
+      ...(seed % 5 === 0 ? { dispenser: 1 } : {}),
+      miner: 1,
+    },
+  };
 }
 
 export function mockRefineryState(now: number = Date.now()): RefineryState {

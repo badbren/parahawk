@@ -57,6 +57,15 @@ export async function renderAbout(): Promise<string> {
 </table>
 <p class="muted-note">1 PHd = ${(PHD_TO_DIFF / 1e9).toFixed(1)}G difficulty units. A miner's best difficulty typically lands around 1–1.5× their total accumulated work. Try the <a href="/potmath">Pot Math calculator</a>.</p>
 
+<h2>Open source</h2>
+<p>Parahawk is <strong>100% open source</strong>. Every formula on this site, the pollers, the Discord bot — all of it is on GitHub for anyone to read, audit, fork, or run themselves. No hidden math, no black box.</p>
+<ul>
+  <li>📦 <strong>Repo:</strong> <a href="https://github.com/badbren/parahawk" target="_blank" rel="noopener">github.com/badbren/parahawk</a> — clone it, open an issue, or send a pull request.</li>
+  <li>🧮 The Pot Math lives in <code>src/math/</code> and is covered by the test suite, so the numbers you see are the numbers the code proves.</li>
+  <li>🖥️ Run your own copy with <code>npm run dev</code> — it boots in mock mode with zero credentials.</li>
+</ul>
+<p class="muted-note">Found a bug or want a feature? <a href="https://github.com/badbren/parahawk/issues" target="_blank" rel="noopener">Open an issue on GitHub</a> — see the <a href="/changelog">changelog</a> for what's shipped.</p>
+
 <h2>Support</h2>
 ${tip}
 

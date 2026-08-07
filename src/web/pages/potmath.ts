@@ -1,6 +1,6 @@
 import { renderPage } from "../layout.js";
 import { getOverview } from "../../services/overview.js";
-import { potMathFromOverview } from "../../services/potmath.js";
+import { potMathFromOverview, getPotMathTrend } from "../../services/potmath.js";
 import { potMathCard } from "../potmath-card.js";
 import { getLuckAudit, type LuckCell } from "../../services/luck.js";
 import { fmtInt, fmtPhd, timeAgo, jsonForScript } from "../format.js";
@@ -47,6 +47,7 @@ function cellColor(c: LuckCell | undefined): string {
 export async function renderPotMath(): Promise<string> {
   const [o, audit] = await Promise.all([getOverview(), getLuckAudit().catch(() => null)]);
   const pm = potMathFromOverview(o);
+  const trend = await getPotMathTrend(pm).catch(() => null);
   const hashprice = o.pool.hashpriceSatsPerPhd ?? 50_000;
   const btc = o.pool.btcPriceUsd ?? 0;
 
@@ -131,7 +132,7 @@ export async function renderPotMath(): Promise<string> {
 <h1>Calculator</h1>
 <p class="lead">The four numbers that describe the current round — depth, rarity, share price, and expected wait — from live pool data, plus a what-if calculator. Scorekeeping, never a forecast.</p>
 
-${potMathCard(pm)}
+<div id="pmcard">${potMathCard(pm, trend)}</div>
 
 <p class="muted-note" style="margin:-6px 0 26px">
   Want to run your own numbers? <strong>Open the calculator</strong> below · look up <a href="/">live pool stats →</a>
@@ -287,17 +288,31 @@ function recomputeRental(){
 ["hr","hours","budget","phd"].forEach(id => $C(id).addEventListener("input", recomputeRental));
 recomputeRental();
 </script>
-<script>setTimeout(function(){location.reload();},30000);</script>
+<script>
+// Refresh only the live Pot Math card in place — no full-page reload, so the
+// open calculator keeps its state and the page never flashes.
+(function(){
+  function refresh(){
+    fetch("/potmath/card",{cache:"no-store"})
+      .then(function(r){return r.ok?r.text():null;})
+      .then(function(html){ if(html){var el=document.getElementById("pmcard"); if(el) el.innerHTML=html;} })
+      .catch(function(){});
+  }
+  setInterval(refresh, 45000);
+})();
+</script>
 
 <style>
-.pbar{position:relative;height:34px;margin:26px 0 4px;background:linear-gradient(90deg,#0d1408,#1a0d0d);border:1px solid var(--line)}
+/* Three clear bands: percentile labels ABOVE, the bar, then the "you are here"
+   value BELOW — so nothing stacks on top of anything else. */
+.pbar{position:relative;height:34px;margin:46px 0 48px;background:linear-gradient(90deg,#0d1408,#1a0d0d);border:1px solid var(--line)}
 .pbar-fill{position:absolute;left:0;top:0;bottom:0;background:rgba(143,209,79,.16);border-right:2px solid var(--green)}
 .pbar .pmk{position:absolute;top:0;bottom:0;transform:translateX(-50%);color:var(--dim);font-size:13px}
 .pbar .pmk i{position:absolute;top:0;bottom:0;left:50%;width:1px;background:#333}
-.pbar .pmk b{position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-weight:400;white-space:nowrap}
-.pbar-here{position:absolute;top:0;transform:translateX(-50%);color:var(--green);text-align:center}
-.pbar-here b{position:absolute;bottom:-2px;left:50%;transform:translateX(-50%);font-size:13px;white-space:nowrap}
-.pbar-here i{position:absolute;top:2px;left:50%;transform:translateX(-50%);font-style:normal}
+.pbar .pmk b{position:absolute;top:-26px;left:50%;transform:translateX(-50%);font-weight:400;white-space:nowrap;padding:0 4px;background:var(--bg)}
+.pbar-here{position:absolute;top:0;bottom:0;width:2px;background:var(--green);transform:translateX(-50%);color:var(--green)}
+.pbar-here i{position:absolute;bottom:-17px;left:50%;transform:translateX(-50%);font-style:normal;font-size:12px;line-height:1}
+.pbar-here b{position:absolute;top:48px;left:50%;transform:translateX(-50%);font-size:13px;white-space:nowrap;background:var(--bg);padding:0 5px}
 .calcwrap{border:1px solid var(--line);background:#070707;margin:26px 0;padding:0}
 .calcwrap>summary{cursor:pointer;padding:18px 22px;color:var(--green);font-size:19px;letter-spacing:1px;list-style:none;user-select:none}
 .calcwrap>summary::-webkit-details-marker{display:none}

@@ -1,7 +1,10 @@
 import { renderPage } from "../layout.js";
 import { getLeaderboard } from "../../data/parasite.js";
 import { renderCadosBody } from "./cados.js";
+import { getCadoData } from "../../services/cados.js";
+import { getCadoWinners, getAddressResolver } from "../../services/winners.js";
 import { getStore } from "../../db/index.js";
+import { walletCell } from "../addr.js";
 import { fmtDiff, fmtInt, esc } from "../format.js";
 import type { LeaderboardEntry } from "../../data/types.js";
 import type { HitRow } from "../../db/types.js";
@@ -9,38 +12,44 @@ import type { HitRow } from "../../db/types.js";
 const TEN_T = 10e12;
 const TWENTYONE_T = 21e12;
 
-/** A full bc1/3/1 address gets a link; masked ones don't. */
-function addrCell(address: string): string {
-  const masked = address.includes("...");
-  const short = masked ? address : `${address.slice(0, 12)}…${address.slice(-4)}`;
-  return masked ? `<span class="dim">${esc(short)}</span>` : `<a href="/address/${esc(address)}">${esc(short)}</a>`;
-}
-
 function bravoBadge(diff: number): string {
   if (diff >= TWENTYONE_T) return `<span class="amber">🏠 21T</span>`;
   return `<span class="red">🥑 10T</span>`;
 }
 
 export async function renderBoard(): Promise<string> {
-  const [cados, lb, storedHits] = await Promise.all([
+  const [cados, cadoData, winners, lb, storedHits, resolve] = await Promise.all([
     renderCadosBody().catch(() => ""),
+    getCadoData().catch(() => null),
+    getCadoWinners().catch(() => ({ winners: [], total: 0, matched: 0 })),
     getLeaderboard(),
     getStore().getHitsSince(0, 500).catch(() => [] as HitRow[]),
+    getAddressResolver().catch(() => (() => null) as (m: string) => string | null),
   ]);
 
   const tenTHits = storedHits.filter((h) => h.difficulty >= TEN_T).sort((a, b) => b.ts - a.ts);
-  const hitRows =
-    tenTHits.length === 0
-      ? `<tr><td colspan="4" class="dim">no 10T+ hits recorded yet — fills in as Parahawk polls</td></tr>`
-      : tenTHits
-          .map(
-            (h) =>
-              `<tr><td class="dim">${esc(new Date(h.ts).toLocaleString("en-US"))}</td><td>${addrCell(
-                h.address,
-              )}</td><td>${fmtDiff(h.difficulty)}</td><td>${bravoBadge(h.difficulty)}</td></tr>`,
-          )
-          .join("");
+  // Authoritative all-time count: every 10T+ share that earned a Bravocado,
+  // reconstructed from complete on-chain dispensary history.
+  const cadoCount = cadoData?.count ?? 0;
+  const allTimeHits = Math.max(cadoCount, winners.total, tenTHits.length);
 
+  // ── all-time cado winners (the 10T+ club, all-time) ───────────────────────────
+  const winnerRows =
+    winners.winners.length === 0
+      ? `<tr><td colspan="4" class="dim">winners load from the all-time difficulty board — check back in a moment</td></tr>`
+      : winners.winners
+          .map((w) => {
+            const label = w.fullAddress
+              ? `${w.fullAddress.slice(0, 10)}…${w.fullAddress.slice(-4)}`
+              : w.maskedAddress;
+            const cell = w.fullAddress
+              ? `<a href="/address/${esc(w.fullAddress)}">${esc(label)}</a> <span class="green" style="font-size:12px">▶ stats</span>`
+              : `<span class="dim">${esc(label)}</span>`;
+            return `<tr><td class="dim">${w.rank}</td><td>${cell}</td><td>${fmtDiff(
+              w.bestDiff,
+            )}</td><td class="dim">${w.blocks ? fmtInt(w.blocks) : "—"}</td></tr>`;
+          })
+          .join("");
   const bravocados = lb.difficulty
     .filter((e) => (e.bestDiff ?? 0) >= TEN_T)
     .sort((a, b) => (b.bestDiff ?? 0) - (a.bestDiff ?? 0));
@@ -50,7 +59,7 @@ export async function renderBoard(): Promise<string> {
       ? `<tr><td colspan="4" class="dim">no 10T+ miners this round yet</td></tr>`
       : bravocados
           .map(
-            (e, i) => `<tr><td class="dim">${i + 1}</td><td>${addrCell(e.address)}</td><td>${fmtDiff(
+            (e, i) => `<tr><td class="dim">${i + 1}</td><td>${walletCell(e.address, resolve)}</td><td>${fmtDiff(
               e.bestDiff ?? 0,
             )}</td><td>${bravoBadge(e.bestDiff ?? 0)}</td></tr>`,
           )
@@ -60,7 +69,7 @@ export async function renderBoard(): Promise<string> {
     .slice(0, 100)
     .map(
       (e: LeaderboardEntry) =>
-        `<tr><td class="dim">${e.rank}</td><td>${addrCell(e.address)}</td><td>${fmtDiff(e.bestDiff ?? 0)}</td></tr>`,
+        `<tr><td class="dim">${e.rank}</td><td>${walletCell(e.address, resolve)}</td><td>${fmtDiff(e.bestDiff ?? 0)}</td></tr>`,
     )
     .join("");
 
@@ -70,15 +79,16 @@ export async function renderBoard(): Promise<string> {
 
 ${cados}
 
-<h2>All-time 10T+ hits <span class="dim" style="font-size:13px">· Parahawk-recorded</span></h2>
+<h2>🏅 All-time cado winners <span class="dim" style="font-size:13px">· the 10T+ club, all-time</span></h2>
 <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
-  <div class="card"><div class="k">10T+ hits recorded</div><div class="v">${fmtInt(tenTHits.length)}</div><div class="sub">top share ≥10T per block, since Parahawk started polling</div></div>
+  <div class="card"><div class="k">All-time 10T+ winners</div><div class="v">${fmtInt(allTimeHits)}</div><div class="sub">miners with a best-ever share ≥10T — every one earned a Bravocado</div></div>
+  <div class="card"><div class="k">Openable wallets</div><div class="v">${fmtInt(winners.matched)}<span class="dim" style="font-size:20px"> / ${fmtInt(winners.total)}</span></div><div class="sub">matched to a full address via the rental order book — click to open their stats</div></div>
 </div>
 <div class="tscroll" style="margin-top:12px"><table>
-  <thead><tr><th>When</th><th>Address</th><th>Best diff</th><th>Tier</th></tr></thead>
-  <tbody>${hitRows}</tbody>
+  <thead><tr><th>#</th><th>Address</th><th>Best diff (all-time)</th><th>Blocks</th></tr></thead>
+  <tbody>${winnerRows}</tbody>
 </table></div>
-<p class="muted-note">Parahawk records the top Parasite share per block from its own polling, so this count grows over time and won't retroactively match every historical cado — the awards above are reconstructed from complete on-chain history. Addresses here are masked by Parasite's feed.</p>
+<p class="muted-note">Ranked by best-ever share difficulty (from Parasite's all-time difficulty board). Parasite masks addresses, but any winner who has rented on the Refinery is matched back to their full address — those are <span class="green">clickable through to a full wallet stats page</span> (hashrate, rental history &amp; spend, hits). The rest stay masked. ${tenTHits.length ? `Parahawk has also directly observed ${fmtInt(tenTHits.length)} recent 10T+ hit${tenTHits.length === 1 ? "" : "s"} live.` : ""}</p>
 
 <h2>10T+ club &amp; top difficulties — current round</h2>
 <div class="stale" style="background:#0d1408;border-color:#33501f;color:#c7f59a">

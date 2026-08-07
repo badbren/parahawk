@@ -31,7 +31,10 @@ const NAV_GROUPS: Array<Array<[string, string]>> = [
     ["/board", "bravocados"],
     ["/wiki", "mr.v wiki"],
   ],
-  [["/about", "about"]],
+  [
+    ["/about", "about"],
+    ["/changelog", "changelog"],
+  ],
 ];
 
 const STYLE = `
@@ -125,7 +128,7 @@ export async function renderPage(opts: PageOpts): Promise<string> {
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>${esc(opts.title)} · Parahawk 🦅</title>
+<title>Parahawk</title>
 <style>${STYLE}</style>
 ${opts.head ?? ""}
 </head>
@@ -151,6 +154,8 @@ ${opts.body}
   <div>
     <div>Parahawk — free stats &amp; alerts for the <a href="https://parasite.space" target="_blank" rel="noopener">Parasite Pool</a> 🥑</div>
     <div style="margin-top:6px">
+      <a href="https://github.com/badbren/parahawk" target="_blank" rel="noopener">⧉ open source on GitHub</a> ·
+      <a href="/changelog">changelog</a> ·
       <a href="https://ordinalmaxibiz.wiki/bravocados" target="_blank" rel="noopener">🥑 Bravocados wiki</a> ·
       <a href="https://ordinalmaxibiz.wiki/explorer" target="_blank" rel="noopener">OMB explorer</a>
     </div>

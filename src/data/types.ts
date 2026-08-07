@@ -51,6 +51,8 @@ export interface RefineryOrder {
   status: OrderStatus;
   /** PHd of work requested by the order. */
   requestedPhd: number;
+  /** PHd of work actually delivered so far (for spend/fill calcs). */
+  deliveredPhd?: number;
   /** Hashrate the order is running at, PH/s. */
   hashratePhs: number;
   /** Best share difficulty the order has produced. */
@@ -87,6 +89,21 @@ export interface UserStats {
   blockCount?: number;
   /** Uptime string as reported by Parasite (e.g. "14d 7h"). */
   uptime?: string;
+  // ── account badge counts (from /api/account metadata.badges) ────────────────
+  /** Bravocados (10T+ cados) this address has WON. */
+  cadosWon?: number;
+  /** Blocks this address personally FOUND (was the winning share). */
+  blocksFound?: number;
+  /** Distinct blocks this address landed a share in. */
+  blocksParticipated?: number;
+  /** Lifetime count of Refinery rental orders from this address. */
+  refineryOrderCount?: number;
+  /** Lightning payout address on file, if public. */
+  lnAddress?: string;
+  /** All Parasite achievement/badge counts by type key (bravocado, block, …). */
+  badges?: Record<string, number>;
+  /** Per-block best-share history (recent), newest first: {height, diff, ts}. */
+  diffHistory?: Array<{ height: number; diff: number; ts: number }>;
 }
 
 export interface RefineryState {

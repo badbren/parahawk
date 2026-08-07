@@ -8,6 +8,11 @@ export interface PollSample {
   lastFoundHeight: number;
   bestDiffSinceBlock: number;
   btcPrice: number;
+  /** W — total work since last block, in T. Optional: only on samples collected
+   *  after the pot-math-trend feature shipped (older rows have it undefined). */
+  workSinceBlockT?: number;
+  /** D — minimum needed diff (network difficulty), in T. Optional (see W). */
+  minNeededDiffT?: number;
 }
 
 export interface BlockFound {

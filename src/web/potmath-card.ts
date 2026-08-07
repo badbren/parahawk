@@ -1,4 +1,4 @@
-import type { PotMathSnapshot } from "../services/potmath.js";
+import type { PotMathSnapshot, PotMathTrend, MetricTrend } from "../services/potmath.js";
 import { fmtInt, fmtDuration } from "./format.js";
 
 /** "1 in N" for a rarity probability (min 1). */
@@ -6,15 +6,38 @@ function oneIn(p: number): number {
   return p > 0 ? Math.max(1, Math.round(1 / p)) : 0;
 }
 
+/** Signed value with a Unicode minus and a caller-supplied number format. */
+function signed(delta: number, fmt: (n: number) => string): string {
+  const sign = delta > 0 ? "+" : delta < 0 ? "−" : "±";
+  return `${sign}${fmt(Math.abs(delta))}`;
+}
+
+/**
+ * A little "▲ +1% 24h" trend pill. `fmt` formats the magnitude of the delta;
+ * `eps` is the dead-band below which we call it flat. Colour is purely
+ * directional (green = up, red = down) — it's a change indicator, not a verdict.
+ */
+function chip(t: MetricTrend | null | undefined, fmt: (n: number) => string, eps = 0): string {
+  if (!t) return "";
+  const up = t.delta > eps;
+  const down = t.delta < -eps;
+  const cls = up ? "up" : down ? "down" : "flat";
+  const arrow = up ? "▲" : down ? "▼" : "–";
+  return `<span class="tr ${cls}">${arrow} ${signed(t.delta, fmt)} <em>24h</em></span>`;
+}
+
+/** Shown in place of a chip when the pot reset inside the window (W-scoped). */
+const RESET_CHIP = `<span class="tr reset">↻ new pot &lt;24h</span>`;
+
 /**
  * The headline POT MATH card — four big numbers, each with a plain-English
- * caption, plus a smaller raw-inputs row. Shared by the homepage; the same
- * numbers power /calc (client-side) and the bot's /pot.
+ * caption and (when a ~24h baseline exists) a trend pill showing which way it's
+ * moving. The same numbers power /calc (client-side) and the bot's /pot.
  */
-export function potMathCard(pm: PotMathSnapshot): string {
+export function potMathCard(pm: PotMathSnapshot, trend?: PotMathTrend | null): string {
   const depth = pm.depth.toFixed(2);
-  const luck = Math.round(pm.luckPct);
-  const rarityPct = Math.round(pm.rarity * 100);
+  const luck = pm.luckPct.toFixed(1);
+  const rarityPct = (pm.rarity * 100).toFixed(1);
   const sats = fmtInt(pm.satsPerG);
   const waitGauge = fmtDuration(pm.expectedDays * 24);
   const wait1d = Math.round(pm.expectedDays1d);
@@ -27,6 +50,31 @@ export function potMathCard(pm: PotMathSnapshot): string {
   const h1d = pm.h1d.toFixed(2);
   const h6d = pm.h6d.toFixed(2);
   const h9d = pm.h9d.toFixed(2);
+
+  // Trend pills. Cycle-scoped numbers (W, depth, rarity, share price) reset with
+  // the pot, so if a block landed inside the window we show a "new pot" note
+  // instead of a misleading delta. D, H and expected wait don't reset.
+  const reset = trend?.potReset ?? false;
+  const t = (m: keyof PotMathTrend, fmt: (n: number) => string, eps = 0, scoped = false): string => {
+    if (!trend) return "";
+    if (scoped && reset) return RESET_CHIP;
+    return chip(trend[m] as MetricTrend | null, fmt, eps);
+  };
+  const num2 = (n: number) => n.toFixed(2);
+  const pp = (n: number) => `${(n * 100).toFixed(1)}%`; // fraction → percentage points
+  const days = (n: number) => fmtDuration(n * 24);
+
+  const depthChip = t("depth", (n) => `${num2(n)}×`, 0.005, true);
+  const rarityChip = t("rarity", pp, 0.0005, true);
+  const satsChip = t("satsPerG", (n) => `${fmtInt(n)}`, 0.5, true);
+  const waitChip = t("expectedDays", days, 0.02);
+  const wChip = t("W", (n) => `${num2(n)}T`, 0.005, true);
+  const dChip = t("D", (n) => `${num2(n)}T`, 0.005);
+  const hChip = t("H", (n) => `${num2(n)}`, 0.005);
+
+  const legend = trend
+    ? `<span class="s trlegend">vs ~${Math.round(trend.spanHours)}h ago &nbsp;<span class="tr up">▲ up</span> <span class="tr down">▼ down</span></span>`
+    : "";
 
   return `
 <style>
@@ -42,6 +90,15 @@ export function potMathCard(pm: PotMathSnapshot): string {
 .potmath .cell .cap{color:#b7c9a6;font-size:15px;margin-top:8px;min-height:2.6em}
 .potmath .raw{margin-top:18px;color:var(--dim);font-size:16px;border-top:1px solid #24361a;padding-top:14px}
 .potmath .raw b{color:#fff;font-weight:400}
+.tr{display:inline-block;font-size:13px;letter-spacing:.3px;padding:1px 7px;border-radius:3px;white-space:nowrap;line-height:1.5;font-family:"SFMono-Regular",Consolas,monospace}
+.tr em{font-style:normal;color:var(--dim);opacity:.8}
+.tr.up{color:#8fd14f;background:rgba(143,209,79,.10)}
+.tr.down{color:#ff7a7a;background:rgba(255,92,92,.10)}
+.tr.flat{color:#8a8a8a;background:#111}
+.tr.reset{color:#f5c451;background:rgba(245,196,81,.10)}
+.potmath .cell .tr{margin-top:2px}
+.potmath .raw .tr{margin-left:4px}
+.trlegend .tr{background:none;padding:0 2px}
 .potmath .keys{margin-top:16px;border-top:1px solid #24361a;padding-top:14px}
 .potmath .keys .keyhd{color:var(--green);font-size:14px;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px}
 .potmath .keys ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:6px 24px}
@@ -53,33 +110,38 @@ export function potMathCard(pm: PotMathSnapshot): string {
   <div class="hd">
     <span class="t">⛏ Pot Math</span>
     <span class="s">the four numbers that describe this round — scorekeeping, not forecasting</span>
+    ${legend}
   </div>
   <div class="four">
     <div class="cell">
       <div class="lbl">Round depth</div>
       <div class="num">${depth}<small>×</small></div>
       <div class="cap">This pot: ${depth}× an average round (${luck}% luck).</div>
+      ${depthChip}
     </div>
     <div class="cell">
       <div class="lbl">Round rarity</div>
       <div class="num">${rarityPct}<small>%</small></div>
       <div class="cap">~${rarityPct}% of rounds get this deep — about 1 in ${oneIn(pm.rarity)}. Normal.</div>
+      ${rarityChip}
     </div>
     <div class="cell">
       <div class="lbl">Share price</div>
       <div class="num">${sats}<small> sats/G</small></div>
       <div class="cap">Pays ~${sats} sats per G of banked work right now (subsidy only).</div>
+      ${satsChip}
     </div>
     <div class="cell">
       <div class="lbl">Expected wait</div>
       <div class="num" style="font-size:40px">${waitGauge}</div>
       <div class="cap">At ${hGauge} PH/s live, ~${waitGaugeDays}d to a block (1D avg ${h1d} PH/s → ~${wait1d}d).</div>
+      ${waitChip}
     </div>
   </div>
   <div class="raw">
-    <b>W</b> ${W}T work since last block ·
-    <b>D</b> ${D}T needed <span class="dim">→ ${nextD}T next retarget</span> ·
-    <b>H</b> ${hGauge} PH/s live <span class="dim">·</span> 1D ${h1d} <span class="dim">·</span> 6D ${h6d} <span class="dim">·</span> 9D ${h9d} PH/s
+    <b>W</b> ${W}T work since last block ${wChip} ·
+    <b>D</b> ${D}T needed ${dChip} <span class="dim">→ ${nextD}T next retarget</span> ·
+    <b>H</b> ${hGauge} PH/s live ${hChip} <span class="dim">·</span> 1D ${h1d} <span class="dim">·</span> 6D ${h6d} <span class="dim">·</span> 9D ${h9d} PH/s
   </div>
   <div class="keys">
     <div class="keyhd">The key &amp; formulas</div>
@@ -93,6 +155,7 @@ export function potMathCard(pm: PotMathSnapshot): string {
       <li><b>Work / block</b> = D · 2³² ÷ 86,400 ÷ 10¹⁵ = <b>${fmtInt(pm.phdNeeded)}</b> PHd</li>
       <li><b>Expected wait</b> = (Work / block) ÷ H = <b>${waitGauge}</b> <span class="dim">@ ${hGauge} PH/s</span></li>
     </ul>
+    ${trend ? `<p class="muted-note" style="margin:12px 0 0">Trend pills compare each figure with the poll sample nearest ~24h ago. Direction only — a deeper pot doesn’t make the next block any likelier. When the pool finds a block mid-window the pot resets, so W-based numbers show <span class="tr reset">↻ new pot</span> instead of a delta.</p>` : ""}
   </div>
 </section>`;
 }

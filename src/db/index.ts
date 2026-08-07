@@ -39,8 +39,16 @@ export async function seedMockHistory(): Promise<void> {
   let prevFound = mockLastFoundHeight(start);
   let cycleStart = start;
   const samples = [];
+  // Mock pool stats are pinned to a fixed "today", so W and D would be flat and
+  // the 24h Pot Math trend would show nothing. Add a small deterministic drift
+  // (a few T of W, a fraction of a T of D) so the trend arrows have something to
+  // point at in mock/dev mode. Live (Supabase) mode stores the real values.
+  const baseW = mockPoolStats(now).totalWorkSinceBlockT ?? 0;
+  const baseD = mockPoolStats(now).minNeededDiffT ?? mockPoolStats(now).networkDifficulty / 1e12;
   for (let t = start; t <= now; t += HOUR) {
     const p = mockPoolStats(t);
+    const driftW = 6 * Math.sin((t / (34 * HOUR)) * 2 * Math.PI);
+    const driftD = 0.7 * Math.sin((t / (52 * HOUR)) * 2 * Math.PI);
     samples.push({
       ts: t,
       poolHashrate: p.poolHashratePhs,
@@ -51,6 +59,8 @@ export async function seedMockHistory(): Promise<void> {
       lastFoundHeight: p.lastFoundHeight,
       bestDiffSinceBlock: p.highestDiffSinceBlock,
       btcPrice: p.btcPriceUsd,
+      workSinceBlockT: Math.max(1, baseW + driftW),
+      minNeededDiffT: Math.max(1, baseD + driftD),
     });
 
     // Detect a mock "block found": last-found height jumped up vs previous hour.

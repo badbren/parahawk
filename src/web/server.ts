@@ -3,9 +3,13 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { config } from "../config.js";
 import { renderOverview } from "./pages/overview.js";
+import { hashrateGauge, gaugeScaleFor } from "./gauge.js";
 import { renderHistory } from "./pages/history.js";
 import { renderAbout } from "./pages/about.js";
+import { renderChangelog } from "./pages/changelog.js";
 import { renderPotMath } from "./pages/potmath.js";
+import { potMathFromOverview, getPotMathTrend } from "../services/potmath.js";
+import { potMathCard } from "./potmath-card.js";
 import { renderWiki } from "./pages/wiki.js";
 import { renderLeaving } from "./pages/leaving.js";
 import { renderBoard } from "./pages/board.js";
@@ -118,16 +122,33 @@ export function createServer(): express.Express {
   app.use("/assets", express.static("public", { maxAge: "1h" }));
 
   app.get("/", page(renderOverview));
+  // Just the Pool Hashrate gauge SVG — the homepage swaps this in every 10s so
+  // the dial updates often without a full-page reload.
+  app.get("/overview/gauge", page(async () => {
+    const o = await getOverview();
+    const h = o.pool.poolHashratePhs;
+    return hashrateGauge({ value: h, max: gaugeScaleFor(h), unit: "PH/s", size: 352 });
+  }));
   app.get("/board", page(renderBoard));
   app.get("/order-books", page(renderOrderBooks));
   // Awards merged into the Bravocados board — redirect old links.
   app.get("/cados", (_req, res) => res.redirect(301, "/board"));
   app.get("/history", page(renderHistory));
   app.get("/potmath", page(renderPotMath));
+  // Just the live Pot Math card, as an HTML fragment. The Calculator page polls
+  // this every 45s to refresh the headline numbers in place — no full-page
+  // reload, so an open what-if calculator keeps its state and there's no flash.
+  app.get("/potmath/card", page(async () => {
+    const o = await getOverview();
+    const pm = potMathFromOverview(o);
+    const trend = await getPotMathTrend(pm).catch(() => null);
+    return potMathCard(pm, trend);
+  }));
   // /luck and /calc folded into /potmath — redirect old links.
   app.get("/luck", (_req, res) => res.redirect(301, "/potmath"));
   app.get("/calc", (_req, res) => res.redirect(301, "/potmath"));
   app.get("/about", page(renderAbout));
+  app.get("/changelog", page(renderChangelog));
   app.get("/wiki", page(renderWiki));
   app.get("/leaving", async (req, res) => {
     try {

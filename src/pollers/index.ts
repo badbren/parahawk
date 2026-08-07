@@ -1,7 +1,9 @@
 import { config } from "../config.js";
 import { getStore } from "../db/index.js";
 import { getOverview } from "../services/overview.js";
-import { getRecentHits } from "../data/parasite.js";
+import { potMathFromOverview } from "../services/potmath.js";
+import { getRecentHits, getUserStats } from "../data/parasite.js";
+import { getCadoWinnerAddresses } from "../services/winners.js";
 import { estimateCurrentPotPhd } from "../services/pot.js";
 import { bus } from "../events.js";
 import { checkWatches } from "./watchdog.js";
@@ -22,6 +24,9 @@ function safe(label: string, fn: () => Promise<void>): () => void {
 async function collect(): Promise<void> {
   const store = getStore();
   const o = await getOverview();
+  // Reuse the Pot Math snapshot so the stored W/D are byte-for-byte the numbers
+  // the Calculator card shows — the 24h-trend baseline must match today's view.
+  const pm = potMathFromOverview(o);
   const sample: PollSample = {
     ts: o.generatedAt,
     poolHashrate: o.pool.poolHashratePhs,
@@ -32,6 +37,8 @@ async function collect(): Promise<void> {
     lastFoundHeight: o.pool.lastFoundHeight,
     bestDiffSinceBlock: o.pool.highestDiffSinceBlock,
     btcPrice: o.pool.btcPriceUsd,
+    workSinceBlockT: pm.W,
+    minNeededDiffT: pm.D,
   };
   await store.insertSample(sample);
 }
@@ -96,6 +103,31 @@ async function collectHits(): Promise<void> {
   lastHitCheck = Date.now();
 }
 
+/**
+ * Snapshot each matched cado-winner's live hashrate into address_snapshots, so
+ * their wallet page can plot a 14-day hashrate timeline. Parasite has no
+ * historical per-address hashrate endpoint, so this is the only way to build one
+ * — it accumulates going forward. Runs sequentially to stay gentle upstream.
+ */
+async function snapshotWinners(): Promise<void> {
+  const store = getStore();
+  const addrs = await getCadoWinnerAddresses().catch(() => [] as string[]);
+  for (const address of addrs) {
+    try {
+      const u = await getUserStats(address);
+      await store.insertAddressSnapshot({
+        address,
+        ts: Date.now(),
+        hashrate: u.hashratePhs,
+        bestDifficulty: u.bestDifficulty,
+        totalWork: u.totalWorkDiff,
+      });
+    } catch {
+      /* one bad address shouldn't stop the rest */
+    }
+  }
+}
+
 /** Current pot age in hours, for the bot presence line. */
 export async function currentPotHours(): Promise<number> {
   const o = await getOverview();
@@ -109,7 +141,7 @@ export async function currentPotHours(): Promise<number> {
  * store and insertHits dedupes by id, so a stateless per-tick run is correct.
  */
 export async function runPollOnce(): Promise<void> {
-  await Promise.allSettled([collect(), checkBlock(), collectHits()]);
+  await Promise.allSettled([collect(), checkBlock(), collectHits(), snapshotWinners()]);
 }
 
 export function startPollers(): void {
@@ -126,4 +158,7 @@ export function startPollers(): void {
   setInterval(safe("hits", collectHits), config.pollIntervalSeconds * 1000);
   setInterval(safe("watchdog", () => checkWatches(store)), 5 * 60 * 1000);
   setInterval(safe("maintenance", () => store.runMaintenance()), 60 * 60 * 1000);
+  // Snapshot cado-winner hashrates every 20 min to build their 14-day timelines.
+  safe("winners", snapshotWinners)();
+  setInterval(safe("winners", snapshotWinners), 20 * 60 * 1000);
 }

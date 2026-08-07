@@ -292,6 +292,22 @@ function mapLbEntry(r: LbRow): LeaderboardEntry {
   };
 }
 
+/**
+ * All-time top-difficulty leaderboard (NO round filter) — masked addresses with
+ * each miner's best-ever share difficulty and blocks participated. The entries
+ * ≥10T are exactly the Bravocado ("cado") winners. Empty in mock mode (the
+ * winners service supplies its own demo set there).
+ */
+export async function getAllTimeTopDifficulty(limit = 100): Promise<LeaderboardEntry[]> {
+  if (config.mockData) return [];
+  try {
+    const rows = await fetchJson<LbRow[]>(`${base()}/api/leaderboard?type=difficulty&limit=${limit}`);
+    return (Array.isArray(rows) ? rows : []).map(mapLbEntry);
+  } catch {
+    return [];
+  }
+}
+
 export async function getLeaderboard(): Promise<Leaderboard> {
   if (config.mockData) {
     const lb = mockLeaderboard();
@@ -360,6 +376,7 @@ function mapRouterOrder(o: RouterOrder): RefineryOrder & { address: string } {
     id: String(o.id),
     status,
     requestedPhd: requested / H_PER_PH,
+    deliveredPhd: delivered / H_PER_PH,
     hashratePhs: Number(o.hashrate ?? 0) / H_PER_PH,
     bestShare: Number(o.best_share ?? 0),
     progressPercent: Math.round(progress),
@@ -368,17 +385,25 @@ function mapRouterOrder(o: RouterOrder): RefineryOrder & { address: string } {
   };
 }
 
+/** Short cache so the many per-page consumers of the (large) order book share
+ *  one fetch: address page, winners board, and the masked→full resolver. */
+const routerOrdersCache = new Cached<Array<RefineryOrder & { address: string }>>(30_000);
+
 /** Raw router orders with the address attached (used for per-address filtering). */
 export async function getRouterOrders(): Promise<Array<RefineryOrder & { address: string }>> {
   if (config.mockData) {
     const s = mockRefineryState();
     return s.orders.map((o) => ({ ...o, address: "bc1qmock0refinery0operator0xxxxxxxxxxxxxxxxx" }));
   }
+  const cached = routerOrdersCache.get();
+  if (cached && !routerOrdersCache.freshness().stale) return cached;
   try {
     const rows = await fetchJson<RouterOrder[]>(`${base()}/api/router/orders`);
-    return (Array.isArray(rows) ? rows : []).map(mapRouterOrder);
+    const mapped = (Array.isArray(rows) ? rows : []).map(mapRouterOrder);
+    routerOrdersCache.set(mapped);
+    return mapped;
   } catch {
-    return [];
+    return routerOrdersCache.get() ?? [];
   }
 }
 
@@ -410,8 +435,19 @@ interface UserApi {
   uptime?: string;
   workerData?: Array<{ name?: string; hashrate?: string | number; bestDifficulty?: string | number }>;
 }
+interface BadgeType {
+  total?: number;
+  bucket?: { count?: number };
+}
 interface AccountApi {
-  account?: { total_diff?: number; metadata?: { block_count?: number } } | null;
+  account?: {
+    total_diff?: number;
+    ln_address?: string;
+    metadata?: {
+      block_count?: number;
+      badges?: { types?: Record<string, BadgeType> };
+    };
+  } | null;
 }
 
 /**
@@ -457,6 +493,21 @@ export async function getUserStats(address: string): Promise<UserStats> {
     }))
     .sort((a, b) => b.hashratePhs - a.hashratePhs);
 
+  const badgeTypes = account.account?.metadata?.badges?.types ?? {};
+  const badgeCount = (b: BadgeType | undefined): number =>
+    b ? Number(b.total ?? b.bucket?.count ?? 0) || 0 : 0;
+  const badgeTotal = (k: string): number | undefined =>
+    badgeTypes[k] ? badgeCount(badgeTypes[k]) : undefined;
+  const badges: Record<string, number> = {};
+  for (const [k, v] of Object.entries(badgeTypes)) {
+    const n = badgeCount(v);
+    if (n > 0) badges[k] = n;
+  }
+  const diffHistory = (diffs ?? [])
+    .map((d) => ({ height: Number(d.block_height ?? 0), diff: Number(d.difficulty ?? 0), ts: Number(d.block_timestamp ?? 0) * 1000 }))
+    .filter((d) => d.height > 0)
+    .sort((a, b) => b.height - a.height);
+
   const result: UserStats = {
     address,
     hashratePhs: Number(user.hashrate ?? 0) / H_PER_PH,
@@ -467,6 +518,13 @@ export async function getUserStats(address: string): Promise<UserStats> {
     rigs,
     blockCount: account.account?.metadata?.block_count,
     uptime: user.uptime,
+    cadosWon: badgeTotal("bravocado"),
+    blocksFound: badgeTotal("block_winner"),
+    blocksParticipated: badgeTotal("block"),
+    refineryOrderCount: badgeTotal("refinery"),
+    lnAddress: account.account?.ln_address,
+    diffHistory,
+    badges,
   };
   userStatsCache.set(address, { v: result, exp: now + USER_STATS_TTL_MS });
   return result;

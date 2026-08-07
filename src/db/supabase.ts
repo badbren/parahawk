@@ -39,6 +39,8 @@ export class SupabaseStore implements Store {
       last_found_height: s.lastFoundHeight,
       best_diff_since_block: s.bestDiffSinceBlock,
       btc_price: s.btcPrice,
+      work_since_block_t: s.workSinceBlockT ?? null,
+      min_needed_diff_t: s.minNeededDiffT ?? null,
     });
   }
 
@@ -57,6 +59,8 @@ export class SupabaseStore implements Store {
         last_found_height: s.lastFoundHeight,
         best_diff_since_block: s.bestDiffSinceBlock,
         btc_price: s.btcPrice,
+        work_since_block_t: s.workSinceBlockT ?? null,
+        min_needed_diff_t: s.minNeededDiffT ?? null,
       }));
       await this.db.from("poll_samples").insert(rows);
     }
@@ -73,6 +77,8 @@ export class SupabaseStore implements Store {
       lastFoundHeight: r.last_found_height ?? 0,
       bestDiffSinceBlock: r.best_diff_since_block ?? 0,
       btcPrice: r.btc_price ?? 0,
+      workSinceBlockT: r.work_since_block_t ?? undefined,
+      minNeededDiffT: r.min_needed_diff_t ?? undefined,
     };
   }
 

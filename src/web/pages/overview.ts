@@ -4,6 +4,8 @@ import { potMathFromOverview } from "../../services/potmath.js";
 import { getLeaderboard } from "../../data/parasite.js";
 import { getRecentBlocks, renderBlocksStrip } from "../../data/blocks.js";
 import { hashrateGauge, gaugeScaleFor } from "../gauge.js";
+import { getAddressResolver, type AddressResolver } from "../../services/winners.js";
+import { walletCell } from "../addr.js";
 import type { LeaderboardEntry } from "../../data/types.js";
 import {
   fmtHashrate,
@@ -13,31 +15,18 @@ import {
   fmtDuration,
   fmtPct,
   timeAgo,
-  esc,
 } from "../format.js";
 
 /** The gauge full-scale, matching parasite.space's 0–9,999 PH/s dial. */
 const GAUGE_MAX = 9999;
 
-function maskAddr(a: string): string {
-  if (a.includes("...") || a.includes("…")) return a;
-  return `${a.slice(0, 6)}…${a.slice(-4)}`;
-}
-
-function addrCell(a: string): string {
-  const masked = a.includes("...") || a.includes("…");
-  return masked
-    ? `<span class="dim">${esc(maskAddr(a))}</span>`
-    : `<a href="/address/${esc(a)}">${esc(maskAddr(a))}</a>`;
-}
-
-function lbTable(rows: LeaderboardEntry[], kind: "difficulty" | "loyalty"): string {
+function lbTable(rows: LeaderboardEntry[], kind: "difficulty" | "loyalty", resolve: AddressResolver): string {
   if (rows.length === 0) return `<p class="muted-note">no entries yet</p>`;
   const head = kind === "difficulty" ? "Best diff" : "Blocks";
   const body = rows
     .slice(0, 8)
     .map(
-      (e) => `<tr><td class="dim">${e.rank}</td><td>${addrCell(e.address)}</td><td>${
+      (e) => `<tr><td class="dim">${e.rank}</td><td>${walletCell(e.address, resolve)}</td><td>${
         kind === "difficulty" ? fmtDiff(e.bestDiff ?? 0) : fmtInt(e.blocks ?? 0)
       }</td></tr>`,
     )
@@ -55,10 +44,11 @@ function trendVsLive(avg: number, live: number): string {
 }
 
 export async function renderOverview(): Promise<string> {
-  const [o, lb, blocks] = await Promise.all([
+  const [o, lb, blocks, resolve] = await Promise.all([
     getOverview(),
     getLeaderboard().catch(() => ({ difficulty: [], loyalty: [] })),
     getRecentBlocks(26).catch(() => []),
+    getAddressResolver().catch(() => (() => null) as AddressResolver),
   ]);
   const pm = potMathFromOverview(o);
   const pot = o.potAge;
@@ -92,8 +82,7 @@ ${renderBlocksStrip(blocks)}
 <div class="grid" style="grid-template-columns:minmax(320px,1fr) minmax(320px,1.4fr); align-items:stretch">
   <div class="card" style="text-align:center">
     <div class="k" style="text-align:left">Pool hashrate</div>
-    <div style="margin:6px auto 0">${hashrateGauge({ value: o.pool.poolHashratePhs, max: gaugeMax, unit: "PH/s", size: 320 })}</div>
-    <div class="dim" style="font-size:13px;margin-top:2px">auto-scaling indicator</div>
+    <div id="gaugebox" style="margin:6px auto 0">${hashrateGauge({ value: o.pool.poolHashratePhs, max: gaugeMax, unit: "PH/s", size: 352 })}</div>
   </div>
   <div class="card">
     <div class="k">Historic hashrate</div>
@@ -115,8 +104,8 @@ ${renderBlocksStrip(blocks)}
 
 <h2>Leaderboard — since last block</h2>
 <div class="grid" style="grid-template-columns:minmax(300px,1fr) minmax(300px,1fr)">
-  <div class="card"><div class="k">🥑 Top difficulty</div>${lbTable(lb.difficulty, "difficulty")}<p class="muted-note" style="margin:8px 0 0"><a href="/board">full Bravocado board →</a></p></div>
-  <div class="card"><div class="k">🏆 Top loyalty (blocks)</div>${lbTable(lb.loyalty, "loyalty")}</div>
+  <div class="card"><div class="k">🥑 Top difficulty</div>${lbTable(lb.difficulty, "difficulty", resolve)}<p class="muted-note" style="margin:8px 0 0"><a href="/board">full Bravocado board →</a></p></div>
+  <div class="card"><div class="k">🏆 Top loyalty (blocks)</div>${lbTable(lb.loyalty, "loyalty", resolve)}</div>
 </div>
 
 <p class="muted-note" style="margin-top:24px">
@@ -124,15 +113,34 @@ ${renderBlocksStrip(blocks)}
   <a href="/about">How payouts work →</a>
 </p>
 <p class="muted-note">data ${o.freshness.stale ? "stale" : "fresh"} · pool ${timeAgo(o.freshness.pool.lastSuccess)} · chain ${timeAgo(o.freshness.chain.lastSuccess)}</p>
-<script>setTimeout(function(){location.reload();},30000);</script>
+<script>
+// Refresh the hashrate gauge on its own every 10s (no flash), and do a full
+// refresh of the rest of the page every 30s.
+(function(){
+  function refreshGauge(){
+    fetch("/overview/gauge",{cache:"no-store"})
+      .then(function(r){return r.ok?r.text():null;})
+      .then(function(html){ if(html){var el=document.getElementById("gaugebox"); if(el) el.innerHTML=html;} })
+      .catch(function(){});
+  }
+  setInterval(refreshGauge, 10000);
+  setTimeout(function(){location.reload();}, 30000);
+})();
+</script>
 
 <style>
 .statrow{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
 .statrow .card .v{font-size:34px}
 .power{margin:22px 0 26px}
 .power-hd{display:flex;justify-content:space-between;color:var(--dim);font-size:15px;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px}
-.power-bar{height:14px;background:#0a0a0a;border:1px solid var(--line);position:relative}
+.power-bar{height:14px;background:#0a0a0a;border:1px solid var(--line);position:relative;overflow:hidden}
 .power-bar>span{position:absolute;left:0;top:0;bottom:0;background:repeating-linear-gradient(90deg,#8fd14f 0,#8fd14f 3px,#0a0a0a 3px,#0a0a0a 6px)}
+/* A green pulse that sweeps left→right every 5s, like the pool is charging up. */
+.power-bar::after{content:"";position:absolute;top:0;bottom:0;left:0;width:100%;pointer-events:none;
+  background:linear-gradient(90deg,transparent 0%,rgba(143,209,79,0) 38%,rgba(143,209,79,.55) 50%,rgba(143,209,79,0) 62%,transparent 100%);
+  transform:translateX(-100%);animation:powerflow 5s linear infinite}
+@keyframes powerflow{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+.hrgauge{max-width:100%;height:auto}
 </style>
 `;
 
