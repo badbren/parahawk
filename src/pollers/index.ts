@@ -118,13 +118,17 @@ const INDEX_BATCH = 40;
  */
 async function seedContributorUniverse(): Promise<void> {
   const store = getStore();
-  const [orders, winners] = await Promise.all([
+  const [orders, winners, rounds] = await Promise.all([
     getRouterOrders().catch(() => []),
     getCadoWinnerAddresses().catch(() => [] as string[]),
+    getRounds().catch(() => []),
   ]);
   const universe = new Set<string>();
   for (const o of orders) if (o.address && o.address.startsWith("bc1")) universe.add(o.address);
   for (const a of winners) universe.add(a);
+  // Block finders (winner_username on completed rounds) are the one other place
+  // Parasite exposes a full address — index them too.
+  for (const r of rounds) if (r.winner && r.winner.startsWith("bc1")) universe.add(r.winner);
   for (const address of universe) await store.trackAddress(address);
 }
 
