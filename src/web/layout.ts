@@ -30,7 +30,7 @@ const NAV_GROUPS: Array<Array<[string, string]>> = [
   [
     ["/board", "bravocados"],
     ["/badges", "badges"],
-    ["/wiki", "mr.v wiki"],
+    ["/community", "community"],
   ],
   [
     ["/about", "about"],

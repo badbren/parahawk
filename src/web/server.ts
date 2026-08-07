@@ -11,7 +11,7 @@ import { renderBadges, renderBadgeHolders } from "./pages/badges.js";
 import { renderPotMath } from "./pages/potmath.js";
 import { potMathFromOverview, getPotMathTrend } from "../services/potmath.js";
 import { potMathCard } from "./potmath-card.js";
-import { renderWiki } from "./pages/wiki.js";
+import { renderCommunity } from "./pages/community.js";
 import { renderLeaving } from "./pages/leaving.js";
 import { renderBoard } from "./pages/board.js";
 import { renderOrderBooks } from "./pages/order-books.js";
@@ -159,7 +159,9 @@ export function createServer(): express.Express {
   app.get("/calc", (_req, res) => res.redirect(301, "/potmath"));
   app.get("/about", page(renderAbout));
   app.get("/changelog", page(renderChangelog));
-  app.get("/wiki", page(renderWiki));
+  app.get("/community", page(renderCommunity));
+  // Mr.V wiki folded into Community — redirect old links.
+  app.get("/wiki", (_req, res) => res.redirect(301, "/community"));
   app.get("/leaving", async (req, res) => {
     try {
       res.type("html").send(await renderLeaving(String(req.query.url ?? "")));

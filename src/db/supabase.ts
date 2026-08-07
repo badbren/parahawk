@@ -7,6 +7,7 @@ import type {
   WatchSubscription,
   AddressSnapshot,
   AccountBadges,
+  TrackedAddress,
   LuckBucket,
   HitRow,
 } from "./types.js";
@@ -286,6 +287,31 @@ export class SupabaseStore implements Store {
       badges: (r.badges ?? {}) as Record<string, number>,
       updatedAt: r.updated_at ? ms(r.updated_at) : 0,
     }));
+  }
+
+  async trackAddress(address: string): Promise<void> {
+    await this.db
+      .from("tracked_addresses")
+      .upsert({ address, first_seen: iso(Date.now()) }, { onConflict: "address", ignoreDuplicates: true });
+  }
+
+  async getStaleTrackedAddresses(limit: number): Promise<TrackedAddress[]> {
+    const { data } = await this.db
+      .from("tracked_addresses")
+      .select("*")
+      .order("last_snapshot_at", { ascending: true, nullsFirst: true })
+      .limit(limit);
+    return (data ?? []).map((r) => ({
+      address: r.address,
+      firstSeen: r.first_seen ? ms(r.first_seen) : 0,
+      lastSnapshotAt: r.last_snapshot_at ? ms(r.last_snapshot_at) : null,
+    }));
+  }
+
+  async markAddressSnapshotted(address: string): Promise<void> {
+    await this.db
+      .from("tracked_addresses")
+      .upsert({ address, last_snapshot_at: iso(Date.now()) }, { onConflict: "address" });
   }
 
   async runMaintenance(): Promise<void> {

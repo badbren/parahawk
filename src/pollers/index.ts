@@ -2,7 +2,7 @@ import { config } from "../config.js";
 import { getStore } from "../db/index.js";
 import { getOverview } from "../services/overview.js";
 import { potMathFromOverview } from "../services/potmath.js";
-import { getRecentHits, getUserStats } from "../data/parasite.js";
+import { getRecentHits, getUserStats, getRouterOrders } from "../data/parasite.js";
 import { getCadoWinnerAddresses } from "../services/winners.js";
 import { estimateCurrentPotPhd } from "../services/pot.js";
 import { bus } from "../events.js";
@@ -103,16 +103,41 @@ async function collectHits(): Promise<void> {
   lastHitCheck = Date.now();
 }
 
+/** How many tracked addresses to refresh per index cycle (each = ~4 upstream
+ *  calls, so keep it modest to stay gentle on Parasite). */
+const INDEX_BATCH = 40;
+
 /**
- * Snapshot each matched cado-winner's live hashrate into address_snapshots, so
- * their wallet page can plot a 14-day hashrate timeline. Parasite has no
- * historical per-address hashrate endpoint, so this is the only way to build one
- * — it accumulates going forward. Runs sequentially to stay gentle upstream.
+ * Register the pool's identifiable contributors so Parahawk indexes them itself
+ * (rather than waiting for someone to search each one): every FULL address in
+ * the Refinery order book, plus every matched cado winner. Masked-only miners
+ * who never rented can't be resolved to a full address, so they can't be
+ * enumerated — the honest limit.
  */
-async function snapshotWinners(): Promise<void> {
+async function seedContributorUniverse(): Promise<void> {
   const store = getStore();
-  const addrs = await getCadoWinnerAddresses().catch(() => [] as string[]);
-  for (const address of addrs) {
+  const [orders, winners] = await Promise.all([
+    getRouterOrders().catch(() => []),
+    getCadoWinnerAddresses().catch(() => [] as string[]),
+  ]);
+  const universe = new Set<string>();
+  for (const o of orders) if (o.address && o.address.startsWith("bc1")) universe.add(o.address);
+  for (const a of winners) universe.add(a);
+  for (const address of universe) await store.trackAddress(address);
+}
+
+/**
+ * Index a batch of tracked wallets (least-recently-snapshotted first): refresh
+ * their badges and record a hashrate snapshot so per-wallet 14-day timelines
+ * build up. Parasite has no historical per-address hashrate endpoint, so this
+ * round-robin is the only way to accumulate one. Runs sequentially, bounded to
+ * INDEX_BATCH, so a large registry never hammers upstream in one tick.
+ */
+async function indexTrackedAddresses(): Promise<void> {
+  const store = getStore();
+  await seedContributorUniverse();
+  const batch = await store.getStaleTrackedAddresses(INDEX_BATCH).catch(() => []);
+  for (const { address } of batch) {
     try {
       const u = await getUserStats(address);
       await store.insertAddressSnapshot({
@@ -125,8 +150,9 @@ async function snapshotWinners(): Promise<void> {
       if (u.badges && Object.keys(u.badges).length > 0) {
         await store.upsertAccountBadges({ address, badges: u.badges, updatedAt: Date.now() });
       }
+      await store.markAddressSnapshotted(address);
     } catch {
-      /* one bad address shouldn't stop the rest */
+      // Don't let one bad address stop the batch; it stays stale and retries.
     }
   }
 }
@@ -144,7 +170,7 @@ export async function currentPotHours(): Promise<number> {
  * store and insertHits dedupes by id, so a stateless per-tick run is correct.
  */
 export async function runPollOnce(): Promise<void> {
-  await Promise.allSettled([collect(), checkBlock(), collectHits(), snapshotWinners()]);
+  await Promise.allSettled([collect(), checkBlock(), collectHits(), indexTrackedAddresses()]);
 }
 
 export function startPollers(): void {
@@ -161,7 +187,8 @@ export function startPollers(): void {
   setInterval(safe("hits", collectHits), config.pollIntervalSeconds * 1000);
   setInterval(safe("watchdog", () => checkWatches(store)), 5 * 60 * 1000);
   setInterval(safe("maintenance", () => store.runMaintenance()), 60 * 60 * 1000);
-  // Snapshot cado-winner hashrates every 20 min to build their 14-day timelines.
-  safe("winners", snapshotWinners)();
-  setInterval(safe("winners", snapshotWinners), 20 * 60 * 1000);
+  // Index tracked wallets (contributors + searched) on a rolling basis to build
+  // their 14-day hashrate timelines and refresh badges.
+  safe("index", indexTrackedAddresses)();
+  setInterval(safe("index", indexTrackedAddresses), 10 * 60 * 1000);
 }

@@ -54,6 +54,10 @@ export async function renderBadges(): Promise<string> {
 <h1>Badges 🏅</h1>
 <p class="lead">Every Parasite achievement, who holds them, and who holds the most. Click a badge to see its holders, or a wallet to open its full stats.</p>
 
+<div class="stale" style="background:#0d1408;border-color:#33501f;color:#c7f59a">
+  This board <strong>fills in as winners are snapshotted and wallets are searched</strong> — Parahawk also indexes the pool's known contributors itself. The Bravocado list is complete now; the rest grow over time.
+</div>
+
 <h2>Achievements</h2>
 <div class="bgrid">${cards}</div>
 <p class="muted-note" style="margin-top:10px">The <strong>Bravocado</strong> holder list is complete (from the all-time 10T+ board). The others fill in as Parahawk indexes wallets — ${fmtInt(idx.indexedWallets)} indexed so far. Search a wallet to add it.</p>

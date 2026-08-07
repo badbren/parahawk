@@ -58,6 +58,12 @@ export interface AccountBadges {
   updatedAt: number; // unix ms
 }
 
+export interface TrackedAddress {
+  address: string;
+  firstSeen: number; // unix ms
+  lastSnapshotAt: number | null; // unix ms, null until first snapshotted
+}
+
 export interface LuckBucket {
   dayOfWeek: number; // 0=Sun..6=Sat
   hourOfDay: number; // 0..23
@@ -98,6 +104,13 @@ export interface Store {
   upsertAccountBadges(a: AccountBadges): Promise<void>;
   /** All indexed wallets' badges, newest-updated first. */
   getAccountBadges(limit: number): Promise<AccountBadges[]>;
+
+  /** Register an address (from a search or enumeration) for ongoing indexing. */
+  trackAddress(address: string): Promise<void>;
+  /** Tracked addresses due for a refresh — least-recently-snapshotted first. */
+  getStaleTrackedAddresses(limit: number): Promise<TrackedAddress[]>;
+  /** Mark that an address was just snapshotted (resets its staleness). */
+  markAddressSnapshotted(address: string): Promise<void>;
 
   /** Aggregate + prune old raw samples. Safe to call periodically. */
   runMaintenance(): Promise<void>;

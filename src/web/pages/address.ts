@@ -76,6 +76,7 @@ export async function renderAddress(addressRaw: string): Promise<string> {
   // (Parasite has no historical per-address hashrate endpoint), and index this
   // wallet's badges for the /badges tab. Fire-and-forget.
   const store = getStore();
+  void store.trackAddress(address).catch(() => {}); // index it from now on
   void store
     .insertAddressSnapshot({
       address,

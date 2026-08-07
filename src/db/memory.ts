@@ -5,6 +5,7 @@ import type {
   WatchSubscription,
   AddressSnapshot,
   AccountBadges,
+  TrackedAddress,
   LuckBucket,
   HitRow,
 } from "./types.js";
@@ -22,6 +23,7 @@ export class MemoryStore implements Store {
   private snapshots: AddressSnapshot[] = [];
   private hits = new Map<string, HitRow>();
   private accountBadges = new Map<string, AccountBadges>();
+  private tracked = new Map<string, TrackedAddress>();
   private nextWatchId = 1;
 
   async insertSample(s: PollSample): Promise<void> {
@@ -131,6 +133,24 @@ export class MemoryStore implements Store {
     return [...this.accountBadges.values()]
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .slice(0, limit);
+  }
+
+  async trackAddress(address: string): Promise<void> {
+    if (!this.tracked.has(address)) {
+      this.tracked.set(address, { address, firstSeen: Date.now(), lastSnapshotAt: null });
+    }
+  }
+
+  async getStaleTrackedAddresses(limit: number): Promise<TrackedAddress[]> {
+    return [...this.tracked.values()]
+      .sort((a, b) => (a.lastSnapshotAt ?? 0) - (b.lastSnapshotAt ?? 0))
+      .slice(0, limit);
+  }
+
+  async markAddressSnapshotted(address: string): Promise<void> {
+    const t = this.tracked.get(address);
+    if (t) t.lastSnapshotAt = Date.now();
+    else this.tracked.set(address, { address, firstSeen: Date.now(), lastSnapshotAt: Date.now() });
   }
 
   async runMaintenance(): Promise<void> {
