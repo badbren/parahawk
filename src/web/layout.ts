@@ -25,7 +25,7 @@ const NAV_GROUPS: Array<Array<[string, string]>> = [
   ],
   [
     ["/potmath", "calculator"],
-    ["/order-books", "order books"],
+    ["/marketplace", "marketplace"],
   ],
   [
     ["/board", "bravocados"],
@@ -33,6 +33,7 @@ const NAV_GROUPS: Array<Array<[string, string]>> = [
     ["/community", "community"],
   ],
   [
+    ["/account", "account"],
     ["/about", "about"],
     ["/changelog", "changelog"],
   ],

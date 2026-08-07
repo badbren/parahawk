@@ -22,6 +22,23 @@ export const config = {
 
   lightningAddress: process.env.LIGHTNING_ADDRESS ?? "",
 
+  /** Secret that encrypts users' linked venue API keys at rest (AES-256-GCM).
+   * Min 16 chars to enable the vault; unset ⇒ linking disabled (non-custodial
+   * ordering stays dark rather than storing keys in the clear). */
+  keysSecret: process.env.KEYS_SECRET ?? "",
+
+  /** Venue referral codes — baked into deep-links / signup paths. Venue pays us,
+   * never the user; disclosed on every ref link. */
+  venueRefs: {
+    nicehash: process.env.NICEHASH_REF ?? "",
+    miningrigrentals: process.env.MRR_REF ?? "",
+  },
+
+  /** Master safety switch for placing REAL money orders via linked keys. Off by
+   * default: the order flow runs as a dry-run (touches no venue API) until this
+   * is explicitly set true. Real orders should only ever go live deliberately. */
+  orderingLive: bool(process.env.ORDERING_LIVE, false),
+
   discord: {
     enabled: bool(process.env.ENABLE_BOT, true),
     token: process.env.DISCORD_TOKEN ?? "",

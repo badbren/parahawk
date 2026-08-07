@@ -72,8 +72,18 @@ export async function renderAbout(): Promise<string> {
   <li><strong>Calculator</strong> — round depth, rarity, share price and expected wait (with 24h trends), the luck audit, and a what-if / rental-odds calculator.</li>
   <li><strong>Wallet stats</strong> — click any address for its achievements, cados won, rental history &amp; spend, and hashrate timeline.</li>
   <li><strong>Bravocados &amp; Badges</strong> — the all-time cado winners board plus every Parasite achievement and who holds it.</li>
-  <li><strong>Order Books</strong> — the live Refinery rental order book.</li>
+  <li><strong>Marketplace</strong> — every hashrate rental venue's price in one place, and a non-custodial order wizard that aims rented hash at Parasite.</li>
 </ul>
+
+<h2>The Marketplace — a price router, not a custodian</h2>
+<p>The Marketplace tab compares what every rental venue — NiceHash, MiningRigRentals, Refinery and more — charges, all normalized to the one unit that matters: <strong>sats per PHd</strong>. It finds you the cheapest hash, then helps you point it straight at the Parasite pool.</p>
+<p><strong>Parahawk never holds your funds.</strong> This is the important part, and it's different from a reseller:</p>
+<ul>
+  <li><strong>You order from your own account.</strong> For venues with an API (NiceHash, MRR) you link your <em>own</em> key — scoped so it can place orders but <em>never</em> withdraw — and Parahawk places the order from your balance, pre-aimed at Parasite. For venues without one, it deep-links you in with a copy-paste config. The money only ever moves inside venues you already trust.</li>
+  <li><strong>We can't take a cut of your order, and wouldn't.</strong> Because the funds never touch Parahawk, there's no hook in that pipe. A reseller marks up the hash and pockets the spread; Parahawk just shows you the real prices and presses the buttons you authorized.</li>
+  <li><strong>How Parahawk earns instead:</strong> optional Lightning tips (framed around the sats you saved) and venue referral codes — where the <em>venue</em> pays us for the signup, never you. That's disclosed wherever a referral link appears. <strong>Never from your order.</strong></li>
+</ul>
+<p class="muted-note">Your linked keys are encrypted at rest (AES-256-GCM), never shown again after entry, and never sent back to your browser. Revoke them at the venue any time.</p>
 
 <style>
 .whatis{margin:6px 0 34px}

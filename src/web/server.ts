@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import express from "express";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
@@ -15,6 +16,22 @@ import { renderCommunity } from "./pages/community.js";
 import { renderLeaving } from "./pages/leaving.js";
 import { renderBoard } from "./pages/board.js";
 import { renderOrderBooks } from "./pages/order-books.js";
+import { renderMarketplace } from "./pages/marketplace.js";
+import { renderLinked } from "./pages/linked.js";
+import {
+  getSession,
+  setSession,
+  clearSession,
+  verifyWalletSignature,
+  isValidAddress,
+  checkCsrf,
+} from "../services/auth.js";
+import { linkAccount, unlinkAccount, getCredentials, type Venue } from "../services/linked.js";
+import { isVaultReady } from "../services/vault.js";
+import { auditDelivery } from "../services/auditor.js";
+import { saveWizardOrder } from "../services/wizard-orders.js";
+import { nhCheckAuth, nhCreatePool, nhPlaceOrder } from "../data/venues/nicehash-client.js";
+import { POOL_TARGETS } from "./marketplace-wizard.js";
 import { renderAddress } from "./pages/address.js";
 import { getOverview } from "../services/overview.js";
 import { getPoolStatsSeries, type PoolWindow } from "../data/parasite.js";
@@ -127,6 +144,9 @@ export function createServer(): express.Express {
   // Static assets (wiki images, etc.) served from ./public at /assets.
   app.use("/assets", express.static("public", { maxAge: "1h" }));
 
+  // Form bodies for the /account POST flow (connect / link / unlink).
+  app.use(express.urlencoded({ extended: false }));
+
   app.get("/", page(renderOverview));
   // Just the Pool Hashrate gauge SVG — the homepage swaps this in every 10s so
   // the dial updates often without a full-page reload.
@@ -145,6 +165,166 @@ export function createServer(): express.Express {
       res.status(500).type("text").send("internal error");
     }
   });
+  app.get("/marketplace", async (req, res) => {
+    try {
+      res.set("Cache-Control", "private, no-cache");
+      res.type("html").send(await renderMarketplace(getSession(req)));
+    } catch (err) {
+      console.error("[/marketplace] failed:", err);
+      res.status(500).type("text").send("internal error");
+    }
+  });
+
+  // ── Wallet identity + Linked Accounts (non-custodial key vault) ────────────
+  const KNOWN_VENUES = new Set<Venue>(["nicehash", "miningrigrentals"]);
+  // Reject cross-site form posts (defense-in-depth alongside the CSRF token).
+  function sameOrigin(req: express.Request): boolean {
+    const origin = req.get("origin");
+    if (!origin) return true; // some browsers omit Origin on top-level form posts
+    try {
+      return new URL(origin).host === req.get("host");
+    } catch {
+      return false;
+    }
+  }
+  app.get("/account", async (req, res) => {
+    try {
+      res.type("html").send(await renderLinked(getSession(req), String(req.query.msg ?? "")));
+    } catch (err) {
+      console.error("[/account] failed:", err);
+      res.status(500).type("text").send("internal error");
+    }
+  });
+  app.post("/account/connect", (req, res) => {
+    const address = String(req.body.address ?? "").trim().toLowerCase();
+    if (!sameOrigin(req)) return res.redirect(303, "/account?msg=err_addr");
+    if (!isValidAddress(address)) return res.redirect(303, "/account?msg=err_addr");
+    try {
+      const ok = verifyWalletSignature(address, String(req.body.message ?? ""), String(req.body.signature ?? ""));
+      if (!ok) return res.redirect(303, "/account?msg=err_addr");
+      setSession(res, address);
+      res.redirect(303, "/account?msg=connected");
+    } catch {
+      // Prod path before BIP-322 verifier is wired: fail closed.
+      res.redirect(303, "/account?msg=err_auth");
+    }
+  });
+  app.post("/account/disconnect", (_req, res) => {
+    clearSession(res);
+    res.redirect(303, "/account");
+  });
+  app.post("/account/link", async (req, res) => {
+    const session = getSession(req);
+    if (!session || !sameOrigin(req) || !checkCsrf(session.address, req.body.csrf)) {
+      return res.redirect(303, "/account?msg=err_link");
+    }
+    const venue = String(req.body.venue ?? "") as Venue;
+    if (!KNOWN_VENUES.has(venue)) return res.redirect(303, "/account?msg=err_link");
+    if (!isVaultReady()) return res.redirect(303, "/account?msg=err_vault");
+    try {
+      await linkAccount({
+        address: session.address,
+        venue,
+        orgId: req.body.orgId ? String(req.body.orgId) : undefined,
+        apiKey: String(req.body.apiKey ?? "").trim(),
+        apiSecret: String(req.body.apiSecret ?? "").trim(),
+      });
+      res.redirect(303, "/account?msg=linked");
+    } catch (err) {
+      console.error("[/account/link] failed:", err);
+      res.redirect(303, "/account?msg=err_link");
+    }
+  });
+  app.post("/account/unlink", async (req, res) => {
+    const session = getSession(req);
+    if (!session || !sameOrigin(req) || !checkCsrf(session.address, req.body.csrf)) {
+      return res.redirect(303, "/account");
+    }
+    const venue = String(req.body.venue ?? "") as Venue;
+    if (KNOWN_VENUES.has(venue)) await unlinkAccount(session.address, venue).catch(() => {});
+    res.redirect(303, "/account?msg=unlinked");
+  });
+
+  // Place an order from the user's own linked venue account. SAFETY: this only
+  // ever fires a real venue order when config.orderingLive is true; otherwise it
+  // runs a dry-run (creates nothing at the venue) so the whole flow is testable
+  // without moving money. Auth is always verified read-only first.
+  app.post("/account/order", async (req, res) => {
+    const session = getSession(req);
+    if (!session || !sameOrigin(req) || !checkCsrf(session.address, req.body.csrf)) {
+      return res.status(403).json({ error: "not authorized" });
+    }
+    const venue = String(req.body.venue ?? "") as Venue;
+    if (venue !== "nicehash") {
+      return res.status(400).json({ error: "only NiceHash ordering is wired right now" });
+    }
+    const phd = Number(req.body.phd ?? 0);
+    const phRate = Number(req.body.phRate ?? 0);
+    const durationHrs = Number(req.body.durationHrs ?? 0);
+    const poolKey = String(req.body.pool ?? "standard") as keyof typeof POOL_TARGETS;
+    const pool = POOL_TARGETS[poolKey] ?? POOL_TARGETS.standard;
+    const worker = String(req.body.worker ?? "parahawk").trim() || "parahawk";
+    const priceBtcPerPhDay = Number(req.body.priceBtcPerPhDay ?? 0);
+    const amountBtc = Number(req.body.amountBtc ?? 0);
+    try {
+      const creds = await getCredentials(session.address, venue);
+      if (!creds) return res.status(400).json({ error: "link your NiceHash key first (Account tab)" });
+      const nh = { orgId: creds.orgId ?? "", apiKey: creds.apiKey, apiSecret: creds.apiSecret };
+
+      // Read-only auth check first — proves the key works & is scoped, no spend.
+      let balanceBtc = 0;
+      try {
+        balanceBtc = (await nhCheckAuth(nh)).total;
+      } catch {
+        return res.status(400).json({ error: "NiceHash rejected the key — check it's active and order-scoped" });
+      }
+
+      const live = config.orderingLive;
+      const [host, portStr] = pool.host.split(":");
+      const poolRes = await nhCreatePool(
+        nh,
+        { name: "Parahawk-Parasite", stratumHostname: host!, stratumPort: Number(portStr), username: `${session.address}.${worker}`, password: "x" },
+        live,
+      );
+      const orderRes = await nhPlaceOrder(
+        nh,
+        { poolId: poolRes.id, priceBtcPerPhDay, limitPhs: phRate, amountBtc, type: "STANDARD" },
+        live,
+      );
+      const id = orderRes.dryRun ? `dry-${randomUUID()}` : orderRes.id;
+      await saveWizardOrder({
+        id,
+        address: session.address,
+        venue,
+        phd,
+        phRate,
+        durationHrs,
+        poolTarget: pool.host,
+        satsPaid: Math.round(amountBtc * 1e8) || undefined,
+        status: orderRes.dryRun ? "dryrun" : "placed",
+        placedAt: Date.now(),
+      }).catch(() => {});
+      res.json({ ok: true, dryRun: orderRes.dryRun, orderId: id, pool: pool.host, balanceBtc });
+    } catch (err) {
+      console.error("[/account/order] failed:", err);
+      res.status(500).json({ error: "order failed — see server logs" });
+    }
+  });
+
+  // Delivery auditor JSON — promised vs pool-side delivered PHd over a window.
+  app.get("/api/audit", async (req, res) => {
+    try {
+      const address = String(req.query.address ?? "").trim();
+      const phd = Number(req.query.phd ?? 0);
+      const hours = Math.max(1, Math.min(720, Number(req.query.hours ?? 24)));
+      if (!address || !(phd > 0)) return res.status(400).json({ error: "address and phd required" });
+      res.json(await auditDelivery(address, phd, hours));
+    } catch (err) {
+      console.error("[/api/audit] failed:", err);
+      res.status(500).json({ error: "audit failed" });
+    }
+  });
+
   app.get("/order-books", page(renderOrderBooks));
   // Awards merged into the Bravocados board — redirect old links.
   app.get("/cados", (_req, res) => res.redirect(301, "/board"));
