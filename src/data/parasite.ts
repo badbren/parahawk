@@ -426,6 +426,45 @@ export async function getRefineryState(): Promise<RefineryState> {
   }
 }
 
+// ── completed rounds (found blocks) ─────────────────────────────────────────
+
+interface RoundRow {
+  block_height: number;
+  total_work: number;
+  winner_username?: string | null;
+  coinbase_value?: number | null;
+}
+export interface CompletedRound {
+  height: number;
+  /** total pool work banked in that round, in difficulty units. */
+  totalWorkDiff: number;
+  /** the winning miner's username (may carry a masked address), if reported. */
+  winner: string | null;
+}
+
+/**
+ * Recently completed pot cycles from `/api/rounds` — each a found block with the
+ * round's total work. Only ~6 rounds are returned, but that's enough to backfill
+ * the Pool page's luck index / pot-length / hall of fame with real history
+ * (Parahawk then extends it as it observes new blocks). Skips the in-progress
+ * round (block_height 0). Empty in mock mode.
+ */
+export async function getRounds(): Promise<CompletedRound[]> {
+  if (config.mockData) return [];
+  try {
+    const rows = await fetchJson<RoundRow[]>(`${base()}/api/rounds?limit=100`);
+    return (Array.isArray(rows) ? rows : [])
+      .filter((r) => Number(r.block_height) > 0 && Number(r.total_work) > 0)
+      .map((r) => ({
+        height: Number(r.block_height),
+        totalWorkDiff: Number(r.total_work),
+        winner: r.winner_username ?? null,
+      }));
+  } catch {
+    return [];
+  }
+}
+
 // ── per-address ───────────────────────────────────────────────────────────────
 
 interface UserApi {

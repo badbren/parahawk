@@ -2,7 +2,9 @@ import { config } from "../config.js";
 import { getStore } from "../db/index.js";
 import { getOverview } from "../services/overview.js";
 import { potMathFromOverview } from "../services/potmath.js";
-import { getRecentHits, getUserStats, getRouterOrders } from "../data/parasite.js";
+import { getRecentHits, getUserStats, getRouterOrders, getRounds } from "../data/parasite.js";
+import { getBlockTimestamp } from "../data/mempool.js";
+import { PHD_TO_DIFF } from "../math/constants.js";
 import { getCadoWinnerAddresses } from "../services/winners.js";
 import { estimateCurrentPotPhd } from "../services/pot.js";
 import { bus } from "../events.js";
@@ -157,6 +159,28 @@ async function indexTrackedAddresses(): Promise<void> {
   }
 }
 
+/**
+ * Backfill completed pot cycles from Parasite's `/api/rounds` (found blocks with
+ * their total work) so the Pool page's luck index / pot-length / hall of fame
+ * have real history immediately, instead of waiting for Parahawk to observe
+ * blocks itself. Dedupes by height (recordBlockFound upserts). Only ~6 rounds
+ * are available, but Parahawk extends the record as it sees new blocks.
+ */
+async function backfillRounds(): Promise<void> {
+  const store = getStore();
+  const rounds = await getRounds().catch(() => []);
+  if (rounds.length === 0) return;
+  const sorted = rounds.slice().sort((a, b) => a.height - b.height);
+  for (let i = 0; i < sorted.length; i++) {
+    const r = sorted[i]!;
+    const prevHeight = i > 0 ? sorted[i - 1]!.height : r.height - 1;
+    const cycleDurationBlocks = Math.max(1, r.height - prevHeight);
+    const estCyclePhd = r.totalWorkDiff / PHD_TO_DIFF;
+    const foundAt = (await getBlockTimestamp(r.height).catch(() => null)) ?? Date.now();
+    await store.recordBlockFound({ height: r.height, foundAt, cycleDurationBlocks, estCyclePhd });
+  }
+}
+
 /** Current pot age in hours, for the bot presence line. */
 export async function currentPotHours(): Promise<number> {
   const o = await getOverview();
@@ -170,7 +194,7 @@ export async function currentPotHours(): Promise<number> {
  * store and insertHits dedupes by id, so a stateless per-tick run is correct.
  */
 export async function runPollOnce(): Promise<void> {
-  await Promise.allSettled([collect(), checkBlock(), collectHits(), indexTrackedAddresses()]);
+  await Promise.allSettled([collect(), checkBlock(), collectHits(), indexTrackedAddresses(), backfillRounds()]);
 }
 
 export function startPollers(): void {
@@ -181,6 +205,8 @@ export function startPollers(): void {
   safe("collect", collect)();
   safe("block", checkBlock)();
   safe("hits", collectHits)();
+  safe("rounds", backfillRounds)();
+  setInterval(safe("rounds", backfillRounds), 10 * 60 * 1000);
 
   setInterval(safe("collect", collect), config.pollIntervalSeconds * 1000);
   setInterval(safe("block", checkBlock), config.blockPollIntervalSeconds * 1000);
