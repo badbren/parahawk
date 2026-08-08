@@ -16,10 +16,46 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "1.2",
+    name: "Beta 1.2 — The Marketplace",
+    date: "2026-08-07",
+    current: true,
+    summary: "A non-custodial hashrate marketplace: compare every rental venue's price, connect your wallet, and order from your own account — Parahawk never holds your funds.",
+    changes: [
+      {
+        tag: "New",
+        text: "Marketplace tab — every hashrate rental venue's price in one place, normalized to sats/PHd. Live prices from NiceHash (order-book average) and MiningRigRentals, plus Refinery, with verdict chips vs the ~50k fair value, a BEST PRICE badge, and how-much-you'd-save-vs-Refinery. Replaces the old Order Books tab (still linked from the top of the board).",
+      },
+      {
+        tag: "New",
+        text: "Order wizard — pick a size (1–50 PH) and duration, see your real odds (10T / 21T / block) and the cost at every venue side by side, and it auto-picks the right Parasite port (high-diff for big rentals). For deep-link venues it hands you a copy-paste config card with the ghost-order fee warning; for NiceHash it can place the order from your own account.",
+      },
+      {
+        tag: "New",
+        text: "Connect your Bitcoin wallet (Xverse) — sign a one-time message (BIP-322) to prove an address is yours. No passwords, nothing spent. Your wallet becomes your Parahawk identity so your linked venue keys belong only to you.",
+      },
+      {
+        tag: "New",
+        text: "Linked Accounts — bring your own NiceHash/MRR API key (scoped to placing orders, never withdrawal). Keys are encrypted at rest (AES-256-GCM), masked, and never shown again. Parahawk places orders from your balance; it can't touch your funds and wouldn't.",
+      },
+      {
+        tag: "New",
+        text: "Delivery auditor — 'did you get what you paid for?' Compares the PHd a rental promised vs the work actually delivered pool-side, with an honest caveat when the sample is coarse.",
+      },
+      {
+        tag: "New",
+        text: "Tip the hawk after an order — a Lightning prompt framed around the sats you saved. Parahawk earns only from optional tips and venue referral codes, never from your order — see About.",
+      },
+      {
+        tag: "Changed",
+        text: "About now explains the non-custodial model in plain English: a price router + your-own-account automation, contrasted with a reseller that marks up the hash.",
+      },
+    ],
+  },
+  {
     version: "1.1",
     name: "Beta 1.1",
     date: "2026-08-06",
-    current: true,
     summary: "Trends on the Calculator, clickable wallet stat pages, achievements, and an all-time cado-winners board.",
     changes: [
       {

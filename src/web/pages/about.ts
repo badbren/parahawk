@@ -13,6 +13,10 @@ import {
 
 /** "What is Parahawk?" feature cards (emoji, title, description). */
 const FEATURES: Array<{ e: string; t: string; d: string }> = [
+  { e: "🛒", t: "Hashrate marketplace", d: "Every rental venue's price in one place — normalized to sats/PHd, cheapest flagged, and how much you'd save vs Refinery." },
+  { e: "🧭", t: "Order wizard", d: "Pick a size → see the odds and each venue's cost → aim it straight at Parasite. Order from your own account or deep-link out." },
+  { e: "🔌", t: "Connect your wallet", d: "Sign in with Xverse (BIP-322) and link your own venue keys — non-custodial, encrypted, and only ever yours." },
+  { e: "🔍", t: "Delivery auditor", d: "Promised vs delivered PHd — an honest check on whether a rental actually showed up pool-side." },
   { e: "🧮", t: "Pot Math, solved", d: "Round depth, rarity, share price and expected time-to-block — computed live so you don't have to." },
   { e: "📈", t: "24-hour trends", d: "Every Pot Math number shows whether it's rising or falling vs a day ago. Not on Parasite." },
   { e: "👛", t: "Click any wallet", d: "One scrollable stats page: achievements, cados won, blocks found, lifetime work, luck, live hashrate." },
