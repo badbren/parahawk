@@ -1,4 +1,5 @@
 import { createHmac, randomUUID } from "node:crypto";
+import { NH_ALGO } from "./nicehash.js";
 
 /**
  * Minimal NiceHash API v2 client — signs requests with the user's own key to
@@ -154,7 +155,7 @@ export async function nhCreatePool(
     path: "/main/api/v2/pool",
     body: {
       name: spec.name,
-      algorithm: "SHA256",
+      algorithm: NH_ALGO,
       stratumHostname: spec.stratumHostname,
       stratumPort: spec.stratumPort,
       username: spec.username,
@@ -182,7 +183,7 @@ export async function nhPlaceOrder(
     path: "/main/api/v2/hashpower/order",
     body: {
       market: "EU", // resolved per-account before go-live
-      algorithm: "SHA256",
+      algorithm: NH_ALGO,
       amount: spec.amountBtc,
       price: spec.priceBtcPerPhDay,
       limit: spec.limitPhs,

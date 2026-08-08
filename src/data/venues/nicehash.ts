@@ -2,7 +2,11 @@ import { config } from "../../config.js";
 import type { VenueContext, VenueQuote } from "./types.js";
 
 const SATS_PER_BTC = 100_000_000;
-const NH_ORDERBOOK = "https://api2.nicehash.com/main/api/v2/hashpower/orderBook?algorithm=SHA256&size=100";
+// The real SHA-256 marketplace liquidity is on SHA256ASICBOOST — the plain
+// SHA256 book is nearly empty (~1-2 PH). Verified live: ASICBOOST carries
+// ~12,000 PH vs ~1.6 PH on SHA256.
+export const NH_ALGO = "SHA256ASICBOOST";
+const NH_ORDERBOOK = `https://api2.nicehash.com/main/api/v2/hashpower/orderBook?algorithm=${NH_ALGO}&size=100`;
 
 /**
  * NiceHash quotes its SHA-256 marketplace in BTC per PH per day. One PH/s for

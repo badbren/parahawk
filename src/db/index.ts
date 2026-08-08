@@ -7,10 +7,15 @@ import type { Store } from "./types.js";
 
 let store: Store | null = null;
 
-/** Singleton store: Supabase when credentials exist, else in-memory. */
+/**
+ * Singleton store: Supabase when credentials exist, else in-memory. In mock mode
+ * we ALWAYS use the in-memory store even if Supabase creds are present, so a
+ * dev/test run can never write synthetic data into a real database (this bit us
+ * once — a mock dev server with prod creds polluted production).
+ */
 export function getStore(): Store {
   if (store) return store;
-  store = hasSupabase() ? new SupabaseStore() : new MemoryStore();
+  store = !config.mockData && hasSupabase() ? new SupabaseStore() : new MemoryStore();
   return store;
 }
 
