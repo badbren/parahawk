@@ -90,35 +90,56 @@ function connectCard(): string {
         || list[0];
   }
   function raw(x){ try{return JSON.stringify(x);}catch(e){return String(x);} }
+  function isDenied(x){ return /-32002|-32000|denied|reject|unauthor/i.test(raw(x)); }
+  // Try a sequence of connect methods; first that yields addresses wins.
+  async function getAddresses(p){
+    var attempts=[
+      ['wallet_connect', { addresses:['payment','ordinals'], message:'Connect to Parahawk' }],
+      ['wallet_connect', null],
+      ['getAddresses', { purposes:['payment','ordinals'], message:'Connect to Parahawk' }],
+      ['getAccounts', { purposes:['payment','ordinals'] }],
+    ];
+    var lastErr=null, lastRaw=null;
+    for(var i=0;i<attempts.length;i++){
+      try{
+        var res=await p.request(attempts[i][0], attempts[i][1]);
+        lastRaw=res;
+        if(res && res.error){ lastErr=res.error; continue; }
+        var list=addrsFrom(res);
+        if(list.length) return { list:list };
+      }catch(e){ lastErr=(e&&(e.error||e)); lastRaw=lastRaw||e; }
+    }
+    return { err:lastErr, raw:lastRaw };
+  }
   btn.onclick=async function(){
     var p=provider();
     if(!p){ say('Xverse not detected. Enable the Xverse extension, then hard-refresh (Ctrl+Shift+R).'); return; }
-    btn.disabled=true; say('Opening Xverse — approve the pop-up…');
+    btn.disabled=true; say('Opening Xverse — <b>unlock your wallet</b> if asked and <b>approve</b> the pop-up…');
     try {
-      // 1) get the wallet's addresses
-      var acc = await p.request('getAddresses', { purposes:['payment','ordinals'], message:'Connect to Parahawk' });
-      var list = addrsFrom(acc);
-      if(!list.length){
-        console.log('[parahawk] getAddresses raw response:', acc);
-        say('Couldn\\'t read an address. <b>Copy this line to Claude:</b><br>ADDR:'+raw(acc).slice(0,300));
+      var g = await getAddresses(p);
+      if(!g.list){
+        console.log('[parahawk] connect: no addresses', g);
+        if(isDenied(g.err)||isDenied(g.raw)){
+          say('Xverse denied the request. Make sure the extension is <b>unlocked</b> (enter your Xverse password), then click <b>Approve / Connect</b> in the pop-up and try again.');
+        } else {
+          say('Couldn\\'t get an address. <b>Copy this to Claude:</b><br>ADDR:'+raw(g.raw||g.err).slice(0,300));
+        }
         btn.disabled=false; return;
       }
-      var pay = pickPayment(list);
+      var pay = pickPayment(g.list);
       var address = pay && pay.address;
-      if(!address){ say('No usable address. <b>Copy to Claude:</b><br>ADDR:'+raw(list).slice(0,300)); btn.disabled=false; return; }
+      if(!address){ say('No usable address. <b>Copy to Claude:</b><br>ADDR:'+raw(g.list).slice(0,300)); btn.disabled=false; return; }
       say('Requesting signature for '+address.slice(0,12)+'… approve the Xverse pop-up.');
-      // 2) nonce + exact message
       var chal = await fetch('/account/nonce?address='+encodeURIComponent(address)).then(function(r){return r.json();});
       if(chal.error) throw new Error(chal.error);
-      // 3) sign (BIP-322)
       var sg = await p.request('signMessage', { address:address, message:chal.message, protocol:'BIP322' });
+      if(sg && sg.error){ console.log('[parahawk] signMessage err', sg); say(isDenied(sg.error)?'You declined the signature — click Sign in the Xverse pop-up to prove the address is yours (no funds move).':'Sign failed. Copy to Claude:<br>SIG:'+raw(sg).slice(0,300)); btn.disabled=false; return; }
       var sig = (sg && sg.result && (sg.result.signature||sg.result)) || (sg && sg.signature);
       if(typeof sig!=='string'){
         console.log('[parahawk] signMessage raw response:', sg);
         say('Couldn\\'t read the signature. <b>Copy to Claude:</b><br>SIG:'+raw(sg).slice(0,300));
         btn.disabled=false; return;
       }
-      // 4) verify server-side + open session
       var r = await fetch('/account/connect',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
         body:'address='+encodeURIComponent(address)+'&token='+encodeURIComponent(chal.token)+'&signature='+encodeURIComponent(sig)}).then(function(r){return r.json();});
       if(r.ok){ say('Verified — signing you in…'); location.href='/account'; }
