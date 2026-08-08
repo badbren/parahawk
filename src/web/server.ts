@@ -18,7 +18,7 @@ import { renderBoard } from "./pages/board.js";
 import { renderOrderBooks } from "./pages/order-books.js";
 import { renderMarketplace } from "./pages/marketplace.js";
 import { renderLinked } from "./pages/linked.js";
-import { renderAdmin, isAdmin, MANUAL_VENUES } from "./pages/admin.js";
+import { renderAdmin, isAdmin, MANUAL_VENUES, usdPerPhdToSatsPerPhd } from "./pages/admin.js";
 import { setManualPrice } from "../services/manual-prices.js";
 import {
   getSession,
@@ -350,11 +350,18 @@ export function createServer(): express.Express {
       return res.status(403).type("text").send("forbidden");
     }
     const venue = String(req.body.venue ?? "");
-    const sats = Number(req.body.sats ?? 0);
-    if (!MANUAL_VENUES.some((v) => v.slug === venue) || !(sats > 0)) {
+    const usd = Number(req.body.usd ?? 0);
+    if (!MANUAL_VENUES.some((v) => v.slug === venue) || !(usd > 0)) {
       return res.redirect(303, "/admin?msg=invalid+value");
     }
-    await setManualPrice(venue, sats, session!.address).catch((err) => console.error("[/admin/price]", err));
+    // Convert the USD-per-PHd the owner typed to sats/PHd at the live BTC price.
+    const overview = await getOverview().catch(() => null);
+    const btc = overview?.pool.btcPriceUsd ?? 0;
+    const sats = Math.round(usdPerPhdToSatsPerPhd(usd, btc));
+    if (!(sats > 0)) return res.redirect(303, "/admin?msg=no+live+BTC+price+-+try+again");
+    await setManualPrice(venue, sats, session!.address, `$${usd.toFixed(2)}/PHd @ BTC ${Math.round(btc)}`).catch((err) =>
+      console.error("[/admin/price]", err),
+    );
     res.redirect(303, "/admin?msg=saved");
   });
 
