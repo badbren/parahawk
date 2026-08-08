@@ -346,9 +346,17 @@ export function createServer(): express.Express {
   });
   app.post("/admin/price", async (req, res) => {
     const session = getSession(req);
-    if (!isAdmin(session) || !sameOrigin(req) || !checkCsrf(session!.address, req.body.csrf)) {
-      return res.status(403).type("text").send("forbidden");
-    }
+    // Specific diagnostics (all values here are the owner's own public data).
+    if (!session) return res.status(403).type("text").send("forbidden: no wallet session — reconnect on /account");
+    if (!isAdmin(session))
+      return res.status(403).type("text").send(`forbidden: not owner — session=${session.address} expected=${config.adminAddress}`);
+    if (!sameOrigin(req))
+      return res
+        .status(403)
+        .type("text")
+        .send(`forbidden: origin mismatch — origin=${req.get("origin")} host=${req.get("host")} xfh=${req.get("x-forwarded-host")}`);
+    if (!checkCsrf(session.address, req.body.csrf))
+      return res.status(403).type("text").send(`forbidden: csrf mismatch — got len ${req.body.csrf ? String(req.body.csrf).length : 0}`);
     const venue = String(req.body.venue ?? "");
     const usd = Number(req.body.usd ?? 0);
     if (!MANUAL_VENUES.some((v) => v.slug === venue) || !(usd > 0)) {
