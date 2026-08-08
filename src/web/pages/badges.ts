@@ -1,9 +1,19 @@
 import { renderPage } from "../layout.js";
 import { getBadgesIndex, getBadgeHolders } from "../../services/badges.js";
 import { getAddressResolver } from "../../services/winners.js";
+import { getBadgeBaseline24h, recordBadgeSnapshot } from "../../services/badge-trends.js";
 import { BADGE_DEFS, BADGE_BY_KEY } from "../../data/badges.js";
 import { walletCell } from "../addr.js";
 import { fmtInt, esc } from "../format.js";
+
+/** 24h growth pill for a badge's total count vs its ~24h-ago baseline. */
+function growthPill(cur: number, base: number | undefined): string {
+  if (base === undefined || base <= 0) return "";
+  const pct = ((cur - base) / base) * 100;
+  const cls = pct > 0.049 ? "green" : pct < -0.049 ? "red" : "dim";
+  const sign = pct > 0 ? "+" : "";
+  return `<span class="bpct ${cls}">${sign}${pct.toFixed(1)}% <span class="dim">24h</span></span>`;
+}
 
 const BADGE_STYLE = `
 <style>
@@ -15,16 +25,20 @@ const BADGE_STYLE = `
 .bcard .ct{color:var(--green);font-size:14px;margin:2px 0 6px}
 .bcard .ht{color:var(--dim);font-size:14px;line-height:1.4}
 .bemoji{font-size:15px;letter-spacing:1px}
+.bpct{font-size:12px;padding:1px 7px;border:1px solid var(--line);border-radius:10px;vertical-align:middle;white-space:nowrap;font-weight:400}
 .tscroll{max-height:640px;overflow:auto;border:1px solid var(--line)}
 .tscroll table{margin:0}
 .tscroll thead th{position:sticky;top:0;background:#0d0d0d;z-index:1}
 </style>`;
 
 export async function renderBadges(): Promise<string> {
-  const [idx, resolve] = await Promise.all([
+  const [idx, resolve, baseline] = await Promise.all([
     getBadgesIndex(),
     getAddressResolver().catch(() => (() => null) as (m: string) => string | null),
+    getBadgeBaseline24h().catch(() => null),
   ]);
+  // Record a throttled snapshot so the 24h series keeps building (best-effort).
+  await recordBadgeSnapshot(idx.totals, idx.holders).catch(() => {});
 
   const cards = BADGE_DEFS.map((b) => {
     const n = idx.holders[b.key] ?? 0;
@@ -34,15 +48,18 @@ export async function renderBadges(): Promise<string> {
         ? `${fmtInt(n)} holders →`
         : `${fmtInt(n)} indexed →`
       : "view holders →";
+    const pill = growthPill(idx.totals[b.key] ?? 0, baseline?.totals[b.key]);
     return `<a class="bcard" href="/badges/${encodeURIComponent(b.key)}">
       <div class="ic">${b.emoji}</div>
       <div>
-        <div class="nm">${esc(b.name)}</div>
+        <div class="nm">${esc(b.name)} ${pill}</div>
         <div class="ct">${label}</div>
         <div class="ht">${esc(b.howto)}</div>
       </div>
     </a>`;
   }).join("");
+
+  const hasBaseline = Boolean(baseline);
 
   const mbRows =
     idx.mostBadges.length === 0
@@ -65,6 +82,11 @@ export async function renderBadges(): Promise<string> {
 </div>
 
 <h2>Achievements</h2>
+<p class="muted-note" style="margin:0 0 10px">${
+    hasBaseline
+      ? "The pill on each badge is its <strong>24h growth</strong> — total activity vs a day ago (e.g. Refinery climbs as more orders land)."
+      : "A <strong>24h growth</strong> pill will appear on each badge once Parahawk has ~a day of history — it's collecting now."
+  }</p>
 <div class="bgrid">${cards}</div>
 <p class="muted-note" style="margin-top:10px"><strong>How the counts work:</strong> <strong>Bravocado</strong> is complete (from the all-time 10T+ board). Every other count is <em>“indexed”, not all-time</em> — Parasite only exposes a full <code>bc1…</code> address for wallets in the <em>current</em> Refinery order book, wallets someone has searched, and cado winners, so those are the only ones Parahawk can look up badges for. So “${fmtInt(idx.holders.refinery ?? 0)} indexed” Refinery holders means the ones we can currently see, not everyone who has ever placed an order. It grows as the order book turns over and wallets get searched — ${fmtInt(idx.indexedWallets)} wallets indexed so far.</p>
 

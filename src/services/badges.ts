@@ -27,6 +27,8 @@ export interface MostBadgesRow {
 export interface BadgesIndex {
   /** badge key → number of wallets known to hold it. */
   holders: Record<string, number>;
+  /** badge key → summed count across all holders (total activity). */
+  totals: Record<string, number>;
   mostBadges: MostBadgesRow[];
   indexedWallets: number;
 }
@@ -38,14 +40,22 @@ export async function getBadgesIndex(): Promise<BadgesIndex> {
   ]);
 
   const holders: Record<string, number> = {};
-  for (const def of BADGE_DEFS) holders[def.key] = 0;
+  const totals: Record<string, number> = {};
+  for (const def of BADGE_DEFS) {
+    holders[def.key] = 0;
+    totals[def.key] = 0;
+  }
   for (const r of rows) {
     for (const [k, n] of Object.entries(r.badges)) {
-      if (n > 0) holders[k] = (holders[k] ?? 0) + 1;
+      if (n > 0) {
+        holders[k] = (holders[k] ?? 0) + 1;
+        totals[k] = (totals[k] ?? 0) + n;
+      }
     }
   }
   // Bravocado holder count is authoritative from the winners list.
   holders.bravocado = Math.max(holders.bravocado ?? 0, winners.total);
+  totals.bravocado = Math.max(totals.bravocado ?? 0, winners.total);
 
   const mostBadges: MostBadgesRow[] = rows
     .map((r) => {
@@ -59,7 +69,7 @@ export async function getBadgesIndex(): Promise<BadgesIndex> {
     .sort((a, b) => b.distinct - a.distinct || b.total - a.total)
     .slice(0, 50);
 
-  return { holders, mostBadges, indexedWallets: rows.length };
+  return { holders, totals, mostBadges, indexedWallets: rows.length };
 }
 
 /** Holders of a single badge type. Bravocado uses the complete winners list. */
