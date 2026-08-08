@@ -2,11 +2,13 @@ import { config } from "../../config.js";
 import type { VenueContext, VenueQuote } from "./types.js";
 
 /**
- * Braiins sells hashrate that is locked to Braiins' own solo pool — it CANNOT be
- * pointed at Parasite. It's on the board only for the solo-yolo comparison, so a
- * user can see its (usually premium) price honestly against the rentable venues.
- * Always badged "Braiins solo only" via the note; never offered in the buy flow
- * for a Parasite target.
+ * Braiins Hashpower IS a real hashrate rental marketplace (pay-as-you-hash) — but
+ * it only routes to a fixed list of supported pools (Braiins Pool/Solo, AntPool,
+ * F2Pool, ViaBTC, …), NOT an arbitrary custom stratum. Parasite is not on that
+ * list, so rented Braiins hash can't be pointed at the pot today. Kept on the
+ * board for price comparison and excluded from the Parasite buy flow until/unless
+ * they add Parasite (or open custom stratums). See braiins.com/blog/buy-bitcoin-
+ * hashrate-introducing-braiins-hashpower.
  */
 const MOCK_SATS_PER_PHD = 59_500; // typically a premium vs the rentable venues
 
@@ -17,8 +19,8 @@ export async function fetchBraiinsQuote(_ctx: VenueContext): Promise<VenueQuote>
       slug: "braiins",
       satsPerPhd: MOCK_SATS_PER_PHD,
       source: "scraped",
-      url: "https://braiins.com",
-      note: "⚠ Braiins solo pool only — cannot point at Parasite",
+      url: "https://braiins.com/hashpower",
+      note: "⚠ marketplace, but routes only to its own pool list — Parasite not supported yet",
       fetchedAt: Date.now(),
       live: true,
     };

@@ -65,7 +65,7 @@ export async function renderMarketplace(session: Session | null = null): Promise
         ? ` <span class="badge-best">BEST PRICE</span>`
         : "";
       const soloBadge = !r.canTargetParasite
-        ? ` <span class="badge-solo">solo only</span>`
+        ? ` <span class="badge-solo">no Parasite route</span>`
         : "";
       const nameCell = r.url && r.url !== "#"
         ? `<a href="${esc(r.url)}" target="_blank" rel="noopener nofollow">${esc(r.venue)}</a>`
