@@ -72,38 +72,58 @@ function connectCard(): string {
 <script>
 (function(){
   var btn=document.getElementById('xv-connect'), st=document.getElementById('xv-status');
-  function say(m){ st.textContent=m; }
+  function say(m){ st.innerHTML=m; }
   function provider(){ return (window.XverseProviders&&window.XverseProviders.BitcoinProvider)||window.BitcoinProvider||null; }
-  async function req(p,method,params){
-    // Xverse exposes request(method, params); tolerate both signatures.
-    try { return await p.request(method, params); }
-    catch(e){ return await p.request({ method:method, params:params }); }
+  // Extract an address list from any of Xverse's response wrappers.
+  function addrsFrom(res){
+    if(!res) return [];
+    var r = (res.result!==undefined) ? res.result : res;
+    if(Array.isArray(r)) return r;
+    if(r && Array.isArray(r.addresses)) return r.addresses;
+    if(res && Array.isArray(res.addresses)) return res.addresses;
+    return [];
   }
+  function pickPayment(list){
+    return list.find(function(a){return (a.purpose||'')==='payment';})
+        || list.find(function(a){return /p2wpkh|p2sh/i.test(a.addressType||'');})
+        || list.find(function(a){var s=String(a.address||'');return s.indexOf('bc1q')===0||s.charAt(0)==='3';})
+        || list[0];
+  }
+  function raw(x){ try{return JSON.stringify(x);}catch(e){return String(x);} }
   btn.onclick=async function(){
     var p=provider();
-    if(!p){ say('Xverse not detected. Install/enable the Xverse extension, then reload this page.'); return; }
-    btn.disabled=true; say('Opening Xverse…');
+    if(!p){ say('Xverse not detected. Enable the Xverse extension, then hard-refresh (Ctrl+Shift+R).'); return; }
+    btn.disabled=true; say('Opening Xverse — approve the pop-up…');
     try {
-      // 1) get the wallet's payment address
-      var acc=await req(p,'getAddresses',{ purposes:['payment'], message:'Connect to Parahawk' });
-      var list=(acc&&acc.result&&acc.result.addresses)||(acc&&acc.addresses)||[];
-      var pay=list.find(function(a){return a.purpose==='payment';})||list[0];
-      if(!pay){ throw new Error('no address returned'); }
-      var address=pay.address;
-      say('Requesting signature for '+address.slice(0,10)+'…');
-      // 2) fetch a nonce + the exact message to sign
-      var chal=await fetch('/account/nonce?address='+encodeURIComponent(address)).then(function(r){return r.json();});
+      // 1) get the wallet's addresses
+      var acc = await p.request('getAddresses', { purposes:['payment','ordinals'], message:'Connect to Parahawk' });
+      var list = addrsFrom(acc);
+      if(!list.length){
+        console.log('[parahawk] getAddresses raw response:', acc);
+        say('Couldn\\'t read an address. <b>Copy this line to Claude:</b><br>ADDR:'+raw(acc).slice(0,300));
+        btn.disabled=false; return;
+      }
+      var pay = pickPayment(list);
+      var address = pay && pay.address;
+      if(!address){ say('No usable address. <b>Copy to Claude:</b><br>ADDR:'+raw(list).slice(0,300)); btn.disabled=false; return; }
+      say('Requesting signature for '+address.slice(0,12)+'… approve the Xverse pop-up.');
+      // 2) nonce + exact message
+      var chal = await fetch('/account/nonce?address='+encodeURIComponent(address)).then(function(r){return r.json();});
       if(chal.error) throw new Error(chal.error);
-      // 3) sign it (BIP-322)
-      var sg=await req(p,'signMessage',{ address:address, message:chal.message, protocol:'BIP322' });
-      var signature=(sg&&sg.result&&sg.result.signature)||(sg&&sg.signature);
-      if(!signature) throw new Error('no signature returned');
-      // 4) hand it to the server to verify + open the session
-      var r=await fetch('/account/connect',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
-        body:'address='+encodeURIComponent(address)+'&token='+encodeURIComponent(chal.token)+'&signature='+encodeURIComponent(signature)}).then(function(r){return r.json();});
+      // 3) sign (BIP-322)
+      var sg = await p.request('signMessage', { address:address, message:chal.message, protocol:'BIP322' });
+      var sig = (sg && sg.result && (sg.result.signature||sg.result)) || (sg && sg.signature);
+      if(typeof sig!=='string'){
+        console.log('[parahawk] signMessage raw response:', sg);
+        say('Couldn\\'t read the signature. <b>Copy to Claude:</b><br>SIG:'+raw(sg).slice(0,300));
+        btn.disabled=false; return;
+      }
+      // 4) verify server-side + open session
+      var r = await fetch('/account/connect',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body:'address='+encodeURIComponent(address)+'&token='+encodeURIComponent(chal.token)+'&signature='+encodeURIComponent(sig)}).then(function(r){return r.json();});
       if(r.ok){ say('Verified — signing you in…'); location.href='/account'; }
       else throw new Error(r.error||'connect failed');
-    } catch(e){ say('Connect failed: '+((e&&e.message)||e)); btn.disabled=false; }
+    } catch(e){ console.log('[parahawk] connect error:', e); say('Connect failed: '+((e&&e.message)||raw(e))); btn.disabled=false; }
   };
 })();
 </script>`;
