@@ -39,6 +39,13 @@ export const config = {
    * is explicitly set true. Real orders should only ever go live deliberately. */
   orderingLive: bool(process.env.ORDERING_LIVE, false),
 
+  /** Owner wallet address allowed into /admin (manual venue prices, etc.). Access
+   * still requires a wallet signature, so publishing the address is harmless.
+   * Defaults to badbren's owner wallet; override with ADMIN_ADDRESS. */
+  adminAddress: (process.env.ADMIN_ADDRESS ?? "bc1q7a5e65ge8gsln973mzr990245fjhava0tcc4mn")
+    .trim()
+    .toLowerCase(),
+
   discord: {
     enabled: bool(process.env.ENABLE_BOT, true),
     token: process.env.DISCORD_TOKEN ?? "",

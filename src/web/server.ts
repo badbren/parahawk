@@ -18,6 +18,8 @@ import { renderBoard } from "./pages/board.js";
 import { renderOrderBooks } from "./pages/order-books.js";
 import { renderMarketplace } from "./pages/marketplace.js";
 import { renderLinked } from "./pages/linked.js";
+import { renderAdmin, isAdmin, MANUAL_VENUES } from "./pages/admin.js";
+import { setManualPrice } from "../services/manual-prices.js";
 import {
   getSession,
   setSession,
@@ -330,6 +332,30 @@ export function createServer(): express.Express {
       console.error("[/account/order] failed:", err);
       res.status(500).json({ error: "order failed — see server logs" });
     }
+  });
+
+  // ── Owner-only admin: manual venue prices ─────────────────────────────────
+  app.get("/admin", async (req, res) => {
+    try {
+      res.set("Cache-Control", "private, no-cache");
+      res.type("html").send(await renderAdmin(getSession(req), String(req.query.msg ?? "")));
+    } catch (err) {
+      console.error("[/admin] failed:", err);
+      res.status(500).type("text").send("internal error");
+    }
+  });
+  app.post("/admin/price", async (req, res) => {
+    const session = getSession(req);
+    if (!isAdmin(session) || !sameOrigin(req) || !checkCsrf(session!.address, req.body.csrf)) {
+      return res.status(403).type("text").send("forbidden");
+    }
+    const venue = String(req.body.venue ?? "");
+    const sats = Number(req.body.sats ?? 0);
+    if (!MANUAL_VENUES.some((v) => v.slug === venue) || !(sats > 0)) {
+      return res.redirect(303, "/admin?msg=invalid+value");
+    }
+    await setManualPrice(venue, sats, session!.address).catch((err) => console.error("[/admin/price]", err));
+    res.redirect(303, "/admin?msg=saved");
   });
 
   // Delivery auditor JSON — promised vs pool-side delivered PHd over a window.
