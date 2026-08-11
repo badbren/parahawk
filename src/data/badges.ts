@@ -21,7 +21,9 @@ export const BADGE_DEFS: BadgeDef[] = [
   { key: "refinery", emoji: "🏭", name: "Refinery", howto: "Rent hashrate through Parasite's Refinery rental order book." },
   { key: "loyalty", emoji: "🎖️", name: "Loyalty", howto: "Keep contributing shares across many blocks over time." },
   { key: "dispenser", emoji: "🎁", name: "Dispenser", howto: "Interact with the OMB Bravocado dispenser." },
-  { key: "miner", emoji: "⚙️", name: "Miner", howto: "Point hashrate at the pool and start submitting shares." },
+  // Note: Parasite exposes a "miner" badge key but currently awards it to no one
+  // (it reads 0 for every wallet, even active block-winners), so it's omitted. If
+  // Parasite starts awarding it, the /badges auto-surfacer will pick it up.
 ];
 
 export const BADGE_BY_KEY: Record<string, BadgeDef> = Object.fromEntries(
