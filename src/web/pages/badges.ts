@@ -6,13 +6,14 @@ import { BADGE_DEFS, BADGE_BY_KEY, badgeDefFor } from "../../data/badges.js";
 import { walletCell } from "../addr.js";
 import { fmtInt, esc } from "../format.js";
 
-/** 24h growth pill for a badge's total count vs its ~24h-ago baseline. */
+/** 24h growth pill: how many MORE wallets hold this badge than ~24h ago. Shown
+ *  only on an increase (badges essentially only grow), so it reads as "going up"
+ *  and hides the one-off dip from the mock-data cleanup. */
 function growthPill(cur: number, base: number | undefined): string {
-  if (base === undefined || base <= 0) return "";
-  const pct = ((cur - base) / base) * 100;
-  const cls = pct > 0.049 ? "green" : pct < -0.049 ? "red" : "dim";
-  const sign = pct > 0 ? "+" : "";
-  return `<span class="bpct ${cls}">${sign}${pct.toFixed(1)}% <span class="dim">24h</span></span>`;
+  if (base === undefined) return "";
+  const delta = cur - base;
+  if (delta <= 0) return "";
+  return `<span class="bpct green">+${fmtInt(delta)} <span class="dim">24h</span></span>`;
 }
 
 const BADGE_STYLE = `
@@ -52,7 +53,7 @@ export async function renderBadges(): Promise<string> {
         ? `${fmtInt(n)} holders →`
         : `${fmtInt(n)} indexed →`
       : "view holders →";
-    const pill = growthPill(idx.totals[b.key] ?? 0, baseline?.totals[b.key]);
+    const pill = growthPill(idx.holders[b.key] ?? 0, baseline?.holders[b.key]);
     return `<a class="bcard" href="/badges/${encodeURIComponent(b.key)}">
       <div class="ic">${b.emoji}</div>
       <div>
