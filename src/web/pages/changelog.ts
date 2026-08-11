@@ -16,10 +16,39 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "1.3",
+    name: "Beta 1.3 — Inscribe & badge accuracy",
+    date: "2026-08-10",
+    current: true,
+    summary:
+      "A new Inscribe tab — mint Ordinals straight from Xverse for just the network fee — plus a big accuracy pass on the badges: Bravocados and Block Finders now reflect what actually happened on-chain.",
+    changes: [
+      {
+        tag: "New",
+        text: "Inscribe tab — inscribe an Ordinal on Bitcoin straight from your Xverse wallet paying only the network fee, no marketplace markup. Connect, drop in text or a file, pick a fee rate, and see the exact commit + reveal cost before anything is signed. Experimental: the live fee estimate and wallet connect are real; the broadcast step is gated off while it's tested on signet.",
+      },
+      {
+        tag: "Fixed",
+        text: "Bravocado holder count now reflects the real number of cados actually dispensed on-chain by the OMB dispensary — the reward for landing a 10T+ share — instead of an inflated figure that mixed in the wider 10T+ leaderboard and the indexed-badge table.",
+      },
+      {
+        tag: "Fixed",
+        text: "Block Finder now lists only the real block finders — the wallets whose own share actually solved a Parasite block (one of them a double-winner) — sourced from each block's on-chain trophy, instead of the couple dozen that Parasite's looser badge counter had tagged.",
+      },
+      {
+        tag: "Improved",
+        text: "The Badges board now surfaces every Parasite achievement automatically — including ones we hadn't hand-labelled yet (like “collected 3 asset types”) — so nothing stays invisible.",
+      },
+      {
+        tag: "New",
+        text: "A Discord link in the header — join the Parahawk Discord for block alerts and future updates.",
+      },
+    ],
+  },
+  {
     version: "1.2",
     name: "Beta 1.2 — The Marketplace",
     date: "2026-08-07",
-    current: true,
     summary: "A non-custodial hashrate marketplace: compare every rental venue's price, connect your wallet, and order from your own account — Parahawk never holds your funds.",
     changes: [
       {

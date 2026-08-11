@@ -16,6 +16,7 @@ const FEATURES: Array<{ e: string; t: string; d: string }> = [
   { e: "🛒", t: "Hashrate marketplace", d: "Every rental venue's price in one place — normalized to sats/PHd, cheapest flagged, and how much you'd save vs Refinery." },
   { e: "🧭", t: "Order wizard", d: "Pick a size → see the odds and each venue's cost → aim it straight at Parasite. Order from your own account or deep-link out." },
   { e: "🔌", t: "Connect your wallet", d: "Sign in with Xverse (BIP-322) and link your own venue keys — non-custodial, encrypted, and only ever yours." },
+  { e: "✍️", t: "Inscribe for network fee", d: "Inscribe an Ordinal straight from Xverse paying only the Bitcoin network fee — no marketplace markup. See the exact commit + reveal cost before anything is signed. (Experimental.)" },
   { e: "🔍", t: "Delivery auditor", d: "Promised vs delivered PHd — an honest check on whether a rental actually showed up pool-side." },
   { e: "🧮", t: "Pot Math, solved", d: "Round depth, rarity, share price and expected time-to-block — computed live so you don't have to." },
   { e: "📈", t: "24-hour trends", d: "Every Pot Math number shows whether it's rising or falling vs a day ago. Not on Parasite." },
@@ -77,6 +78,7 @@ export async function renderAbout(): Promise<string> {
   <li><strong>Wallet stats</strong> — click any address for its achievements, cados won, rental history &amp; spend, and hashrate timeline.</li>
   <li><strong>Bravocados &amp; Badges</strong> — the all-time cado winners board plus every Parasite achievement and who holds it.</li>
   <li><strong>Marketplace</strong> — every hashrate rental venue's price in one place, and a non-custodial order wizard that aims rented hash at Parasite.</li>
+  <li><strong>Inscribe</strong> — inscribe Ordinals on Bitcoin straight from Xverse at network-fee-only cost, with a live commit + reveal estimate before you sign. <em>(Experimental — fee estimate live; broadcast gated.)</em></li>
 </ul>
 
 <h2>The Marketplace — a price router, not a custodian</h2>
@@ -126,7 +128,7 @@ export async function renderAbout(): Promise<string> {
 <ul>
   <li>📦 <strong>Repo:</strong> <a href="https://github.com/badbren/parahawk" target="_blank" rel="noopener">github.com/badbren/parahawk</a> — clone it, open an issue, or send a pull request.</li>
   <li>🧮 The Pot Math lives in <code>src/math/</code> and is covered by the test suite, so the numbers you see are the numbers the code proves.</li>
-  <li>🖥️ Run your own copy with <code>npm run dev</code> — it boots in mock mode with zero credentials.</li>
+  <li>🖥️ Run your own copy with <code>npm run dev</code> — it boots with zero credentials against the public APIs it can reach.</li>
 </ul>
 <p class="muted-note">Found a bug or want a feature? <a href="https://discord.com/users/1097991369986932828" target="_blank" rel="noopener">Message me on Discord</a> — see the <a href="/changelog">changelog</a> for what's shipped.</p>
 

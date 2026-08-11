@@ -17,15 +17,16 @@ import { renderLeaving } from "./pages/leaving.js";
 import { renderBoard } from "./pages/board.js";
 import { renderOrderBooks } from "./pages/order-books.js";
 import { renderMarketplace } from "./pages/marketplace.js";
+import { renderInscribe } from "./pages/inscribe.js";
 import { renderLinked } from "./pages/linked.js";
 import { renderAdmin, isAdmin, MANUAL_VENUES, usdPerPhdToSatsPerPhd } from "./pages/admin.js";
 import { setManualPrice } from "../services/manual-prices.js";
+import { recordVisit } from "../services/traffic.js";
 import {
   getSession,
   setSession,
   clearSession,
   verifyWalletSignature,
-  isValidAddress,
   isSignableAddress,
   checkCsrf,
   issueNonce,
@@ -180,6 +181,7 @@ export function createServer(): express.Express {
       res.status(500).type("text").send("internal error");
     }
   });
+  app.get("/inscribe", page(renderInscribe));
 
   // ── Wallet identity + Linked Accounts (non-custodial key vault) ────────────
   const KNOWN_VENUES = new Set<Venue>(["nicehash", "miningrigrentals"]);
@@ -212,20 +214,14 @@ export function createServer(): express.Express {
     res.json({ token, message: buildSignInMessage(address, nonce) });
   });
   app.post("/account/connect", async (req, res) => {
-    // Dev typed-address path lowercases bc1; prod uses the wallet's exact address
-    // (base58 is case-sensitive), gated by the signature check below.
-    if (config.mockData) {
-      const address = String(req.body.address ?? "").trim().toLowerCase();
-      if (!sameOrigin(req) || !isValidAddress(address)) return res.redirect(303, "/account?msg=err_addr");
-      setSession(res, address);
-      return res.redirect(303, "/account?msg=connected");
-    }
+    // The wallet's exact address is used as-is (base58 is case-sensitive), gated
+    // by the BIP-322 signature check below.
     const address = String(req.body.address ?? "").trim();
     if (!sameOrigin(req) || !isSignableAddress(address)) {
       return res.status(400).json({ error: "invalid address" });
     }
-    // Prod: verify a BIP-322 signature over our own nonce. The message is
-    // rebuilt server-side from the signed token, so the client can't alter it.
+    // Verify a BIP-322 signature over our own nonce. The message is rebuilt
+    // server-side from the signed token, so the client can't alter it.
     const nonce = verifyNonce(String(req.body.token ?? ""));
     if (!nonce) return res.status(400).json({ error: "sign-in expired — please retry" });
     const message = buildSignInMessage(address, nonce);
@@ -450,6 +446,18 @@ export function createServer(): express.Express {
     res.type("application/javascript").set("cache-control", "no-cache").send(POTMATH_CLIENT_JS);
   });
 
+  // Client beacon sink for traffic counting (see the beacon in layout.ts). The
+  // browser pings this once per page load; uncached + awaited so the visit is
+  // persisted before the 204 (a fire-and-forget write would be lost when the
+  // serverless instance freezes after responding). Covered by globalLimiter.
+  const hit = async (req: express.Request, res: express.Response) => {
+    res.set("Cache-Control", "no-store");
+    await recordVisit(req).catch(() => {});
+    res.status(204).end();
+  };
+  app.get("/hit", hit);
+  app.post("/hit", hit);
+
   app.get("/healthz", (_req, res) => res.type("text").send("ok"));
 
   return app;
@@ -459,8 +467,6 @@ export function startServer(): void {
   const app = createServer();
   app.listen(config.port, () => {
     // eslint-disable-next-line no-console
-    console.log(
-      `🦅 Parahawk web on http://localhost:${config.port}  (mock=${config.mockData})`,
-    );
+    console.log(`🦅 Parahawk web on http://localhost:${config.port}`);
   });
 }

@@ -21,7 +21,7 @@ npm install
 npm run dev
 ```
 
-Open **http://localhost:3000**. It runs in **mock mode** by default (`MOCK_DATA=true`): all pool/chain data comes from realistic fixtures, the pollers write synthetic samples, and the charts/luck audit are pre-seeded with 7 days of history — no Discord token, no Supabase, no API keys required.
+Open **http://localhost:3000**. With no configuration it serves the site against the public APIs it can reach (mempool.space works out of the box) plus an in-memory store that starts empty and fills as the pollers run — no Discord token, no Supabase, no API keys required to boot. Point `PARASITE_BASE_URL` at the real endpoints and add Supabase for full pool data + persistent history (see **Going live** below).
 
 Run the tests:
 
@@ -77,13 +77,13 @@ The odds math is a Poisson process, `P(≥1 hit in W PHd) = 1 − e^(−W/rate)`
 
 ---
 
-## Going live (turning MOCK_DATA off)
+## Going live (real data + persistence)
 
 ```bash
 cp .env.example .env
 ```
 
-Then fill in `.env`. See the sections below. Set `MOCK_DATA=false` only once you have the real Parasite endpoints wired (below) — everything else (Discord, Supabase, mempool) works independently of mock mode.
+Then fill in `.env`. See the sections below — Discord, Supabase, mempool, and the Parasite endpoints are each configured independently.
 
 ### 1. Supabase (the database) — ~2 minutes
 
@@ -117,8 +117,8 @@ With those set, Parahawk writes real samples every ~45s and the charts/luck audi
 Parasite's API is undocumented. Open **parasite.wtf** with devtools → **Network → XHR**, watch the requests the dashboard makes, and:
 
 1. Set `PARASITE_BASE_URL` and the `PARASITE_*_PATH` vars in `.env` to the real endpoints.
-2. Map the real JSON into Parahawk's typed shapes in [`src/data/parasite.ts`](src/data/parasite.ts) — the `mapPoolStats` / `mapUserStats` / `mapRefineryState` functions have `TODO` markers and sensible field-name fallbacks to start from.
-3. Set `MOCK_DATA=false` and restart.
+2. Map the real JSON into Parahawk's typed shapes in [`src/data/parasite.ts`](src/data/parasite.ts) — the `mapPoolStats` (and sibling) mappers use sensible field-name fallbacks to start from.
+3. Restart.
 
 If the endpoints fail at runtime, Parahawk serves the last-good cached data with a "stale since …" banner and the bot keeps running — it never crashes on upstream errors.
 
@@ -157,21 +157,21 @@ Put nginx/Caddy in front for TLS and point `PUBLIC_BASE_URL` at your domain. A s
 ```
 src/
   math/       pure, unit-tested: odds (Poisson), work/diff, pot age, hashprice
-  data/       typed Parasite adapter (mock + real) + mempool client + caching
+  data/       typed Parasite adapter + mempool client + caching
   db/         Store interface → SupabaseStore | MemoryStore; migrations in supabase/
   services/   overview / pot estimate / history / luck audit (shared web+bot)
   pollers/    data collector, block watcher, order watchdog, maintenance
   web/        Express server, terminal-styled server-rendered pages, tip QR
   bot/        discord.js client, slash commands, embeds, command registration
   events.ts   process bus (blockFound / watchAlert) linking pollers → bot
-  config.ts   env loading (MOCK_DATA defaults true)
+  config.ts   env loading
 ```
 
 **Graceful degradation** is a design goal: data-source layers cache the last-good value and surface a stale flag; the pollers and bot wrap every async task so a thrown error is logged, never fatal.
 
 ### Environment variables
 
-See [`.env.example`](.env.example) for the full, commented list: `MOCK_DATA`, `PORT`, `PUBLIC_BASE_URL`, `LIGHTNING_ADDRESS`, `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`, `ALERT_CHANNEL_ID`, `DISCORD_GUILD_ID`, `ENABLE_BOT`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `PARASITE_*`, `MEMPOOL_BASE_URL`, `POLL_INTERVAL_SECONDS`, `BLOCK_POLL_INTERVAL_SECONDS`.
+See [`.env.example`](.env.example) for the full, commented list: `PORT`, `PUBLIC_BASE_URL`, `LIGHTNING_ADDRESS`, `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`, `ALERT_CHANNEL_ID`, `DISCORD_GUILD_ID`, `ENABLE_BOT`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `PARASITE_*`, `MEMPOOL_BASE_URL`, `POLL_INTERVAL_SECONDS`, `BLOCK_POLL_INTERVAL_SECONDS`.
 
 ---
 

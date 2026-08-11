@@ -22,18 +22,6 @@ export interface RecentBlock {
   topDiff?: number;
 }
 
-/** Pool names cycled through deterministically in mock mode. */
-const MOCK_POOLS = [
-  "Foundry USA",
-  "AntPool",
-  "F2Pool",
-  "ViaBTC",
-  "MARA Pool",
-  "Binance Pool",
-  "SpiderPool",
-  "Luxor",
-] as const;
-
 /** Shape of a mempool.space `/v1/blocks` entry (only the fields we read). */
 interface MempoolBlock {
   height: number;
@@ -47,8 +35,6 @@ interface MempoolBlock {
  * On any upstream failure the real path returns [] (the caller renders nothing).
  */
 export async function getRecentBlocks(limit = 26): Promise<RecentBlock[]> {
-  if (config.mockData) return mockRecentBlocks(limit);
-
   try {
     // mempool.space /v1/blocks returns 15 at a time; page down for more.
     const need = limit - 1; // reserve one slot for the in-progress block
@@ -90,33 +76,6 @@ export async function getRecentBlocks(limit = 26): Promise<RecentBlock[]> {
   } catch {
     return [];
   }
-}
-
-/**
- * Deterministic mock strip. Leads with the in-progress Parasite block at a
- * fixed height, then counts down through confirmed blocks that get ~10 min
- * older each step. Everything is derived from the height so output is stable
- * (no Date.now / Math.random).
- */
-function mockRecentBlocks(limit: number): RecentBlock[] {
-  const MINING_HEIGHT = 971_834;
-  const blocks: RecentBlock[] = [
-    { height: MINING_HEIGHT, minutesAgo: 0, pool: "Parasite", mining: true },
-  ];
-  for (let i = 1; i < limit; i++) {
-    const height = MINING_HEIGHT - i;
-    // ~10 min per step, with a small deterministic wobble derived from height.
-    const minutesAgo = i * 10 + (height % 5) - 2;
-    const pool = MOCK_POOLS[height % MOCK_POOLS.length]!;
-    blocks.push({
-      height,
-      minutesAgo,
-      pool,
-      topDiffAddress: `bc1q...${(height % 46656).toString(36).padStart(3, "0")}`,
-      topDiff: 1e12 * (1 + (height % 50) / 10),
-    });
-  }
-  return blocks;
 }
 
 /**

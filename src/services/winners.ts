@@ -1,4 +1,3 @@
-import { config } from "../config.js";
 import { getAllTimeTopDifficulty, getRouterOrders } from "../data/parasite.js";
 
 /**
@@ -38,32 +37,8 @@ export interface CadoWinnersData {
 
 let cache: { at: number; data: CadoWinnersData } | null = null;
 
-/** Deterministic demo winners for mock mode — a mix of clickable + masked. */
-function mockWinners(): CadoWinnersData {
-  const rows: Array<[number, string | null, number]> = [
-    [63.3e12, "bc1qmockwinneralpha00000000000000000000abcd", 2811],
-    [40.2e12, "bc1qmockwinnerbravo00000000000000000000wxyz", 1204],
-    [22.1e12, null, 640],
-    [15.7e12, "bc1qmockwinnerdelta000000000000000000009vkv", 412],
-    [11.4e12, null, 88],
-  ];
-  const winners = rows.map(([diff, full, blocks], i) => ({
-    rank: i + 1,
-    maskedAddress: full ? `bc1q…${full.slice(-4)}` : `bc1q…${["z7t0", "9x2n"][i % 2]}`,
-    fullAddress: full,
-    bestDiff: diff,
-    blocks,
-  }));
-  return { winners, total: winners.length, matched: winners.filter((w) => w.fullAddress).length };
-}
-
 export async function getCadoWinners(): Promise<CadoWinnersData> {
   if (cache && Date.now() - cache.at < TTL_MS) return cache.data;
-  if (config.mockData) {
-    const data = mockWinners();
-    cache = { at: Date.now(), data };
-    return data;
-  }
 
   try {
     const [rows, orders] = await Promise.all([
@@ -125,11 +100,6 @@ export async function getCadoWinnerAddresses(): Promise<string[]> {
 export type AddressResolver = (masked: string) => string | null;
 
 export async function getAddressResolver(): Promise<AddressResolver> {
-  if (config.mockData) {
-    // In mock mode every masked leaderboard addr resolves to a demo wallet so the
-    // "click through" affordance is visible in dev.
-    return (masked) => `bc1qmock${String(masked).replace(/[^a-z0-9]/gi, "").slice(-6)}0000000000000000000000`;
-  }
   const orders = await getRouterOrders().catch(() => []);
   const byLast4 = new Map<string, string[]>();
   for (const o of orders) {

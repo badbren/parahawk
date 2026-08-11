@@ -47,20 +47,7 @@ function flash(msg: string | undefined): string {
 
 /** The connect card, shown when there's no session. */
 function connectCard(): string {
-  if (config.mockData) {
-    return `
-<div class="card" style="max-width:640px">
-  <h3>Connect your wallet</h3>
-  <p class="muted-note">Dev mode: paste any <code>bc1…</code> address to simulate a connected wallet (no signature required locally).</p>
-  <form method="POST" action="/account/connect" style="margin-top:12px">
-    <input type="text" name="address" placeholder="bc1q…" autocomplete="off" spellcheck="false" required style="margin-bottom:12px"/>
-    <button type="submit">Connect</button>
-  </form>
-  <p class="muted-note" style="margin-top:14px">Connecting is optional — the price board and wizard work without it. You only need it to link a venue key and place orders from your own account.</p>
-</div>`;
-  }
-
-  // Prod: connect via Xverse by signing a one-time nonce (BIP-322). No funds move.
+  // Connect via Xverse by signing a one-time nonce (BIP-322). No funds move.
   return `
 <div class="card" style="max-width:640px">
   <h3>Connect your wallet</h3>

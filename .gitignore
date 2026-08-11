@@ -6,6 +6,7 @@ dist/
 npm-debug.log*
 .DS_Store
 .data/
+/data/
 coverage/
 *.tsbuildinfo
 supabase/.temp/

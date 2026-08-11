@@ -1,4 +1,3 @@
-import { config } from "../../config.js";
 import { getManualPrice } from "../../services/manual-prices.js";
 import type { VenueContext, VenueQuote } from "./types.js";
 
@@ -10,15 +9,14 @@ import type { VenueContext, VenueQuote } from "./types.js";
  * the board renders it as "manual · Xm ago", never dressed up as live. Pool
  * targets are KMH's own list, which DOES include Parasite (verified in their UI).
  */
-const MOCK_SATS_PER_PHD = 56_300;
-const MOCK_AGE_MS = 40 * 60_000;
 const NOTE = "reseller (NiceHash-sourced) · Parasite supported";
 
 export async function fetchKissMyHashQuote(_ctx: VenueContext): Promise<VenueQuote> {
-  // Prefer an admin-set manual price; fall back to the mock fixture in dev.
+  // Prefer an admin-set manual price; without one KMH stays unpriced (its live
+  // quotes are login-gated) and renders as needing a manual price.
   const manual = await getManualPrice("kissmyhash").catch(() => null);
-  const satsPerPhd = manual?.satsPerPhd ?? (config.mockData ? MOCK_SATS_PER_PHD : 0);
-  const fetchedAt = manual?.updatedAt ?? (config.mockData ? Date.now() - MOCK_AGE_MS : 0);
+  const satsPerPhd = manual?.satsPerPhd ?? 0;
+  const fetchedAt = manual?.updatedAt ?? 0;
 
   if (satsPerPhd <= 0) {
     return {

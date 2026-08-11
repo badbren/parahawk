@@ -1,4 +1,3 @@
-import { config } from "../../config.js";
 import type { VenueContext, VenueQuote } from "./types.js";
 
 const SATS_PER_BTC = 100_000_000;
@@ -52,30 +51,11 @@ export function nicehashVwapSatsPerPhd(stats: {
   return nicehashOrderPriceToSatsPerPhd(num / den, mf);
 }
 
-/** Mock fixture: NiceHash ~51.8k sats/PHd, the usual liquidity-king price. */
-const MOCK_BTC_PER_PH_DAY = 0.000518; // → 51,800 sats/PHd
-
 /**
  * NiceHash SHA-256 spot price. Public order-book endpoint needs no auth (order
- * placement, later, uses the user's own key). In mock mode we serve the fixture
- * so the board works with zero credentials.
+ * placement, later, uses the user's own key).
  */
 export async function fetchNiceHashQuote(_ctx: VenueContext): Promise<VenueQuote> {
-  if (config.mockData) {
-    return {
-      venue: "NiceHash",
-      slug: "nicehash",
-      satsPerPhd: nicehashBtcPerPhDayToSatsPerPhd(MOCK_BTC_PER_PH_DAY),
-      capacityPhd: 140,
-      minOrderPhd: 0.5,
-      source: "api",
-      url: "https://www.nicehash.com/my/marketplace/SHA256",
-      note: "spot marketplace · custom stratum supported",
-      fetchedAt: Date.now(),
-      live: true,
-    };
-  }
-
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 8000);
   try {

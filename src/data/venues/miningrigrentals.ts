@@ -1,4 +1,3 @@
-import { config } from "../../config.js";
 import type { VenueContext, VenueQuote } from "./types.js";
 
 const SATS_PER_BTC = 100_000_000;
@@ -45,31 +44,7 @@ export function mrrBestThreeAverageSatsPerPhd(
   return best.reduce((a, b) => a + b, 0) / best.length;
 }
 
-/** Mock rig book — best-3 average lands at ~54.2k sats/PHd. */
-const MOCK_RIGS = [
-  { pricePerDayBtc: 0.000535, speedPhs: 1.0 }, // 53,500
-  { pricePerDayBtc: 0.000542, speedPhs: 1.0 }, // 54,200
-  { pricePerDayBtc: 0.001098, speedPhs: 2.0 }, // 54,900
-  { pricePerDayBtc: 0.000630, speedPhs: 1.0 }, // 63,000 (outlier, excluded)
-];
-
 export async function fetchMrrQuote(_ctx: VenueContext): Promise<VenueQuote> {
-  if (config.mockData) {
-    const capacityPhd = MOCK_RIGS.reduce((a, r) => a + r.speedPhs, 0);
-    return {
-      venue: "MiningRigRentals",
-      slug: "miningrigrentals",
-      satsPerPhd: mrrBestThreeAverageSatsPerPhd(MOCK_RIGS),
-      capacityPhd,
-      minOrderPhd: 0.1,
-      source: "api",
-      url: "https://www.miningrigrentals.com/rigs/sha256",
-      note: "best-3-rigs avg · custom pool supported",
-      fetchedAt: Date.now(),
-      live: true,
-    };
-  }
-
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 8000);
   try {

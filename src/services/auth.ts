@@ -12,10 +12,8 @@ import { config } from "../config.js";
  *
  * Auth model: the user proves control of the address by signing a one-time
  * nonce with their wallet (Xverse / sats-connect, BIP-322), exactly like
- * parasite.space. In MOCK_DATA/dev we accept a typed address without a
- * signature so the flow is testable credential-free; in production
- * `verifyWalletSignature` MUST validate the signature and fails closed until
- * it does — we never accept an unauthenticated connect on a live deployment.
+ * parasite.space. `verifyWalletSignature` always validates the signature and
+ * fails closed until it does — we never accept an unauthenticated connect.
  */
 
 const COOKIE = "ph_session";
@@ -26,12 +24,6 @@ const TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 function secret(): string {
   if (config.keysSecret.length >= 16) return config.keysSecret;
   return "dev-insecure-session-secret-do-not-use-in-prod";
-}
-
-/** Bech32 mainnet address shape — enough to use as a handle, not full validation. */
-const BC1_RE = /^bc1[a-z0-9]{20,87}$/;
-export function isValidAddress(addr: string): boolean {
-  return BC1_RE.test(addr.trim().toLowerCase());
 }
 
 /**
@@ -157,15 +149,13 @@ export function verifyNonce(token: string): string | null {
 /**
  * Verify a wallet signature over the sign-in message. Fails closed: any error or
  * a bad signature returns false, so no unauthenticated connect can succeed. Uses
- * BIP-322 (what Xverse produces for segwit addresses). In mock/dev it accepts a
- * well-formed address so the flow is testable without a wallet.
+ * BIP-322 (what Xverse produces for segwit addresses).
  */
 export async function verifyWalletSignature(
   address: string,
   message: string,
   signature: string,
 ): Promise<boolean> {
-  if (config.mockData) return isValidAddress(address);
   try {
     // Lazy-load bip322-js so a native-module load issue on serverless can only
     // ever break wallet sign-in, never the whole site's page rendering.

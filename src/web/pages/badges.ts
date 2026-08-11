@@ -2,7 +2,7 @@ import { renderPage } from "../layout.js";
 import { getBadgesIndex, getBadgeHolders } from "../../services/badges.js";
 import { getAddressResolver } from "../../services/winners.js";
 import { getBadgeBaseline24h, recordBadgeSnapshot } from "../../services/badge-trends.js";
-import { BADGE_DEFS, BADGE_BY_KEY } from "../../data/badges.js";
+import { BADGE_DEFS, BADGE_BY_KEY, badgeDefFor } from "../../data/badges.js";
 import { walletCell } from "../addr.js";
 import { fmtInt, esc } from "../format.js";
 
@@ -40,9 +40,13 @@ export async function renderBadges(): Promise<string> {
   // Record a throttled snapshot so the 24h series keeps building (best-effort).
   await recordBadgeSnapshot(idx.totals, idx.holders).catch(() => {});
 
-  const cards = BADGE_DEFS.map((b) => {
+  // Surface any badge key Parasite reports that we haven't hand-labelled yet, so
+  // nothing (e.g. "3 different asset types collected") is invisible on the board.
+  const extraKeys = Object.keys(idx.holders).filter((k) => !BADGE_BY_KEY[k] && (idx.holders[k] ?? 0) > 0);
+  const displayDefs = [...BADGE_DEFS, ...extraKeys.map(badgeDefFor)];
+  const cards = displayDefs.map((b) => {
     const n = idx.holders[b.key] ?? 0;
-    const complete = b.key === "bravocado";
+    const complete = b.key === "bravocado" || b.key === "block_winner";
     const label = n
       ? complete
         ? `${fmtInt(n)} holders →`
@@ -88,7 +92,7 @@ export async function renderBadges(): Promise<string> {
       : "A <strong>24h growth</strong> pill will appear on each badge once Parahawk has ~a day of history — it's collecting now."
   }</p>
 <div class="bgrid">${cards}</div>
-<p class="muted-note" style="margin-top:10px"><strong>How the counts work:</strong> <strong>Bravocado</strong> is complete (from the all-time 10T+ board). Every other count is <em>“indexed”, not all-time</em> — Parasite only exposes a full <code>bc1…</code> address for wallets in the <em>current</em> Refinery order book, wallets someone has searched, and cado winners, so those are the only ones Parahawk can look up badges for. So “${fmtInt(idx.holders.refinery ?? 0)} indexed” Refinery holders means the ones we can currently see, not everyone who has ever placed an order. It grows as the order book turns over and wallets get searched — ${fmtInt(idx.indexedWallets)} wallets indexed so far.</p>
+<p class="muted-note" style="margin-top:10px"><strong>How the counts work:</strong> <strong>Bravocado</strong> and <strong>Block Finder</strong> are authoritative — Bravocado is the number of cados <em>actually dispensed on-chain</em> by the OMB dispensary (the real 10T+ hitters), and Block Finder is the curated set of wallets that truly solved a block. Every <em>other</em> count is <em>“indexed”, not all-time</em> — Parasite only exposes a full <code>bc1…</code> address for wallets in the <em>current</em> Refinery order book, wallets someone has searched, and cado winners, so those are the only ones Parahawk can look up badges for. So “${fmtInt(idx.holders.refinery ?? 0)} indexed” Refinery holders means the ones we can currently see, not everyone who has ever placed an order. It grows as the order book turns over and wallets get searched — ${fmtInt(idx.indexedWallets)} wallets indexed so far.</p>
 
 <h2>🏆 Most badges</h2>
 <div class="tscroll"><table>
@@ -103,14 +107,7 @@ ${BADGE_STYLE}`;
 
 export async function renderBadgeHolders(typeRaw: string): Promise<string> {
   const type = String(typeRaw || "").toLowerCase();
-  const def = BADGE_BY_KEY[type];
-  if (!def) {
-    return renderPage({
-      title: "Badge",
-      active: "badges",
-      body: `<h1>Badges 🏅</h1><p class="lead">Unknown badge "${esc(typeRaw)}".</p><p><a href="/badges">← all badges</a></p>`,
-    });
-  }
+  const def = badgeDefFor(type);
 
   const [holders, resolve] = await Promise.all([
     getBadgeHolders(type),
@@ -119,7 +116,7 @@ export async function renderBadgeHolders(typeRaw: string): Promise<string> {
 
   const rows =
     holders.length === 0
-      ? `<tr><td colspan="3" class="dim">no holders indexed yet</td></tr>`
+      ? `<tr><td colspan="3" class="dim">${type === "block_winner" ? "no block finders recorded yet" : "no holders indexed yet"}</td></tr>`
       : holders
           .map(
             (h, i) =>
@@ -135,9 +132,13 @@ export async function renderBadgeHolders(typeRaw: string): Promise<string> {
   <thead><tr><th>#</th><th>Wallet</th><th>Held</th></tr></thead>
   <tbody>${rows}</tbody>
 </table></div>
-<p class="muted-note" style="margin-top:12px">${type === "bravocado"
-      ? "Complete list — every miner with a 10T+ best share. Matched wallets are clickable through to their stats."
-      : "Coverage grows as Parahawk indexes wallets (from winner snapshots + searches). Clickable wallets have a matched full address."}</p>
+<p class="muted-note" style="margin-top:12px">${
+    type === "block_winner"
+      ? "The pool's real block finders — wallets whose own share actually solved a Parasite block. Curated and authoritative, not derived from the noisy per-wallet badge index."
+      : type === "bravocado"
+        ? "The wallets actually dispensed a Bravocado on-chain by the OMB dispensary — the real count of miners who've hit a 10T+ share. Cados land in ordinal (bc1p) wallets, so these are shown masked and don't link to mining stats."
+        : "Coverage grows as Parahawk indexes wallets (from winner snapshots + searches). Clickable wallets have a matched full address."
+  }</p>
 ${BADGE_STYLE}`;
 
   return renderPage({ title: `${def.name} badge`, active: "badges", body });

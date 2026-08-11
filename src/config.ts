@@ -11,11 +11,11 @@ function int(v: string | undefined, dflt: number): number {
 }
 
 /**
- * Central config. MOCK_DATA defaults to true so the entire system runs with
- * zero credentials — `npm run dev` serves the site in mock mode out of the box.
+ * Central config. All data comes from the real upstreams (parasite.space /
+ * mempool.space) via the pollers; with no Supabase creds the store is a real
+ * in-memory one that the pollers fill.
  */
 export const config = {
-  mockData: bool(process.env.MOCK_DATA, true),
   port: int(process.env.PORT, 3000),
   /** Public base URL of the site, used for links in Discord embeds. */
   publicBaseUrl: process.env.PUBLIC_BASE_URL ?? "",

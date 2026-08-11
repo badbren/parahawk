@@ -1,4 +1,3 @@
-import { config } from "../../config.js";
 import type { VenueContext, VenueQuote } from "./types.js";
 
 /**
@@ -10,21 +9,7 @@ import type { VenueContext, VenueQuote } from "./types.js";
  * they add Parasite (or open custom stratums). See braiins.com/blog/buy-bitcoin-
  * hashrate-introducing-braiins-hashpower.
  */
-const MOCK_SATS_PER_PHD = 59_500; // typically a premium vs the rentable venues
-
 export async function fetchBraiinsQuote(_ctx: VenueContext): Promise<VenueQuote> {
-  if (config.mockData) {
-    return {
-      venue: "Braiins",
-      slug: "braiins",
-      satsPerPhd: MOCK_SATS_PER_PHD,
-      source: "scraped",
-      url: "https://braiins.com/hashpower",
-      note: "⚠ marketplace, but routes only to its own pool list — Parasite not supported yet",
-      fetchedAt: Date.now(),
-      live: true,
-    };
-  }
   // No public rental price feed for Braiins. Show it honestly as unpriced
   // rather than fabricate a number — it stays on the board for the solo
   // comparison, and an admin can supply a manual figure later.

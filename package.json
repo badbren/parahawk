@@ -14,6 +14,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "audit:badges": "tsx src/tools/audit-badges.ts",
     "register-commands": "tsx src/bot/register.ts"
   },
   "dependencies": {

@@ -4,6 +4,7 @@ import { esc, timeAgo, fmtInt, fmtUsd } from "../format.js";
 import { csrfToken, type Session } from "../../services/auth.js";
 import { getAllManualPrices } from "../../services/manual-prices.js";
 import { getOverview } from "../../services/overview.js";
+import { getTrafficSummary, type TrafficSummary } from "../../services/traffic.js";
 
 /** Venues that take an admin-set manual price (no public feed). */
 export const MANUAL_VENUES: Array<{ slug: string; name: string; hint: string }> = [
@@ -22,6 +23,42 @@ export function usdPerPhdToSatsPerPhd(usd: number, btcPriceUsd: number): number 
   return (usd / btcPriceUsd) * 1e8;
 }
 
+/** Owner-only daily-traffic panel: headline cards + a 30-day visitors/views table. */
+function renderTrafficSection(t: TrafficSummary): string {
+  const maxViews = Math.max(1, ...t.days.map((d) => d.views));
+  const rows = [...t.days]
+    .reverse() // newest first in the table
+    .map((d) => {
+      const pct = Math.round((d.views / maxViews) * 100);
+      return `<tr>
+  <td>${esc(d.day)}</td>
+  <td>${fmtInt(d.visitors)}</td>
+  <td>${fmtInt(d.views)} <span class="bar" style="width:120px;margin-left:8px"><span style="width:${pct}%"></span></span></td>
+</tr>`;
+    })
+    .join("");
+  const devNote =
+    t.backend === "memory"
+      ? ` <span class="dim" style="font-size:14px;text-transform:none;letter-spacing:0">(dev — not persisted)</span>`
+      : "";
+  const card = (k: string, v: string, sub: string) =>
+    `<div class="card"><div class="k">${k}</div><div class="v">${esc(v)}</div><div class="sub">${esc(sub)}</div></div>`;
+  return `
+<h2>Traffic${devNote}</h2>
+<p class="lead">Unique visitors (by IP) and page views per UTC day. Counted by a client beacon on public pages; this dashboard is excluded.</p>
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-bottom:22px">
+  ${card("Today · visitors", fmtInt(t.today.visitors), `${fmtInt(t.today.views)} views`)}
+  ${card("Last 7d · visitors", fmtInt(t.last7.visitors), `${fmtInt(t.last7.views)} views`)}
+  ${card("Last 30d · visitors", fmtInt(t.last30.visitors), `${fmtInt(t.last30.views)} views`)}
+</div>
+<div class="card" style="padding:0;overflow-x:auto">
+  <table style="margin:0">
+    <thead><tr><th>Date (UTC)</th><th>Visitors</th><th>Views</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+</div>`;
+}
+
 export async function renderAdmin(session: Session | null, msg?: string): Promise<string> {
   if (!isAdmin(session)) {
     const why = !session
@@ -33,9 +70,10 @@ export async function renderAdmin(session: Session | null, msg?: string): Promis
     return renderPage({ title: "Admin", active: "", body });
   }
 
-  const [prices, overview] = await Promise.all([
+  const [prices, overview, traffic] = await Promise.all([
     getAllManualPrices().catch(() => []),
     getOverview().catch(() => null),
+    getTrafficSummary().catch(() => null),
   ]);
   const btc = overview?.pool.btcPriceUsd ?? 0;
   const byVenue = new Map(prices.map((p) => [p.venue, p]));
@@ -73,6 +111,7 @@ export async function renderAdmin(session: Session | null, msg?: string): Promis
 ${flash}
 <div class="card" style="max-width:640px;margin-bottom:22px">Signed in as owner <span class="green" style="word-break:break-all">${esc(session!.address)}</span></div>
 <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(340px,1fr))">${cards}</div>
+${traffic ? renderTrafficSection(traffic) : ""}
 <script>
 (function(){
   var BTC = ${btc > 0 ? btc : 0};

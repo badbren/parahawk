@@ -1,12 +1,5 @@
 import { config } from "../config.js";
 import { Cached, fetchJson } from "./cache.js";
-import {
-  mockPoolStats,
-  mockUserStats,
-  mockRefineryState,
-  mockHitsInRange,
-  mockLeaderboard,
-} from "./mock.js";
 import type {
   PoolStats,
   UserStats,
@@ -114,11 +107,6 @@ async function mapPoolStats(raw: Record<string, any>): Promise<PoolStats> {
 }
 
 export async function getPoolStats(): Promise<PoolStats> {
-  if (config.mockData) {
-    const s = mockPoolStats();
-    poolCache.set(s);
-    return s;
-  }
   try {
     const raw = await fetchJson<Record<string, any>>(`${base()}/api/pool-stats`);
     const s = await mapPoolStats(raw);
@@ -155,20 +143,6 @@ interface HistoricalRowFull {
   hashrate15m?: number;
 }
 
-/** Points per window and the sampling step, used for the mock synthesizer. */
-function windowSpec(window: PoolWindow): { points: number; stepMs: number } {
-  switch (window) {
-    case "1h":
-      return { points: 12, stepMs: 5 * 60_000 };
-    case "4h":
-      return { points: 48, stepMs: 5 * 60_000 };
-    case "1d":
-      return { points: 288, stepMs: 5 * 60_000 };
-    case "1w":
-      return { points: 168, stepMs: 60 * 60_000 };
-  }
-}
-
 /**
  * Historical hashrate / users / workers over a selectable window.
  *   1H → last 12 pts of period=1d&interval=5m   (5-min resolution)
@@ -178,8 +152,6 @@ function windowSpec(window: PoolWindow): { points: number; stepMs: number } {
  * Hashrate uses hashrate15m (H/s → PH/s). Timestamps seconds → ms.
  */
 export async function getPoolStatsSeries(window: PoolWindow): Promise<PoolSeries> {
-  if (config.mockData) return mockPoolSeries(window);
-
   const isWeek = window === "1w";
   const period = isWeek ? "7d" : "1d";
   const interval = isWeek ? "1h" : "5m";
@@ -203,24 +175,6 @@ export async function getPoolStatsSeries(window: PoolWindow): Promise<PoolSeries
   };
 }
 
-/** Mock-mode fallback: a smooth deterministic series around the pinned snapshot. */
-function mockPoolSeries(window: PoolWindow): PoolSeries {
-  const { points, stepMs } = windowSpec(window);
-  const now = Date.now();
-  const snap = mockPoolStats(now);
-  const hashrate: SeriesPoint[] = [];
-  const users: SeriesPoint[] = [];
-  const workers: SeriesPoint[] = [];
-  for (let i = points - 1; i >= 0; i--) {
-    const t = now - i * stepMs;
-    const w = Math.sin((t / (6 * 3_600_000)) * 2 * Math.PI);
-    hashrate.push({ t, v: Math.round(snap.poolHashratePhs * (1 + 0.08 * w) * 10) / 10 });
-    users.push({ t, v: Math.round(snap.users * (1 + 0.04 * w)) });
-    workers.push({ t, v: Math.round(snap.workers * (1 + 0.05 * w)) });
-  }
-  return { hashrate, users, workers };
-}
-
 // ── hits (highest-diff feed) ──────────────────────────────────────────────────
 
 interface HighestDiffRow {
@@ -230,11 +184,9 @@ interface HighestDiffRow {
   block_timestamp: number;
 }
 
-export async function getRecentHits(sinceMs?: number): Promise<HitEvent[]> {
-  const now = Date.now();
-  const since = sinceMs ?? now - 24 * 60 * 60 * 1000;
-  if (config.mockData) return mockHitsInRange(since, now);
-
+export async function getRecentHits(_sinceMs?: number): Promise<HitEvent[]> {
+  // The upstream feed returns the latest highest-diff shares; it isn't range
+  // filtered, so _sinceMs is accepted for call-site compatibility but unused.
   try {
     const rows = await fetchJson<HighestDiffRow[]>(`${base()}/api/highest-diff?limit=50`);
     return (Array.isArray(rows) ? rows : []).map((r) => ({
@@ -259,7 +211,6 @@ export interface TopDiff {
 
 export async function getTopDiffByBlock(limit = 50): Promise<Map<number, TopDiff>> {
   const map = new Map<number, TopDiff>();
-  if (config.mockData) return map;
   try {
     const rows = await fetchJson<HighestDiffRow[]>(`${base()}/api/highest-diff?limit=${limit}`);
     for (const r of Array.isArray(rows) ? rows : []) {
@@ -295,11 +246,9 @@ function mapLbEntry(r: LbRow): LeaderboardEntry {
 /**
  * All-time top-difficulty leaderboard (NO round filter) — masked addresses with
  * each miner's best-ever share difficulty and blocks participated. The entries
- * ≥10T are exactly the Bravocado ("cado") winners. Empty in mock mode (the
- * winners service supplies its own demo set there).
+ * ≥10T are exactly the Bravocado ("cado") winners.
  */
 export async function getAllTimeTopDifficulty(limit = 100): Promise<LeaderboardEntry[]> {
-  if (config.mockData) return [];
   try {
     const rows = await fetchJson<LbRow[]>(`${base()}/api/leaderboard?type=difficulty&limit=${limit}`);
     return (Array.isArray(rows) ? rows : []).map(mapLbEntry);
@@ -309,11 +258,6 @@ export async function getAllTimeTopDifficulty(limit = 100): Promise<LeaderboardE
 }
 
 export async function getLeaderboard(): Promise<Leaderboard> {
-  if (config.mockData) {
-    const lb = mockLeaderboard();
-    leaderboardCache.set(lb);
-    return lb;
-  }
   try {
     const [diff, loyalty] = await Promise.all([
       fetchJson<LbRow[]>(`${base()}/api/leaderboard?type=difficulty&limit=100&round=current`),
@@ -391,10 +335,6 @@ const routerOrdersCache = new Cached<Array<RefineryOrder & { address: string }>>
 
 /** Raw router orders with the address attached (used for per-address filtering). */
 export async function getRouterOrders(): Promise<Array<RefineryOrder & { address: string }>> {
-  if (config.mockData) {
-    const s = mockRefineryState();
-    return s.orders.map((o) => ({ ...o, address: "bc1qmock0refinery0operator0xxxxxxxxxxxxxxxxx" }));
-  }
   const cached = routerOrdersCache.get();
   if (cached && !routerOrdersCache.freshness().stale) return cached;
   try {
@@ -408,11 +348,6 @@ export async function getRouterOrders(): Promise<Array<RefineryOrder & { address
 }
 
 export async function getRefineryState(): Promise<RefineryState> {
-  if (config.mockData) {
-    const s = mockRefineryState();
-    refineryCache.set(s);
-    return s;
-  }
   try {
     const orders = await getRouterOrders();
     const s: RefineryState = { hashpriceSatsPerPhd: 0, orders };
@@ -447,10 +382,9 @@ export interface CompletedRound {
  * round's total work. Only ~6 rounds are returned, but that's enough to backfill
  * the Pool page's luck index / pot-length / hall of fame with real history
  * (Parahawk then extends it as it observes new blocks). Skips the in-progress
- * round (block_height 0). Empty in mock mode.
+ * round (block_height 0).
  */
 export async function getRounds(): Promise<CompletedRound[]> {
-  if (config.mockData) return [];
   try {
     const rows = await fetchJson<RoundRow[]>(`${base()}/api/rounds?limit=100`);
     return (Array.isArray(rows) ? rows : [])
@@ -500,8 +434,6 @@ const USER_STATS_TTL_MS = 45_000;
 const userStatsCache = new Map<string, { v: UserStats; exp: number }>();
 
 export async function getUserStats(address: string): Promise<UserStats> {
-  if (config.mockData) return mockUserStats(address);
-
   const now = Date.now();
   const cachedUser = userStatsCache.get(address);
   if (cachedUser && cachedUser.exp > now) return cachedUser.v;
@@ -545,6 +477,12 @@ export async function getUserStats(address: string): Promise<UserStats> {
   }
   const heightsOf = (k: string): number[] =>
     (badgeTypes[k]?.unique ?? []).map((u) => Number(u.blockheight ?? 0)).filter((h) => h > 0).sort((a, b) => b - a);
+  // Parasite's block_winner badge `total` over-reports (many wallets carry it);
+  // the authoritative signal is the actual solved-block heights it lists under
+  // `unique`. Use that count so Block Finder = the blocks a wallet TRULY solved.
+  const blockWinnerHeights = heightsOf("block_winner");
+  if (blockWinnerHeights.length > 0) badges.block_winner = blockWinnerHeights.length;
+  else delete badges.block_winner;
   const diffHistory = (diffs ?? [])
     .map((d) => ({ height: Number(d.block_height ?? 0), diff: Number(d.difficulty ?? 0), ts: Number(d.block_timestamp ?? 0) * 1000 }))
     .filter((d) => d.height > 0)
@@ -561,14 +499,14 @@ export async function getUserStats(address: string): Promise<UserStats> {
     blockCount: account.account?.metadata?.block_count,
     uptime: user.uptime,
     cadosWon: badgeTotal("bravocado"),
-    blocksFound: badgeTotal("block_winner"),
+    blocksFound: blockWinnerHeights.length,
     blocksParticipated: badgeTotal("block"),
     refineryOrderCount: badgeTotal("refinery"),
     lnAddress: account.account?.ln_address,
     diffHistory,
     badges,
     blockHeights: heightsOf("block"),
-    blockWinnerHeights: heightsOf("block_winner"),
+    blockWinnerHeights,
   };
   userStatsCache.set(address, { v: result, exp: now + USER_STATS_TTL_MS });
   return result;
