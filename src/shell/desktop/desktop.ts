@@ -27,6 +27,8 @@ export interface DesktopOptions {
   store: KeyValueStore;
   tick: TickFeed;
   mode: WmMode;
+  /** Shell-level items appended to both the desktop context menu and the start menu (e.g. wallpaper motion). */
+  extraMenuItems?: () => MenuItem[];
 }
 
 export interface Desktop {
@@ -259,6 +261,7 @@ export function createDesktop(opts: DesktopOptions): Desktop {
     { label: "Open Parahawk", onSelect: () => openApp("parahawk") },
     { label: "Refresh data", onSelect: () => { void tick.refresh(); } },
     { label: "Show hidden apps", onSelect: () => openApp(BIN_ID) },
+    ...(opts.extraMenuItems?.() ?? []),
     { label: "Classic site", href: classicHref(), target: "_top" },
   ];
   const showContextMenu = (x: number, y: number, returnFocusTo: HTMLElement | null) => {
@@ -279,6 +282,7 @@ export function createDesktop(opts: DesktopOptions): Desktop {
     startItems: () => [
       ...shownApps().filter((a) => !a.system).map<MenuItem>((a) => ({ label: a.label, icon: a.icon, onSelect: () => openApp(a.id) })),
       { label: "Show hidden apps", icon: ICONS.recycleBin, onSelect: () => openApp(BIN_ID) },
+      ...(opts.extraMenuItems?.() ?? []),
       { label: "Classic site", href: classicHref(), target: "_top" },
     ],
   });

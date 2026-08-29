@@ -21,6 +21,15 @@ import type { WmMode } from "./wm/types";
 
 const BOOTED_KEY = "ph.booted";
 const CLASSIC_KEY = "ph.classic";
+const MOTION_KEY = "desktop.motion";
+
+/**
+ * Wallpaper/intro motion preference. "auto" follows the OS
+ * prefers-reduced-motion setting (Windows "Show animations" off → static);
+ * "on" / "off" override it. Persisted per browser via the store.
+ */
+type MotionPref = "auto" | "on" | "off";
+const MOTION_CYCLE: Record<MotionPref, MotionPref> = { auto: "on", on: "off", off: "auto" };
 
 /**
  * Classic-site opt-out. The plain pages set/clear localStorage["ph.classic"]
@@ -61,9 +70,16 @@ function main(): void {
 
   const openPath = sameOriginPath(rootEl.dataset.open);
   const bootMode = rootEl.dataset.boot === "full" ? "full" : "skip";
-  const reducedMotion = prefersReducedMotion();
+  const osReducedMotion = prefersReducedMotion();
   let mode: WmMode = isMobileViewport() ? "mobile" : "desktop";
   const store = createLocalStore();
+  const readMotion = (): MotionPref => {
+    const v = store.get<string>(MOTION_KEY);
+    return v === "on" || v === "off" ? v : "auto";
+  };
+  const effectiveReduced = (pref: MotionPref): boolean => (pref === "on" ? false : pref === "off" ? true : osReducedMotion);
+  let motion = readMotion();
+  const reducedMotion = effectiveReduced(motion);
 
   // ── DOM ──────────────────────────────────────────────────────────────────
   const canvas = h("canvas", { class: "ph-wallpaper", "aria-hidden": "true" });
@@ -76,17 +92,39 @@ function main(): void {
   rootEl.replaceChildren(canvas, desktopArea, taskbar);
 
   // ── Modules ──────────────────────────────────────────────────────────────
-  const wallpaper = createWallpaper(canvas, { reducedMotion, quietBottomPx: 0 });
-  const tick = createTickFeed({ url: rootEl.dataset.tick || "/api/tick" });
-  const wm = createWindowManager({ root: windowsRoot, storage: store, mode });
-  const desktop = createDesktop({ iconsRoot, taskbarRoot: taskbar, wm, apps: APPS, store, tick, mode });
-
-  tick.subscribe((t, meta) => {
+  let wallpaper = createWallpaper(canvas, { reducedMotion, quietBottomPx: 0 });
+  const applyTick = (t: import("./data/tick").Tick) =>
     wallpaper.update({
       poolHashratePhs: t.hashratePhs, avg1dPhs: t.avg1dPhs, networkDifficulty: t.difficulty,
       potAgeBlocks: t.potBlocks, potAgeHours: t.potHours, potVerdict: t.potVerdict,
       btcPriceUsd: t.btcUsd, phdBanked: t.phdBanked, chainHeight: t.height,
     });
+  /** Swap the wallpaper for one with the new motion setting, keeping data and dim state. */
+  const setMotion = (pref: MotionPref) => {
+    motion = pref;
+    store.set(MOTION_KEY, pref);
+    wallpaper.destroy();
+    wallpaper = createWallpaper(canvas, { reducedMotion: effectiveReduced(pref), quietBottomPx: 0 });
+    wallpaper.resize();
+    const last = tick.latest();
+    if (last) applyTick(last);
+    wallpaper.setDimmed(wm.list().some((w) => !w.minimized));
+    wallpaper.resume();
+  };
+  const motionLabel = (): string => {
+    const state = effectiveReduced(motion) ? "static" : "animated";
+    const pref = motion === "auto" ? "Auto" : motion === "on" ? "On" : "Off";
+    return `Wallpaper motion: ${pref} · ${state}`;
+  };
+  const tick = createTickFeed({ url: rootEl.dataset.tick || "/api/tick" });
+  const wm = createWindowManager({ root: windowsRoot, storage: store, mode });
+  const desktop = createDesktop({
+    iconsRoot, taskbarRoot: taskbar, wm, apps: APPS, store, tick, mode,
+    extraMenuItems: () => [{ label: motionLabel(), onSelect: () => setMotion(MOTION_CYCLE[motion]) }],
+  });
+
+  tick.subscribe((t, meta) => {
+    applyTick(t);
     if (meta.blockFound) wallpaper.blockFound();
   });
 
@@ -135,7 +173,8 @@ function main(): void {
     playBoot(bootEl, {
       // Brief §7: phones and slow connections get the 3-second cut.
       short: mode === "mobile" || (navigator as { connection?: { saveData?: boolean } }).connection?.saveData === true,
-      ignoreReducedMotion: forceBoot,
+      // wantBoot already accounts for the OS setting and the user's motion preference.
+      ignoreReducedMotion: true,
       onComplete: () => {
         try { sessionStorage.setItem(BOOTED_KEY, "1"); } catch { /* ignore */ }
         reveal();
@@ -146,7 +185,7 @@ function main(): void {
   }
 
   // Debug handle.
-  (window as unknown as { ph: unknown }).ph = { wm, desktop, wallpaper, tick, apps: APPS };
+  (window as unknown as { ph: unknown }).ph = { wm, desktop, get wallpaper() { return wallpaper; }, tick, apps: APPS, setMotion, getMotion: () => motion };
 }
 
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", main);
