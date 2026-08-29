@@ -57,6 +57,15 @@ export async function renderInscribe(): Promise<string> {
   <code>docs/specs/inscribe.md</code>.
 </div>
 
+<div id="ins-framed" hidden></div>
+<script>
+(function(){
+  if(window.self===window.top) return;
+  var n=document.getElementById('ins-framed'); if(!n) return;
+  n.className='stale'; n.hidden=false;
+  n.innerHTML='Wallet extensions may not see this page inside the desktop window. <a href="'+location.pathname+'?classic=1" target="_top">Open in a full tab \\u2192</a>';
+})();
+</script>
 <div class="ins-card">
   <div class="ins-h">1 · Connect wallet</div>
   <button type="button" id="ins-connect">Connect Xverse</button>

@@ -1,9 +1,46 @@
 /* Window chrome — owned by wm/window-manager.ts. Tokens come from ../shell.css. */
-.ph-win{position:absolute;left:0;top:0;background:var(--ph-panel);border:1px solid var(--ph-line);box-shadow:0 20px 60px rgba(0,0,0,.8),0 0 0 1px #000;display:flex;flex-direction:column;pointer-events:auto;min-width:0;min-height:0}
-.ph-win-title{height:30px;flex:0 0 30px;display:flex;align-items:center;gap:8px;padding:0 6px 0 8px;background:#0e0e0e;border-bottom:1px solid var(--ph-line);font:12px var(--ph-mono);color:var(--ph-fg);user-select:none;touch-action:none;cursor:default}
-.ph-win-icon{width:16px;height:16px}
-.ph-win-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ph-win-btn{width:24px;height:20px;border:1px solid var(--ph-line);background:#0a0a0a;color:var(--ph-dim);font:11px var(--ph-mono);cursor:pointer;padding:0;display:grid;place-items:center}
+.ph-win{position:absolute;left:0;top:0;background:var(--ph-panel);border:1px solid var(--ph-line);box-shadow:0 20px 60px rgba(0,0,0,.8),0 0 0 1px #000;display:flex;flex-direction:column;pointer-events:auto;min-width:0;min-height:0;outline:none;contain:layout style;transform:translate(0,0)}
+.ph-win[hidden]{display:none}
+.ph-win-dragging{will-change:transform;user-select:none}
+.ph-win-dragging .ph-win-body{pointer-events:none}
+.ph-win-focused{border-color:#333;box-shadow:0 24px 70px rgba(0,0,0,.9),0 0 0 1px #000}
+.ph-win-title{height:30px;flex:0 0 30px;display:flex;align-items:center;gap:8px;padding:0 4px 0 8px;background:#0e0e0e;border-bottom:1px solid var(--ph-line);font:12px var(--ph-mono);color:var(--ph-dim);user-select:none;-webkit-user-select:none;touch-action:none;cursor:default}
+.ph-win-focused .ph-win-title{background:#161616;color:var(--ph-fg);border-bottom-color:var(--ph-accent)}
+.ph-win-icon{width:16px;height:16px;opacity:.6;pointer-events:none}
+.ph-win-focused .ph-win-icon{opacity:1}
+.ph-win-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:.02em}
+.ph-win-btns{display:flex;gap:2px;flex:0 0 auto}
+.ph-win-btn{height:20px;min-width:24px;border:1px solid var(--ph-line);background:#0a0a0a;color:var(--ph-dim);font:11px var(--ph-mono);cursor:pointer;padding:0 4px;display:grid;place-items:center;touch-action:manipulation}
 .ph-win-btn:hover{color:var(--ph-fg);border-color:#444}
-.ph-win-body{flex:1;min-height:0;position:relative;background:#000}
-.ph-win-frame{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}
+.ph-win-btn:focus-visible{outline:1px solid var(--ph-accent);outline-offset:1px}
+.ph-win-btn-close:hover{color:#000;background:var(--ph-red);border-color:var(--ph-red)}
+.ph-win-btn-back{display:none}
+.ph-win-body{flex:1;min-height:0;position:relative;background:#000;overflow:auto}
+.ph-win-frame{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000;display:block}
+/* Covers the iframe of every unfocused window (and every iframe during a gesture) so the parent gets the pointer. */
+.ph-win-shield{position:absolute;inset:0;background:transparent;pointer-events:auto;cursor:default}
+.ph-win-shield[hidden]{display:none}
+/* Resize hit zones just outside the border. Hidden unless the window is resizable and floating. */
+.ph-win-h{position:absolute;display:none;touch-action:none}
+.ph-win-resizable .ph-win-h{display:block}
+.ph-win-h-n{top:-6px;left:12px;right:12px;height:7px;cursor:ns-resize}
+.ph-win-h-s{bottom:-6px;left:12px;right:12px;height:7px;cursor:ns-resize}
+.ph-win-h-e{right:-6px;top:12px;bottom:12px;width:7px;cursor:ew-resize}
+.ph-win-h-w{left:-6px;top:12px;bottom:12px;width:7px;cursor:ew-resize}
+.ph-win-h-ne{top:-6px;right:-6px;width:13px;height:13px;cursor:nesw-resize}
+.ph-win-h-sw{bottom:-6px;left:-6px;width:13px;height:13px;cursor:nesw-resize}
+.ph-win-h-nw{top:-6px;left:-6px;width:13px;height:13px;cursor:nwse-resize}
+.ph-win-h-se{bottom:-6px;right:-6px;width:13px;height:13px;cursor:nwse-resize}
+/* Maximized: fills the desktop area (root), not the viewport. */
+.ph-win-max{width:100%;height:100%;border-width:0;box-shadow:none}
+.ph-win-max .ph-win-title{cursor:default}
+/* Snap preview while dragging against the left/right edge. */
+.ph-win-snap{position:absolute;left:0;top:0;border:1px solid var(--ph-accent);background:rgba(143,209,79,.06);pointer-events:none;z-index:2147483000;box-sizing:border-box}
+/* Mobile: every window is fullscreen with a back affordance; no drag, no resize, no min/max. */
+.ph-win-mobile{width:100%;height:100%;border-width:0;box-shadow:none}
+.ph-win-mobile .ph-win-title{height:40px;flex-basis:40px;touch-action:auto;padding-left:4px}
+.ph-win-mobile .ph-win-btn-back{display:grid;height:28px;padding:0 10px;font-size:13px;color:var(--ph-fg)}
+.ph-win-mobile .ph-win-btn-min,.ph-win-mobile .ph-win-btn-max{display:none}
+.ph-win-mobile .ph-win-btn-close{height:28px;min-width:32px}
+.ph-win-mobile .ph-win-h{display:none}
+@media (prefers-reduced-motion:no-preference){.ph-win-snap{transition:transform .08s linear,width .08s linear}}

@@ -52,6 +52,7 @@ export interface WindowState {
   id: WindowId;
   title: string;
   icon: string;
+  /** The window's un-maximized geometry. While maximized or in mobile mode the on-screen box is the whole root; don't read this as the visible box. */
   rect: Rect;
   minimized: boolean;
   maximized: boolean;

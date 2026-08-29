@@ -10,6 +10,11 @@ export interface AppOpenContext {
   path: string | null;
   /** The icon element that launched the app — focus returns here on close. */
   launcher: HTMLElement | null;
+  /**
+   * Shell-provided content for apps whose UI lives in the shell (Recycle Bin).
+   * The registry stays declarative; desktop.ts supplies the mount.
+   */
+  mount?: (host: HTMLElement, win: import("../wm/types").WindowHandle) => (() => void) | void;
 }
 
 export interface AppSpec {
@@ -59,14 +64,14 @@ export const APPS: AppSpec[] = [
     label: "Recycle Bin",
     icon: ICONS.recycleBin,
     system: true,
-    open: ({ launcher }) => ({
+    open: ({ launcher, mount }) => ({
       id: "recycle-bin",
       title: "Recycle Bin",
       icon: ICONS.recycleBin,
       defaultSize: { w: 520, h: 380 },
       returnFocusTo: launcher,
-      // Mounted by desktop/recycle-bin.ts via main.ts; the registry stays declarative.
-      content: { kind: "element", mount: () => undefined },
+      // desktop.ts passes the real mount (desktop/recycle-bin.ts); the registry stays declarative.
+      content: { kind: "element", mount: mount ?? (() => undefined) },
     }),
   },
   {

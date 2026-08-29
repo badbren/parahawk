@@ -20,13 +20,46 @@ import { h, isMobileViewport, prefersReducedMotion } from "./util/dom";
 import type { WmMode } from "./wm/types";
 
 const BOOTED_KEY = "ph.booted";
+const CLASSIC_KEY = "ph.classic";
+
+/**
+ * Classic-site opt-out. The plain pages set/clear localStorage["ph.classic"]
+ * when they see ?classic=1 / ?classic=0 (see layout.ts). If it's set, this
+ * top-level visit should be the plain site: bounce to the same URL with
+ * ?classic=1 (the server's desktop gate lets that through). Cache-safe: the
+ * CDN never has to know about the preference.
+ */
+/** data-open comes from the request URL. The server sanitizes it; this is defence in depth. */
+function sameOriginPath(raw: string | undefined): string | null {
+  if (!raw || raw[0] !== "/" || raw.startsWith("//") || raw.startsWith("/\\")) return null;
+  try {
+    const u = new URL(raw, location.origin);
+    if (u.origin !== location.origin) return null;
+    return u.pathname + u.search + u.hash;
+  } catch {
+    return null;
+  }
+}
+
+function classicRedirect(): boolean {
+  try {
+    if (localStorage.getItem(CLASSIC_KEY) !== "1") return false;
+  } catch {
+    return false;
+  }
+  const u = new URL(location.href);
+  u.searchParams.set("classic", "1");
+  location.replace(u.pathname + u.search + u.hash);
+  return true;
+}
 
 function main(): void {
   const rootEl = document.getElementById("ph-root");
   if (!rootEl) return;
+  if (classicRedirect()) return;
   document.body.classList.add("ph-body");
 
-  const openPath = rootEl.dataset.open || null;
+  const openPath = sameOriginPath(rootEl.dataset.open);
   const bootMode = rootEl.dataset.boot === "full" ? "full" : "skip";
   const reducedMotion = prefersReducedMotion();
   let mode: WmMode = isMobileViewport() ? "mobile" : "desktop";
@@ -36,6 +69,8 @@ function main(): void {
   const canvas = h("canvas", { class: "ph-wallpaper", "aria-hidden": "true" });
   const iconsRoot = h("div", { class: "ph-icons", role: "group", "aria-label": "Desktop" });
   const windowsRoot = h("div", { class: "ph-windows" });
+  // desktop.ts attaches empty-desktop click/context-menu handling to iconsRoot.parentElement
+  // (this element), because .ph-icons itself is pointer-events:none so windows/icons stay clickable.
   const desktopArea = h("div", { class: "ph-desktop" }, iconsRoot, windowsRoot);
   const taskbar = h("div", { class: "ph-taskbar", role: "toolbar", "aria-label": "Taskbar" });
   rootEl.replaceChildren(canvas, desktopArea, taskbar);
@@ -77,23 +112,30 @@ function main(): void {
   wallpaper.resize();
 
   // ── Boot, then reveal ────────────────────────────────────────────────────
+  // Start polling before the cinematic so the dial shows real numbers the moment the desktop appears.
+  tick.start();
+
   const reveal = () => {
     rootEl.removeAttribute("data-booting");
     wallpaper.resume();
-    tick.start();
     if (openPath) desktop.openApp("parahawk", openPath);
   };
 
   let seenBoot = false;
   try { seenBoot = sessionStorage.getItem(BOOTED_KEY) === "1"; } catch { /* ignore */ }
-  const wantBoot = bootMode === "full" && !seenBoot && !reducedMotion;
+  // ?boot=1 replays the intro regardless of session/reduced-motion (QA aid + shareable).
+  let forceBoot = false;
+  try { forceBoot = new URLSearchParams(location.search).get("boot") === "1"; } catch { /* ignore */ }
+  const wantBoot = forceBoot || (bootMode === "full" && !seenBoot && !reducedMotion);
   if (wantBoot) {
     rootEl.setAttribute("data-booting", "1");
     const bootEl = h("div", { class: "ph-boot" });
     document.body.append(bootEl);
     wallpaper.pause();
     playBoot(bootEl, {
-      short: mode === "mobile",
+      // Brief §7: phones and slow connections get the 3-second cut.
+      short: mode === "mobile" || (navigator as { connection?: { saveData?: boolean } }).connection?.saveData === true,
+      ignoreReducedMotion: forceBoot,
       onComplete: () => {
         try { sessionStorage.setItem(BOOTED_KEY, "1"); } catch { /* ignore */ }
         reveal();

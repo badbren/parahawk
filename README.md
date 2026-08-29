@@ -167,6 +167,15 @@ src/
   config.ts   env loading
 ```
 
+### Desktop shell
+
+`parahawk.space` is a desktop-in-the-browser; the stats site runs inside a window on it.
+
+- **The gate** (`src/web/server.ts`): top-level browser navigations (`Sec-Fetch-Dest: document`, HTML accepted) get the shell page (`src/web/desktop-page.ts`), which opens the requested path in a same-origin iframe. Frames, fetches, curl, bots and `/api`, `/assets`, fragment routes fall through to the plain site. Responses vary on `Sec-Fetch-Dest`.
+- **`?classic=1`** on any URL bypasses the desktop and sets a `ph.classic` localStorage flag the shell honours; **`?classic=0`** clears it.
+- **`/api/tick`** — the slim JSON the shell polls (hashrate, difficulty, height, last block, pot age, BTC price, PHd banked); CDN-cached 10s, exempt from the `/api` limiter.
+- **Build:** `npm run build:shell` bundles `src/shell` → `public/shell/shell.js` + `shell.css` (`npm run dev:shell` watches). `npm run build` runs both server and shell builds.
+
 **Graceful degradation** is a design goal: data-source layers cache the last-good value and surface a stale flag; the pollers and bot wrap every async task so a thrown error is logged, never fatal.
 
 ### Environment variables

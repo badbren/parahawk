@@ -224,6 +224,18 @@ ${opts.body}
     else{ fetch('/hit',{method:'POST',keepalive:true}); }
   }catch(e){}
 })();
+(function(){
+  // Desktop shell hooks: tell the parent window where we are (title-bar +
+  // history sync), and persist the ?classic flag the shell honours.
+  try{
+    if(window.self!==window.top){
+      var post=function(){ try{ parent.postMessage({ph:'nav',path:location.pathname+location.search,title:document.title},location.origin); }catch(e){} };
+      post(); addEventListener('pageshow',post);
+    }
+    var m=/[?&]classic=([01])(?:&|$)/.exec(location.search);
+    if(m){ try{ if(m[1]==='1') localStorage.setItem('ph.classic','1'); else localStorage.removeItem('ph.classic'); }catch(e){} }
+  }catch(e){}
+})();
 </script>
 </body>
 </html>`;

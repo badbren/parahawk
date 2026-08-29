@@ -49,6 +49,15 @@ function flash(msg: string | undefined): string {
 function connectCard(): string {
   // Connect via Xverse by signing a one-time nonce (BIP-322). No funds move.
   return `
+<div id="xv-framed" hidden></div>
+<script>
+(function(){
+  if(window.self===window.top) return;
+  var n=document.getElementById('xv-framed'); if(!n) return;
+  n.className='stale'; n.hidden=false;
+  n.innerHTML='Wallet extensions may not see this page inside the desktop window. <a href="'+location.pathname+'?classic=1" target="_top">Open in a full tab \\u2192</a>';
+})();
+</script>
 <div class="card" style="max-width:640px">
   <h3>Connect your wallet</h3>
   <p class="muted-note">Connect with <strong>Xverse</strong> — you'll sign a one-time message to prove the address is yours. Nothing is spent and no funds move. Your wallet address becomes your Parahawk identity, so your linked venue keys belong only to you.</p>
