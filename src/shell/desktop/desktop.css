@@ -1,0 +1,13 @@
+/* Icons, taskbar, recycle bin, context menu — owned by desktop/desktop.ts. */
+.ph-icons{position:absolute;inset:0;display:grid;grid-auto-flow:column;grid-template-rows:repeat(auto-fill,96px);grid-auto-columns:96px;gap:4px;padding:8px;align-content:start;pointer-events:none}
+.ph-icon{pointer-events:auto;width:96px;height:96px;background:transparent;border:1px solid transparent;color:var(--ph-fg);font:12px var(--ph-mono);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:default;padding:4px}
+.ph-icon img{width:48px;height:48px}
+.ph-icon span{text-shadow:0 1px 2px #000,0 0 6px #000}
+.ph-icon:hover,.ph-icon:focus-visible{background:rgba(143,209,79,.08);border-color:rgba(143,209,79,.35);outline:none}
+.ph-taskbar{display:flex;align-items:center;gap:6px;padding:0 6px;background:#0a0a0a;border-top:1px solid var(--ph-line);font:12px var(--ph-mono);color:var(--ph-dim)}
+.ph-tb-start{font:900 13px var(--ph-head);letter-spacing:.06em;text-transform:uppercase;color:var(--ph-fg);background:#111;border:1px solid var(--ph-line);padding:5px 10px;cursor:pointer}
+.ph-tb-windows{display:flex;gap:4px;flex:1;overflow:hidden}
+.ph-tb-win{font:inherit;color:var(--ph-fg);background:#0e0e0e;border:1px solid var(--ph-line);padding:5px 10px;cursor:pointer;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ph-tb-win.on{border-color:var(--ph-accent);color:var(--ph-accent)}
+.ph-tb-right{display:flex;gap:12px;align-items:center;padding-right:4px}
+.ph-tb-diff{color:var(--ph-fg)}

@@ -1,0 +1,2 @@
+/* Boot cinematic overlay — owned by boot/boot.ts. */
+.ph-boot{position:fixed;inset:0;z-index:1000;background:#000}

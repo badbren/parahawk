@@ -11,3 +11,6 @@ coverage/
 *.tsbuildinfo
 supabase/.temp/
 supabase/.branches/
+
+# built desktop shell bundle (npm run build:shell)
+public/shell/
