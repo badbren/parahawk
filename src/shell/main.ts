@@ -78,6 +78,11 @@ function main(): void {
     return v === "on" || v === "off" ? v : "auto";
   };
   const effectiveReduced = (pref: MotionPref): boolean => (pref === "on" ? false : pref === "off" ? true : osReducedMotion);
+  // ?motion=on|off|auto sets the preference from a link (demo / support).
+  try {
+    const q = new URLSearchParams(location.search).get("motion");
+    if (q === "on" || q === "off" || q === "auto") store.set(MOTION_KEY, q);
+  } catch { /* ignore */ }
   let motion = readMotion();
   const reducedMotion = effectiveReduced(motion);
 
