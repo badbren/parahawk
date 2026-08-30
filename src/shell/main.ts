@@ -15,6 +15,8 @@ import { APPS } from "./desktop/registry";
 import { createWallpaper } from "./desktop/wallpaper";
 import { createTickFeed } from "./data/tick";
 import { createLocalStore } from "./session/store";
+import { createWalletSession } from "./session/wallet";
+import { createPracticeLedger } from "./session/ledger";
 import { playBoot } from "./boot/boot";
 import { h, isMobileViewport, prefersReducedMotion } from "./util/dom";
 import type { WmMode } from "./wm/types";
@@ -125,8 +127,15 @@ function main(): void {
   };
   const tick = createTickFeed({ url: rootEl.dataset.tick || "/api/tick" });
   const wm = createWindowManager({ root: windowsRoot, storage: store, mode });
+  // Identity only — reads an address, never moves funds. A previous session is
+  // resumed silently (no popup) so the Profile icon survives a reload.
+  const wallet = createWalletSession(store);
+  // Practice progress follows the signed-in wallet, falling back to a per-browser
+  // record for guests. Nothing here is an NFT; every screen that reads it says so.
+  const ledger = createPracticeLedger(store, wallet.account());
+  wallet.subscribe((acct) => ledger.setIdentity(acct));
   const desktop = createDesktop({
-    iconsRoot, taskbarRoot: taskbar, wm, apps: APPS, store, tick, mode,
+    iconsRoot, taskbarRoot: taskbar, wm, apps: APPS, store, tick, wallet, ledger, mode,
     extraMenuItems: () => [{ label: motionLabel(), onSelect: () => setMotion(MOTION_CYCLE[motion]) }],
   });
 
@@ -221,7 +230,7 @@ function main(): void {
   }
 
   // Debug handle.
-  (window as unknown as { ph: unknown }).ph = { wm, desktop, get wallpaper() { return wallpaper; }, tick, apps: APPS, setMotion, getMotion: () => motion };
+  (window as unknown as { ph: unknown }).ph = { wm, desktop, get wallpaper() { return wallpaper; }, tick, wallet, ledger, apps: APPS, setMotion, getMotion: () => motion };
 }
 
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", main);

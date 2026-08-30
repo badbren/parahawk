@@ -1,6 +1,7 @@
 /* Parahawk desktop shell — tokens + layout. Module styles are in the imported files. */
 @import "./wm/window.css";
 @import "./desktop/desktop.css";
+@import "./apps/apps.css";
 @import "./boot/boot.css";
 @import "./cursors.css";
 

@@ -10,6 +10,8 @@ import type { AppSpec } from "./registry";
 import { ICONS } from "./registry";
 import type { WindowId, WindowManager, WindowSpec, WmMode } from "../wm/types";
 import type { KeyValueStore } from "../session/store";
+import type { WalletSession } from "../session/wallet";
+import type { PracticeLedger } from "../session/ledger";
 import type { TickFeed } from "../data/tick";
 import { h } from "../util/dom";
 import { createHiddenApps } from "./hidden";
@@ -26,6 +28,10 @@ export interface DesktopOptions {
   apps: AppSpec[];
   store: KeyValueStore;
   tick: TickFeed;
+  /** Wallet sign-in. Apps flagged `requiresWallet` appear only while connected. */
+  wallet?: WalletSession;
+  /** Practice progress — ore banked and Blacks claimed. */
+  ledger?: PracticeLedger;
   mode: WmMode;
   /** Shell-level items appended to both the desktop context menu and the start menu (e.g. wallpaper motion). */
   extraMenuItems?: () => MenuItem[];
@@ -42,7 +48,7 @@ const BIN_ID = "recycle-bin";
 const DRAG_THRESHOLD_PX = 6;
 
 export function createDesktop(opts: DesktopOptions): Desktop {
-  const { iconsRoot, taskbarRoot, wm, apps, tick } = opts;
+  const { iconsRoot, taskbarRoot, wm, apps, tick, wallet, ledger } = opts;
   const hidden = createHiddenApps(opts.store);
   const area = iconsRoot.parentElement ?? iconsRoot;
   const classicHref = () => location.pathname + "?classic=1";
@@ -54,8 +60,12 @@ export function createDesktop(opts: DesktopOptions): Desktop {
   const icons = new Map<string, HTMLButtonElement>();
   let selectedId: string | null = null;
 
+  /** An app the user can see right now: not feature-flagged off, not in the bin, wallet gate satisfied. */
+  const available = (a: AppSpec): boolean =>
+    !a.hidden && (!a.requiresWallet || wallet?.account() != null);
+
   const shownApps = (): AppSpec[] => {
-    const list = apps.filter((a) => !a.hidden && (a.system || !hidden.has(a.id)));
+    const list = apps.filter((a) => available(a) && (a.system || !hidden.has(a.id)));
     return [...list.filter((a) => a.system), ...list.filter((a) => !a.system)];
   };
   const iconSrc = (app: AppSpec) => (app.id === BIN_ID && hidden.list().length > 0 ? ICONS.recycleBinFull : app.icon);
@@ -101,14 +111,14 @@ export function createDesktop(opts: DesktopOptions): Desktop {
 
   // ── Open ─────────────────────────────────────────────────────────────────
   const buildSpec = (app: AppSpec, path: string | null, launcher: HTMLElement | null): WindowSpec => {
-    const spec = app.open({ path, launcher });
+    const spec = app.open({ path, launcher, tick, wallet, ledger });
     if (app.id !== BIN_ID) return spec;
     return { ...spec, content: { kind: "element", mount: (host) => mountRecycleBin(host, { apps, hidden }) } };
   };
 
   const openApp = (id: string, path: string | null = null): WindowId | null => {
     const app = apps.find((a) => a.id === id);
-    if (!app || app.hidden) return null;
+    if (!app || !available(app)) return null;
     return wm.open(buildSpec(app, path, icons.get(id) ?? null));
   };
 
@@ -278,7 +288,8 @@ export function createDesktop(opts: DesktopOptions): Desktop {
 
   // ── Taskbar ──────────────────────────────────────────────────────────────
   const taskbar = createTaskbar({
-    root: taskbarRoot, wm, tick, mode: opts.mode,
+    root: taskbarRoot, wm, tick, mode: opts.mode, wallet,
+    openProfile: () => { openApp("profile"); },
     startItems: () => [
       ...shownApps().filter((a) => !a.system).map<MenuItem>((a) => ({ label: a.label, icon: a.icon, onSelect: () => openApp(a.id) })),
       { label: "Show hidden apps", icon: ICONS.recycleBin, onSelect: () => openApp(BIN_ID) },
@@ -297,6 +308,15 @@ export function createDesktop(opts: DesktopOptions): Desktop {
   iconsRoot.addEventListener("dblclick", onDblClick);
   iconsRoot.addEventListener("keydown", onKeyDown);
   const offHidden = hidden.subscribe(renderIcons);
+  // Signing in adds the Profile icon; signing out takes it away — and closes the
+  // window with it, so a signed-out desktop never leaves an orphaned Profile open.
+  let sawAccount = wallet?.account() != null;
+  const offWallet = wallet?.subscribe((acct) => {
+    const has = acct != null;
+    if (!has && sawAccount) wm.close("profile");
+    sawAccount = has;
+    renderIcons();
+  });
 
   const setMode = (m: WmMode) => {
     iconsRoot.classList.toggle("ph-icons--mobile", m === "mobile");
@@ -312,6 +332,7 @@ export function createDesktop(opts: DesktopOptions): Desktop {
       endDrag(false);
       ctx?.close();
       offHidden();
+      offWallet?.();
       taskbar.destroy();
       area.removeEventListener("pointerdown", onPointerDown);
       area.removeEventListener("pointermove", onPointerMove);

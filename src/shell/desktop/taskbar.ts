@@ -6,6 +6,8 @@
 import type { WindowManager, WindowState, WmMode } from "../wm/types";
 import type { TickFeed } from "../data/tick";
 import { fmtDifficulty } from "../data/tick";
+import type { WalletId, WalletSession } from "../session/wallet";
+import { shortAddress } from "../session/wallet";
 import { BRAND } from "./registry";
 import { h } from "../util/dom";
 import { openMenu, openPopover, type Floating, type MenuItem } from "./context-menu";
@@ -17,6 +19,10 @@ export interface TaskbarOptions {
   mode: WmMode;
   /** Items for the start menu, built fresh each time it opens. */
   startItems: () => MenuItem[];
+  /** Wallet sign-in. Omitted in tests / harnesses, where the button stays a notice. */
+  wallet?: WalletSession;
+  /** Opens the Profile window (the tray's shortcut once signed in). */
+  openProfile?: () => void;
 }
 
 export interface Taskbar {
@@ -102,19 +108,85 @@ export function createTaskbar(opts: TaskbarOptions): Taskbar {
   });
   const liveTimer = window.setInterval(renderLive, 15_000);
 
+  // ── Wallet ───────────────────────────────────────────────────────────────
+  // Signed out: a picker of the wallets we support, each flagged installed or
+  // not. Signed in: the short address, with Profile / Disconnect behind it.
+  const session = opts.wallet;
   let wallet: Floating | null = null;
+  const walletFull = h("span", { class: "ph-tb-wallet-full" }, "Connect wallet");
+  const walletShort = h("span", { class: "ph-tb-wallet-short", "aria-hidden": "true" }, "Wallet");
   const walletBtn = h("button", {
-    class: "ph-tb-btn ph-tb-wallet", type: "button", "aria-haspopup": "dialog", "aria-expanded": "false", title: "Wallet login coming soon",
-  }, h("span", { class: "ph-tb-wallet-full" }, "Connect wallet"), h("span", { class: "ph-tb-wallet-short", "aria-hidden": "true" }, "Wallet"));
+    class: "ph-tb-btn ph-tb-wallet", type: "button", "aria-haspopup": session ? "menu" : "dialog", "aria-expanded": "false",
+  }, walletFull, walletShort);
+
+  const closeWallet = () => { wallet?.close(); };
+
+  /** Signed-in menu: jump to Profile, or sign out. */
+  const signedInItems = (): MenuItem[] => [
+    ...(opts.openProfile ? [{ label: "Open Profile", onSelect: () => opts.openProfile?.() }] : []),
+    { label: "Disconnect", onSelect: () => session?.disconnect() },
+  ];
+
+  /** Signed-out picker. An uninstalled wallet links out instead of failing. */
+  const signedOutItems = (): MenuItem[] => {
+    const list = session?.providers() ?? [];
+    return list.map<MenuItem>((p) =>
+      p.installed
+        ? { label: p.label, onSelect: () => { void connect(p.id); } }
+        : { label: `${p.label} — install`, href: p.site, target: "_blank" });
+  };
+
+  const connect = async (id: WalletId) => {
+    if (!session) return;
+    walletFull.textContent = "Connecting…";
+    try {
+      await session.connect(id);
+      // render() runs off the session subscription and restores the label.
+    } catch (err) {
+      render();
+      // Surface the wallet's own reason rather than failing silently.
+      wallet = openPopover({
+        label: "Wallet", anchor: walletBtn, ignore: [walletBtn], returnFocusTo: walletBtn,
+        body: [h("strong", {}, "Could not connect"), h("br"), (err as Error).message],
+        onClose: () => { wallet = null; walletBtn.setAttribute("aria-expanded", "false"); },
+      });
+    }
+  };
+
+  const render = () => {
+    const acct = session?.account() ?? null;
+    walletBtn.classList.toggle("is-on", acct != null);
+    if (acct) {
+      walletFull.textContent = shortAddress(acct.address);
+      walletShort.textContent = shortAddress(acct.address, 3, 3);
+      walletBtn.title = `${acct.address} — click for Profile`;
+    } else {
+      walletFull.textContent = "Connect wallet";
+      walletShort.textContent = "Wallet";
+      walletBtn.title = session ? "Sign in with Phantom or MetaMask" : "Wallet login coming soon";
+    }
+  };
+
   walletBtn.addEventListener("click", () => {
-    if (wallet) { wallet.close(); return; }
+    if (wallet) { closeWallet(); return; }
     walletBtn.setAttribute("aria-expanded", "true");
-    wallet = openPopover({
-      label: "Wallet", anchor: walletBtn, ignore: [walletBtn], returnFocusTo: walletBtn,
-      body: [h("strong", {}, "Wallet login coming soon"), h("br"), "Phantom · MetaMask · Xverse"],
-      onClose: () => { wallet = null; walletBtn.setAttribute("aria-expanded", "false"); },
+    const onClose = () => { wallet = null; walletBtn.setAttribute("aria-expanded", "false"); };
+    if (!session) {
+      wallet = openPopover({
+        label: "Wallet", anchor: walletBtn, ignore: [walletBtn], returnFocusTo: walletBtn,
+        body: [h("strong", {}, "Wallet login coming soon"), h("br"), "Phantom · MetaMask · Xverse"],
+        onClose,
+      });
+      return;
+    }
+    wallet = openMenu({
+      items: session.account() ? signedInItems() : signedOutItems(),
+      label: "Wallet", anchor: walletBtn, ignore: [walletBtn], returnFocusTo: walletBtn, onClose,
     });
   });
+
+  const offWallet = session?.subscribe(() => { render(); closeWallet(); });
+  render();
 
   const clock = h("time", { class: "ph-tb-clock" }, "");
   const renderClock = () => {
@@ -140,7 +212,7 @@ export function createTaskbar(opts: TaskbarOptions): Taskbar {
   return {
     setMode,
     destroy() {
-      offWm(); offTick();
+      offWm(); offTick(); offWallet?.();
       clearInterval(liveTimer); clearTimeout(clockTimeout);
       if (clockInterval != null) clearInterval(clockInterval);
       menu?.close(); wallet?.close();
