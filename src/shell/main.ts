@@ -73,9 +73,11 @@ function main(): void {
   const osReducedMotion = prefersReducedMotion();
   let mode: WmMode = isMobileViewport() ? "mobile" : "desktop";
   const store = createLocalStore();
+  // Default is "on": the owner wants the motion for everyone. "auto" (follow the
+  // OS reduced-motion setting) and "off" are one click away in the desktop menu.
   const readMotion = (): MotionPref => {
     const v = store.get<string>(MOTION_KEY);
-    return v === "on" || v === "off" ? v : "auto";
+    return v === "auto" || v === "off" ? v : "on";
   };
   const effectiveReduced = (pref: MotionPref): boolean => (pref === "on" ? false : pref === "off" ? true : osReducedMotion);
   // ?motion=on|off|auto sets the preference from a link (demo / support).
