@@ -2,12 +2,20 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm run build",
   "functions": {
-    "api/index.js": { "includeFiles": "public/**" }
+    "api/index.js": {
+      "includeFiles": "public/**"
+    }
   },
   "rewrites": [
-    { "source": "/((?!api/).*)", "destination": "/api" }
+    {
+      "source": "/((?!api/cron/).*)",
+      "destination": "/api"
+    }
   ],
   "crons": [
-    { "path": "/api/cron/poll", "schedule": "*/10 * * * *" }
+    {
+      "path": "/api/cron/poll",
+      "schedule": "*/10 * * * *"
+    }
   ]
 }
