@@ -2,6 +2,7 @@
 @import "./wm/window.css";
 @import "./desktop/desktop.css";
 @import "./boot/boot.css";
+@import "./cursors.css";
 
 :root{
   --ph-bg:#000; --ph-panel:#0a0a0a; --ph-fg:#e6e6e6; --ph-dim:#8a8a8a; --ph-line:#222;
