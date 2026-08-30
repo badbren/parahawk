@@ -21,3 +21,4 @@ body.ph-body{font:14px var(--ph-mono)}
 @media (max-width:767px){
   :root{--ph-taskbar-h:36px}
 }
+.ph-perf{position:fixed;left:8px;bottom:calc(var(--ph-taskbar-h) + 8px);z-index:900;margin:0;padding:8px 10px;background:rgba(0,0,0,.85);border:1px solid var(--ph-line);color:var(--ph-accent);font:11px/1.5 var(--ph-mono);pointer-events:none;white-space:pre}

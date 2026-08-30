@@ -184,6 +184,35 @@ function main(): void {
     reveal();
   }
 
+  // ?perf=1 — on-screen frame-time readout for diagnosing "it lags" reports.
+  let perfOn = false;
+  try { perfOn = new URLSearchParams(location.search).get("perf") === "1"; } catch { /* ignore */ }
+  if (perfOn) {
+    const box = h("pre", { class: "ph-perf", "aria-hidden": "true" });
+    document.body.append(box);
+    const samples: number[] = [];
+    let last = performance.now();
+    const sample = (now: number) => {
+      samples.push(now - last); last = now;
+      if (samples.length > 120) samples.shift();
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+    setInterval(() => {
+      if (samples.length < 10) return;
+      const s = [...samples].sort((x, y) => x - y);
+      const avg = samples.reduce((x, y) => x + y, 0) / samples.length;
+      const d = wallpaper.debug();
+      const lines = [
+        `fps ${(1000 / avg).toFixed(0)}  avg ${avg.toFixed(1)}ms  p95 ${s[Math.floor(s.length * 0.95)]!.toFixed(1)}ms  worst ${s[s.length - 1]!.toFixed(0)}ms`,
+        `wallpaper js ${d.frameMs.toFixed(2)}ms  pacing ${d.gapMs}ms  glyphs ${d.glyphs}  level ${d.level}  scale ${d.scale}  motion ${motion}`,
+        `dpr ${devicePixelRatio}  canvas ${canvas.width}x${canvas.height}  reduced-motion(os) ${osReducedMotion}`,
+        `renderer ${d.renderer}`,
+      ];
+      box.textContent = lines.join(String.fromCharCode(10));
+    }, 1000);
+  }
+
   // Debug handle.
   (window as unknown as { ph: unknown }).ph = { wm, desktop, get wallpaper() { return wallpaper; }, tick, apps: APPS, setMotion, getMotion: () => motion };
 }

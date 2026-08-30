@@ -49,7 +49,7 @@ export interface WallpaperOptions {
 }
 
 export interface WallpaperDebug {
-  debug(): { frameMs: number; glyphs: number; level: number };
+  debug(): { frameMs: number; gapMs: number; glyphs: number; level: number; scale: number; renderer: string };
 }
 
 /* ── constants ─────────────────────────────────────────────────────────── */
@@ -61,7 +61,24 @@ const POT_RING = 1.1, POT_FULL_BLOCKS = 100, RADAR_DEG = 55;
 const GLYPH_DENSITY = 90 / (1920 * 1080), GLYPH_MIN = 30, GLYPH_MAX = 140, GLYPH_CAP = 160;
 const GLYPH_SPEED = 38, GLYPH_SPIN = 0.22, GREEN_SHARE = 0.08, GLYPH_ALPHA = 0.55, TRAIL = 26;
 const SIZES = [14, 11, 8] as const, NBUCKET = 5;
-const LEVEL_MULT = [1, 0.7, 0.45, 0.28] as const;
+const LEVEL_MULT = [1, 0.7, 0.45, 0.28, 0.28, 0.2] as const;
+/** Canvas render scale per level: 4 and 5 draw at 0.75× / 0.5× and let the browser upscale — the big lever when the GPU is off. */
+const RENDER_SCALE = [1, 1, 1, 1, 0.75, 0.5] as const;
+const LEVEL_MAX = LEVEL_MULT.length - 1;
+/** Frame pacing above this (ms between rAF callbacks) means the browser can't keep up, whatever our own JS cost says. */
+const SLOW_GAP_MS = 34;
+/** Software rendering (GPU acceleration off, SwiftShader, RDP…) — start low instead of discovering it over the first seconds. */
+function softwareRenderer(): { software: boolean; renderer: string } {
+  try {
+    const gl = document.createElement("canvas").getContext("webgl") as WebGLRenderingContext | null;
+    if (!gl) return { software: true, renderer: "no-webgl" };
+    const ext = gl.getExtension("WEBGL_debug_renderer_info");
+    const r = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : String(gl.getParameter(gl.RENDERER));
+    return { software: /swiftshader|software|llvmpipe|basic render|mesa offscreen/i.test(r), renderer: r };
+  } catch {
+    return { software: true, renderer: "unknown" };
+  }
+}
 const BURST_S = 2.8, DIM = 0.4;
 const HEX = "0123456789abcdef";
 
@@ -138,7 +155,9 @@ export function createWallpaper(canvas: HTMLCanvasElement, opts: WallpaperOption
   let T = 0, lastTs = 0, raf = 0, running = false, wantRun = false, destroyed = false;
   let burstOn = false, burstT = 0, ringKick = 0;
   const ringPhase = [0, 0, 0, 0];
-  let level = 0, ema = 8, hiSince = -1, loSince = -1;
+  const gpu = softwareRenderer();
+  let level = gpu.software ? 4 : 0, ema = 8, gapEma = 16, hiSince = -1, loSince = -1;
+  if (gpu.software) console.debug("[wallpaper] software renderer detected (" + gpu.renderer + ") → level 4");
   let readingNum = "0.0", readingKey = -1, potLine = "", potKey = -1;
   let readoutDirty = true, dimmed = false;
   let resizeTimer = 0, resizePending = false;
@@ -345,7 +364,7 @@ export function createWallpaper(canvas: HTMLCanvasElement, opts: WallpaperOption
 
   function layout(): void {
     if (!ctx) return;
-    DPR = Math.min(level >= 1 ? 1.5 : 2, window.devicePixelRatio || 1);
+    DPR = Math.min(level >= 1 ? 1.5 : 2, window.devicePixelRatio || 1) * RENDER_SCALE[level]!;
     W = canvas.clientWidth || 1; H = canvas.clientHeight || 1;
     canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -507,8 +526,8 @@ export function createWallpaper(canvas: HTMLCanvasElement, opts: WallpaperOption
     if (burstOn) { burstT += dt; if (burstT > BURST_S) burstOn = false; }
 
     ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
-    if (vignette) { ctx.fillStyle = vignette; ctx.fillRect(cx - R * 2.6, cy - R * 2.6, R * 5.2, R * 5.2); }
-    if (mite) {
+    if (vignette && level < 4) { ctx.fillStyle = vignette; ctx.fillRect(cx - R * 2.6, cy - R * 2.6, R * 5.2, R * 5.2); }
+    if (mite && level < 4) {
       const mx = W * 0.34 + Math.sin(T * 0.05) * H * 0.03 - MITE_W * miteS * 0.5;
       const my = H * 0.55 + Math.cos(T * 0.037) * H * 0.02 - MITE_H * miteS * 0.5;
       ctx.drawImage(mite, mx, my);
@@ -525,21 +544,26 @@ export function createWallpaper(canvas: HTMLCanvasElement, opts: WallpaperOption
   /* ── loop + adaptive quality ── */
   function setLevel(n: number): void {
     if (n === level) return;
-    level = n; hiSince = loSince = -1;
+    level = n; hiSince = loSince = -1; gapEma = 16; ema = 8;
     console.debug("[wallpaper] level", n);
     layout();
   }
   function loop(ts: number): void {
     if (!running) return;
     raf = requestAnimationFrame(loop);
-    const dt = lastTs ? Math.min(0.1, (ts - lastTs) / 1000) : 0.016;
+    const gapMs = lastTs ? Math.min(200, ts - lastTs) : 16;
+    const dt = lastTs ? Math.min(0.1, gapMs / 1000) : 0.016;
     lastTs = ts; T += dt;
     const t0 = performance.now();
     drawFrame(dt, t0);
     const cost = performance.now() - t0;
     ema += (cost - ema) * 0.1;
-    if (ema > 14) { loSince = -1; if (hiSince < 0) hiSince = ts; else if (ts - hiSince > 1000 && level < 3) setLevel(level + 1); }
-    else if (ema < 8) { hiSince = -1; if (loSince < 0) loSince = ts; else if (ts - loSince > 20000 && level > 0) setLevel(level - 1); }
+    // Pacing (time between frames) catches what our own timer can't: raster/present cost when the GPU is off.
+    gapEma += (gapMs - gapEma) * 0.1;
+    const slow = ema > 14 || gapEma > SLOW_GAP_MS;
+    const fast = ema < 8 && gapEma < 20;
+    if (slow) { loSince = -1; if (hiSince < 0) hiSince = ts; else if (ts - hiSince > 1000 && level < LEVEL_MAX) setLevel(level + 1); }
+    else if (fast) { hiSince = -1; if (loSince < 0) loSince = ts; else if (ts - loSince > 20000 && level > 0) setLevel(level - 1); }
     else hiSince = loSince = -1;
   }
   function start(): void {
@@ -605,6 +629,6 @@ export function createWallpaper(canvas: HTMLCanvasElement, opts: WallpaperOption
       if (resizeTimer) { clearTimeout(resizeTimer); resizeTimer = 0; }
       document.removeEventListener("visibilitychange", onVis);
     },
-    debug() { return { frameMs: Math.round(ema * 100) / 100, glyphs: glyphN, level }; },
+    debug() { return { frameMs: Math.round(ema * 100) / 100, gapMs: Math.round(gapEma * 10) / 10, glyphs: glyphN, level, scale: RENDER_SCALE[level]!, renderer: gpu.renderer }; },
   };
 }
