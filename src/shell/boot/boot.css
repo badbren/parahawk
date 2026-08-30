@@ -1,0 +1,9 @@
+/* Boot cinematic overlay — owned by boot/boot.ts. */
+.ph-boot{position:fixed;inset:0;z-index:1000;background:#000;opacity:1}
+.ph-boot-canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.ph-boot.ph-boot-white{background:#fff}
+.ph-boot.ph-boot-white .ph-boot-canvas{visibility:hidden}
+.ph-boot.ph-boot-out{opacity:0;pointer-events:none;transition:opacity var(--ph-boot-fade,700ms) ease-out}
+.ph-boot-skip{position:absolute;right:16px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:1;font:12px var(--ph-mono);letter-spacing:.14em;color:var(--ph-dim);background:transparent;border:1px solid transparent;padding:6px 10px;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .35s ease,color .15s ease}
+.ph-boot-skip.is-on{opacity:1;pointer-events:auto}
+.ph-boot-skip:hover,.ph-boot-skip:focus-visible{color:var(--ph-fg);border-color:var(--ph-line);outline:none}

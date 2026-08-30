@@ -11,3 +11,6 @@ coverage/
 *.tsbuildinfo
 supabase/.temp/
 supabase/.branches/
+
+# desktop shell: the bundle is committed (guaranteed to ship); sourcemaps are not
+public/shell/*.map

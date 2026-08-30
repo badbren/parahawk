@@ -44,6 +44,10 @@ import { getOverview } from "../services/overview.js";
 import { getPoolStatsSeries, type PoolWindow } from "../data/parasite.js";
 import { getHistory, type Point } from "../services/history.js";
 import { POTMATH_CLIENT_JS } from "./potmath-client.js";
+import { renderPage } from "./layout.js";
+import { renderDesktopPage, sanitizeOpenPath, computeAssetVersion } from "./desktop-page.js";
+import { PHD_TO_DIFF } from "../math/constants.js";
+import { getBlockTimestamp } from "../data/mempool.js";
 
 /** Keep only the points inside a window; fall back to all if the slice is empty. */
 function sliceByWindow(points: Point[], window: PoolWindow): Point[] {
@@ -118,14 +122,15 @@ export function createServer(): express.Express {
           "style-src": ["'self'", "'unsafe-inline'"],
           "script-src": ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
           "connect-src": ["'self'"],
-          "frame-ancestors": ["'none'"],
+          "frame-ancestors": ["'self'"],
           "base-uri": ["'self'"],
         },
       },
-      // X-Content-Type-Options: nosniff (helmet default), Referrer-Policy, deny
-      // framing, and HSTS (a no-op until behind TLS, safe to include).
+      // X-Content-Type-Options: nosniff (helmet default), Referrer-Policy,
+      // same-origin framing only (the desktop shell iframes the site), and
+      // HSTS (a no-op until behind TLS, safe to include).
       referrerPolicy: { policy: "no-referrer" },
-      frameguard: { action: "deny" },
+      frameguard: { action: "sameorigin" },
       hsts: { maxAge: 15552000 },
     }),
   );
@@ -146,10 +151,72 @@ export function createServer(): express.Express {
   });
   app.use(globalLimiter);
   app.use("/address", upstreamLimiter);
+
+  // Slim live-data projection polled by the desktop shell (every 15s per open
+  // tab, CDN-cached for 10s). Registered BEFORE the /api upstream limiter on
+  // purpose: it must not be capped at 30/min. Shape = Tick in src/shell/data/tick.ts.
+  app.get("/api/tick", async (_req, res) => {
+    try {
+      const o = await getOverview();
+      const work = o.pool.workSinceLastBlockDiff ?? 0;
+      // Exact block time (same cached mempool lookup the pot-age code uses).
+      const lastFoundAtMs = await getBlockTimestamp(o.pool.lastFoundHeight).catch(() => null);
+      res.set("Cache-Control", "public, s-maxage=10, stale-while-revalidate=30");
+      res.json({
+        hashratePhs: o.pool.poolHashratePhs,
+        avg1dPhs: o.pool.avg1dPhs > 0 ? o.pool.avg1dPhs : null,
+        difficulty: o.pool.networkDifficulty,
+        height: o.chain.height,
+        lastFoundHeight: o.pool.lastFoundHeight > 0 ? o.pool.lastFoundHeight : null,
+        lastFoundAtMs,
+        potBlocks: o.potAge.blocks,
+        potHours: o.potAge.hours,
+        potVerdict: o.potAge.verdict,
+        btcUsd: o.pool.btcPriceUsd,
+        hashpriceSats: o.pool.hashpriceSatsPerPhd,
+        phdBanked: work > 0 ? work / PHD_TO_DIFF : 0,
+        generatedAt: new Date(o.generatedAt).toISOString(),
+      });
+    } catch (err) {
+      console.error("[/api/tick] failed:", err);
+      res.status(503).set("Cache-Control", "no-store").json({ error: "upstream unavailable" });
+    }
+  });
+
   app.use("/api", upstreamLimiter);
 
   // Static assets (wiki images, etc.) served from ./public at /assets.
   app.use("/assets", express.static("public", { maxAge: "1h" }));
+
+  // ── Desktop gate ──────────────────────────────────────────────────────────
+  // Top-level browser navigations (Sec-Fetch-Dest: document) get the desktop
+  // shell, which then loads the requested page inside a same-origin iframe.
+  // Frames, fetches, curl and bots (no Sec-Fetch-Dest) fall through to the
+  // plain site, as does ?classic=1. Every GET passing through here varies on
+  // Sec-Fetch-Dest so the edge caches the two variants separately.
+  const assetVersion = computeAssetVersion();
+  const UNGATED = ["/api", "/assets", "/overview/gauge", "/potmath/card", "/potmath.js", "/hit", "/healthz", "/account/nonce"];
+  app.use((req, res, next) => {
+    if (req.method !== "GET" && req.method !== "HEAD") return next();
+    if (UNGATED.some((p) => req.path === p || req.path.startsWith(p + "/"))) return next();
+    res.vary("Sec-Fetch-Dest");
+    const accept = req.headers.accept ?? "";
+    // ?classic=1 (last value wins if repeated) forces the plain site.
+    const classicRaw = req.query.classic;
+    const classic = Array.isArray(classicRaw) ? classicRaw[classicRaw.length - 1] : classicRaw;
+    if (req.headers["sec-fetch-dest"] !== "document" || !accept.includes("text/html") || classic === "1") {
+      return next();
+    }
+    const root = req.path === "/";
+    res.set("Cache-Control", "public, s-maxage=20, stale-while-revalidate=60");
+    res.type("html").send(
+      renderDesktopPage({
+        openPath: root ? null : sanitizeOpenPath(req.originalUrl),
+        boot: root ? "full" : "skip",
+        assetVersion,
+      }),
+    );
+  });
 
   // Form bodies for the /account POST flow (connect / link / unlink).
   app.use(express.urlencoded({ extended: false }));
@@ -459,6 +526,21 @@ export function createServer(): express.Express {
   app.post("/hit", hit);
 
   app.get("/healthz", (_req, res) => res.type("text").send("ok"));
+
+  // Styled 404 so a bad path inside the desktop window still looks like the site.
+  app.use(async (_req, res) => {
+    try {
+      res.status(404).type("html").send(
+        await renderPage({
+          title: "Not found",
+          active: "",
+          body: `<h1>Not found</h1><p class="lead">That page doesn't exist. <a href="/">Back to the overview →</a></p>`,
+        }),
+      );
+    } catch {
+      res.status(404).type("text").send("not found");
+    }
+  });
 
   return app;
 }

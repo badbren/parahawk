@@ -1,0 +1,24 @@
+/* Parahawk desktop shell — tokens + layout. Module styles are in the imported files. */
+@import "./wm/window.css";
+@import "./desktop/desktop.css";
+@import "./boot/boot.css";
+
+:root{
+  --ph-bg:#000; --ph-panel:#0a0a0a; --ph-fg:#e6e6e6; --ph-dim:#8a8a8a; --ph-line:#222;
+  --ph-accent:#8fd14f; --ph-amber:#f5c451; --ph-red:#ff5c5c;
+  --ph-mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  --ph-head:Impact,"Arial Narrow","Arial Black",sans-serif;
+  --ph-taskbar-h:40px;
+}
+html,body.ph-body{margin:0;padding:0;height:100%;background:var(--ph-bg);color:var(--ph-fg);overflow:hidden}
+body.ph-body{font:14px var(--ph-mono)}
+#ph-root{position:fixed;inset:0;display:flex;flex-direction:column}
+.ph-wallpaper{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:0}
+.ph-desktop{position:relative;flex:1;min-height:0;z-index:1}
+.ph-windows{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.ph-taskbar{position:relative;flex:0 0 var(--ph-taskbar-h);height:var(--ph-taskbar-h);z-index:2}
+#ph-root[data-booting="1"] .ph-desktop,#ph-root[data-booting="1"] .ph-taskbar{visibility:hidden}
+@media (max-width:767px){
+  :root{--ph-taskbar-h:36px}
+}
+.ph-perf{position:fixed;left:8px;bottom:calc(var(--ph-taskbar-h) + 8px);z-index:900;margin:0;padding:8px 10px;background:rgba(0,0,0,.85);border:1px solid var(--ph-line);color:var(--ph-accent);font:11px/1.5 var(--ph-mono);pointer-events:none;white-space:pre}
