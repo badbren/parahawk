@@ -391,7 +391,7 @@ export const APPS: AppSpec[] = [
     requiresWallet: true,
     // No desktop icon: it opens from the round button by the corner logo (desktop/corner-profile.ts).
     noIcon: true,
-    open: ({ launcher, wallet, ledger, me, profile, tick, openApp, openPath }) => ({
+    open: ({ launcher, wallet, me, profile, tick, openApp, openPath }) => ({
       id: "profile",
       title: "Profile",
       icon: ICONS.profile,
@@ -402,7 +402,7 @@ export const APPS: AppSpec[] = [
           if (!wallet) { host.textContent = "Wallet unavailable."; return; }
           return mountProfile(host, {
             wallet,
-            ...(ledger ? { ledger } : {}), ...(me ? { me } : {}), ...(profile ? { profile } : {}), ...(tick ? { tick } : {}),
+            ...(me ? { me } : {}), ...(profile ? { profile } : {}), ...(tick ? { tick } : {}),
             ...(openApp ? { openApp } : {}), ...(openPath ? { openPath } : {}),
           });
         },

@@ -2,30 +2,16 @@
  * Profile — the window that appears once a wallet is connected.
  *
  * Top to bottom: who you are (your display name, editable once you've signed
- * in with Xverse, and the address it belongs to), then two dropdowns:
+ * in with Xverse, and the address it belongs to), then the Parahawk dropdown:
+ * your pool side — wallet page, returns, rentals and the Parahawk badges
+ * (profile-parahawk.ts). Open by default; it remembers being open or shut, per
+ * browser.
  *
- *   Parahawk     your pool side — wallet page, returns, rentals and the
- *                Parahawk badges (profile-parahawk.ts). Open by default.
- *   BTC Hunters  your collection and practice runs. Closed by default.
- *
- * Each dropdown remembers being open or shut, per browser.
- *
- * The BTC Hunters part is deliberately honest about being mostly empty: nothing
- * is minted, so the collection rows show real zeroes against real caps rather
- * than invented numbers, and the practice record says it is practice. When
- * those systems ship, the placeholders here are the shape the data goes into.
+ * The BTC Hunters dropdown (collection + practice runs) was taken out on
+ * 2026-11-06 until the NFT project ships — it last lived in commit a72a834.
  */
 import "./profile.css";
-import {
-  GAME_RESERVE,
-  MAX_ORE_PER_RUN,
-  MAX_PLAYS_PER_WALLET,
-  ORE_PER_WHITE,
-  TIERS,
-  type Tier,
-} from "../../econ/tokenomics";
 import { NAME_MAX, NAME_MIN, checkName, sameAddress, tidyName } from "../../profile/rules";
-import type { PracticeLedger } from "../session/ledger";
 import type { ServerSession } from "../session/me";
 import type { ProfileSession } from "../session/profile";
 import type { TickFeed } from "../data/tick";
@@ -38,7 +24,6 @@ import { avatarEl, shrinkPicture } from "./avatar";
 /** What the Profile window is given (registry.ts). Only the wallet is required. */
 export interface ProfileContext {
   wallet: WalletSession;
-  ledger?: PracticeLedger;
   me?: ServerSession;
   /** Display name (session/profile.ts). */
   profile?: ProfileSession;
@@ -53,98 +38,23 @@ const WALLET_LABEL: Record<WalletAccount["id"], string> = { xverse: "Xverse", wa
 
 /** Which dropdowns are open, per browser (store key → "ph.profile.drops"). */
 const DROPS_KEY = "profile.drops";
-type DropId = "parahawk" | "hunters";
+type DropId = "parahawk";
 type Drops = Partial<Record<DropId, boolean>>;
 
 function readDrops(store: KeyValueStore): Drops {
   const raw = store.get<unknown>(DROPS_KEY);
   if (!raw || typeof raw !== "object") return {};
   const out: Drops = {};
-  for (const id of ["parahawk", "hunters"] as const) {
+  for (const id of ["parahawk"] as const) {
     const v = (raw as Record<string, unknown>)[id];
     if (typeof v === "boolean") out[id] = v;
   }
   return out;
 }
 
-function section(title: string, ...body: Array<Node | string | false | null>): HTMLElement {
-  return h("section", { class: "ph-prof-sec" }, h("h2", {}, title), ...body);
-}
-
-/** A count against a cap, e.g. "0 / 20 runs used". */
-function stat(label: string, value: string, note?: string): HTMLElement {
-  return h("div", { class: "ph-prof-stat" },
-    h("span", { class: "ph-prof-stat-v" }, value),
-    h("span", { class: "ph-prof-stat-l" }, label),
-    note ? h("span", { class: "ph-prof-stat-n" }, note) : null);
-}
-
-function tierRow(t: Tier, held: number): HTMLElement {
-  return h("tr", { class: held > 0 ? "is-held" : "" },
-    h("th", { scope: "row" },
-      h("span", { class: "ph-prof-chip" },
-        h("i", { class: "ph-prof-swatch", style: `background:${t.color}`, "aria-hidden": "true" }), t.name)),
-    h("td", { class: "ph-num" }, String(held)),
-    h("td", { class: "ph-num ph-prof-dim" }, t.weight.toLocaleString("en-US", { maximumFractionDigits: 2 })),
-    h("td", { class: "ph-num ph-prof-dim" }, (held * t.weight).toLocaleString("en-US", { maximumFractionDigits: 2 })));
-}
-
-/** The BTC Hunters dropdown's body: collection, practice runs, desktop. Repainted when the ledger moves. */
-function huntersSections(ledger: PracticeLedger | undefined): HTMLElement[] {
-  const collection = section("Collection",
-    h("div", { class: "ph-prof-scroll" },
-      h("table", { class: "ph-prof-table" },
-        h("thead", {}, h("tr", {},
-          h("th", { scope: "col" }, "Tier"),
-          h("th", { scope: "col", class: "ph-num" }, "Held"),
-          h("th", { scope: "col", class: "ph-num" }, "Weight each"),
-          h("th", { scope: "col", class: "ph-num" }, "Your weight"))),
-        h("tbody", {}, ...TIERS.map((t) => tierRow(t, 0))))),
-    h("p", { class: "ph-prof-note" },
-      h("span", { class: "ph-prof-badge" }, "PLANNED"),
-      " Nothing is minted yet — no contract is deployed and the chain is not final. These are real zeroes, not a loading state."));
-
-  // Real numbers from real runs, but a practice record: no contract exists,
-  // nothing here is an NFT, and it does not carry over. Said plainly below.
-  const led = ledger?.state();
-  const runs = led?.runs ?? 0;
-  const ore = led?.ore ?? 0;
-  const claimed = led?.claims ?? [];
-  const toGo = Math.max(0, ORE_PER_WHITE - ore);
-
-  const claimedList = claimed.length > 0
-    ? h("div", { class: "ph-prof-claims" },
-        ...claimed.slice().reverse().map((b) =>
-          h("div", { class: "ph-prof-claim" },
-            h("i", { class: "ph-prof-swatch", style: `background:${TIERS[0]!.color}`, "aria-hidden": "true" }),
-            h("b", {}, "White"),
-            h("code", {}, b.id),
-            h("span", {}, new Date(b.at).toLocaleDateString()))))
-    : null;
-
-  const game = section("Mining — practice",
-    h("div", { class: "ph-prof-stats" },
-      stat("runs", String(runs), `the live cap will be ${MAX_PLAYS_PER_WALLET} per wallet`),
-      stat("ore banked", ore.toLocaleString("en-US"), toGo > 0 ? `${toGo.toLocaleString("en-US")} to go for a White` : "enough for a White"),
-      stat("best run", String(led?.bestRun ?? 0), `capped at ${MAX_ORE_PER_RUN} a run`),
-      stat("Whites claimed", String(claimed.length), `from a ${GAME_RESERVE.toLocaleString("en-US")} reserve`)),
-    claimedList,
-    h("p", { class: "ph-prof-note" },
-      h("span", { class: "ph-prof-badge" }, "PRACTICE"),
-      " These are your real runs, but a practice record — nothing above is an NFT, nothing was minted, and none of it carries over when the collection ships."));
-
-  const desktop = section("Desktop",
-    h("p", {}, "Your icon layout and hidden apps are saved ", h("strong", {}, "in this browser"), " right now."),
-    h("p", { class: "ph-prof-note" },
-      h("span", { class: "ph-prof-badge" }, "SOON"),
-      " Per-wallet sync, so the same desktop follows this address to any browser."));
-
-  return [collection, game, desktop];
-}
-
 /** Builds the window for one connected wallet. Returns its cleanup. */
 function mountAccount(host: HTMLElement, acct: WalletAccount, ctx: ProfileContext, prefs: KeyValueStore): () => void {
-  const { wallet: session, ledger, me, profile, tick, openPath } = ctx;
+  const { wallet: session, me, profile, tick, openPath } = ctx;
   const cleanups: Array<() => void> = [];
 
   // ── Display name ─────────────────────────────────────────────────────────
@@ -417,17 +327,11 @@ function mountAccount(host: HTMLElement, acct: WalletAccount, ctx: ProfileContex
   };
   const parahawk = dropdown("parahawk", "Parahawk", "your wallet page, returns, rentals & badges", true, phBody, mountPh);
 
-  const huntersBody = h("div", { class: "ph-prof-drop-body" });
-  const paintHunters = () => { huntersBody.replaceChildren(...huntersSections(ledger)); };
-  paintHunters();
-  if (ledger) cleanups.push(ledger.subscribe(paintHunters));
-  const hunters = dropdown("hunters", "BTC Hunters", "your collection & practice runs", false, huntersBody);
-
   const disconnect = h("button", { class: "ph-prof-btn ph-prof-btn-danger", type: "button" }, "Disconnect");
   disconnect.addEventListener("click", () => session.disconnect());
   const foot = h("footer", { class: "ph-prof-foot" }, disconnect);
 
-  host.replaceChildren(identity, parahawk, hunters, foot);
+  host.replaceChildren(identity, parahawk, foot);
   paintName();
   paintPic();
   paintPriv();

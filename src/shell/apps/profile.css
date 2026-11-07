@@ -1,10 +1,15 @@
-/* Profile window (profile.ts): who you are + display name, then the Parahawk and
-   BTC Hunters dropdowns. Moved here from apps.css on 2026-11-06. Tokens come from ../shell.css. */
+/* Profile window (profile.ts): who you are + display name, then the Parahawk
+   dropdown. Moved here from apps.css on 2026-11-06. Tokens come from ../shell.css. */
 .ph-prof{box-sizing:border-box;height:100%;overflow:auto;padding:0 0 24px;font:13px/1.7 var(--ph-mono);color:var(--ph-fg)}
 .ph-prof p{margin:0 0 8px}
 .ph-prof strong{color:#fff;font-weight:600}
 .ph-prof-dim{color:var(--ph-dim)}
-.ph-prof .ph-num{text-align:right}
+/* Everything in the window drawn 1.5× on the desktop (owner, 2026-11-06: "make everything in
+   there way bigger"). One zoom on the window's children instead of retuning every size below,
+   so the pieces shared with someone's public profile (profile-parahawk.css) grow here only.
+   Phones (the shell's mobile mode, ≤767px) keep the old size: their two-column badge cards
+   have no room to grow. */
+@media (min-width:768px){.ph-prof>*{zoom:1.5}}
 
 .ph-prof-empty{padding:26px 22px;color:var(--ph-fg)}
 
@@ -20,43 +25,14 @@
 .ph-prof-btn:focus-visible{outline:1px dotted var(--ph-accent);outline-offset:-3px}
 .ph-prof-btn-danger:hover{color:var(--ph-red);border-color:var(--ph-red)}
 
-.ph-prof-sec{padding:16px 22px 4px;border-bottom:1px solid var(--ph-line)}
-.ph-prof-sec h2{margin:0 0 12px;font:900 13px/1 var(--ph-head);letter-spacing:.14em;text-transform:uppercase;color:var(--ph-fg);
-  padding:6px 9px;background:#101010;border:1px solid #000;box-shadow:inset 1px 1px 0 #2e2e2e,inset -1px -1px 0 #050505}
-
-.ph-prof-scroll{overflow-x:auto;margin:0 0 10px;border:1px solid var(--ph-line)}
-.ph-prof-table{border-collapse:collapse;width:100%;min-width:430px;font-variant-numeric:tabular-nums}
-.ph-prof-table th,.ph-prof-table td{padding:6px 10px;text-align:left;border-bottom:1px solid var(--ph-line);font-weight:400;white-space:nowrap}
-.ph-prof-table thead th{background:#101010;color:var(--ph-dim);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
-.ph-prof-table tbody tr:last-child th,.ph-prof-table tbody tr:last-child td{border-bottom:0}
-.ph-prof-table tbody tr.is-held{background:rgba(143,209,79,.06)}
-.ph-prof-chip{display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
-.ph-prof-swatch{width:11px;height:11px;flex:none;border:1px solid rgba(0,0,0,.7);box-shadow:0 0 0 1px rgba(230,230,230,.25)}
-
-.ph-prof-stats{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
-.ph-prof-stat{flex:1 1 150px;padding:10px 12px;border:1px solid var(--ph-line);background:#0c0c0c;display:flex;flex-direction:column;gap:1px}
-.ph-prof-stat-v{font:900 21px/1.1 var(--ph-head);letter-spacing:.03em;color:var(--ph-accent);font-variant-numeric:tabular-nums}
-.ph-prof-stat-l{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ph-fg)}
-.ph-prof-stat-n{font-size:11px;color:var(--ph-dim);line-height:1.5}
-
 .ph-prof-note{color:var(--ph-dim)}
-.ph-prof-badge{display:inline-block;padding:1px 6px;margin-right:4px;font-size:10px;letter-spacing:.1em;color:var(--ph-amber);border:1px solid currentColor;line-height:1.5}
 
 .ph-prof-foot{padding:16px 22px 0;display:flex;justify-content:flex-end}
 
 @media (max-width:600px){
   .ph-prof-id{padding:14px}
-  .ph-prof-sec{padding:14px 14px 4px}
   .ph-prof-foot{padding:14px 14px 0}
 }
-
-/* Practice Whites listed under BTC Hunters. */
-.ph-prof-claims{margin:0 0 10px;border:1px solid var(--ph-line)}
-.ph-prof-claim{display:flex;align-items:center;gap:9px;padding:6px 10px;border-bottom:1px solid var(--ph-line);font-size:12px}
-.ph-prof-claim:last-child{border-bottom:0}
-.ph-prof-claim b{font-weight:600}
-.ph-prof-claim code{color:var(--ph-dim)}
-.ph-prof-claim span{margin-left:auto;color:var(--ph-dim);font-size:11px}
 
 /* ── Display name ──────────────────────────────────────────────────────────── */
 .ph-prof-name-row{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;margin:0 0 8px}
@@ -76,7 +52,7 @@
 .ph-prof .ph-prof-hint{margin:0 0 8px;font-size:11px;color:var(--ph-dim)}
 .ph-prof .ph-prof-locked{margin:0 0 10px;font-size:12px}
 
-/* ── Dropdowns: Parahawk, BTC Hunters ─────────────────────────────────────── */
+/* ── The Parahawk dropdown ─────────────────────────────────────────────────── */
 .ph-prof-drop{border-bottom:1px solid var(--ph-line)}
 .ph-prof-drop>summary{list-style:none;display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 12px;margin:14px 22px;padding:8px 10px;cursor:pointer;user-select:none;-webkit-user-select:none;
   background:#101010;border:1px solid #000;box-shadow:inset 1px 1px 0 #2e2e2e,inset -1px -1px 0 #050505}
@@ -90,9 +66,6 @@
 .ph-prof-drop-s{font-size:11px;color:var(--ph-dim)}
 .ph-prof-drop-body{padding:0 0 6px}
 .ph-prof-ph{padding:12px 22px 10px}
-/* Sections inside a dropdown: lighter headings, no rule under the last one. */
-.ph-prof-drop .ph-prof-sec h2{padding:0;background:none;border:0;box-shadow:none;color:var(--ph-dim);font-size:12px}
-.ph-prof-drop .ph-prof-sec:last-child{border-bottom:0}
 
 @media (max-width:600px){
   .ph-prof-name{font-size:24px}
