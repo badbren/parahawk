@@ -5,7 +5,7 @@ import { getLeaderboard } from "../../data/parasite.js";
 import { getRecentBlocks, renderBlocksStrip } from "../../data/blocks.js";
 import { hashrateGauge, gaugeScaleFor } from "../gauge.js";
 import { getAddressResolver, type AddressResolver } from "../../services/winners.js";
-import { walletCell } from "../addr.js";
+import { walletCell, walletNames, type WalletNames } from "../addr.js";
 import type { LeaderboardEntry } from "../../data/types.js";
 import {
   fmtHashrate,
@@ -20,13 +20,13 @@ import {
 /** The gauge full-scale, matching parasite.space's 0–9,999 PH/s dial. */
 const GAUGE_MAX = 9999;
 
-function lbTable(rows: LeaderboardEntry[], kind: "difficulty" | "loyalty", resolve: AddressResolver): string {
+function lbTable(rows: LeaderboardEntry[], kind: "difficulty" | "loyalty", resolve: AddressResolver, names?: WalletNames): string {
   if (rows.length === 0) return `<p class="muted-note">no entries yet</p>`;
   const head = kind === "difficulty" ? "Best diff" : "Blocks";
   const body = rows
     .slice(0, 8)
     .map(
-      (e) => `<tr><td class="dim">${e.rank}</td><td>${walletCell(e.address, resolve)}</td><td>${
+      (e) => `<tr><td class="dim">${e.rank}</td><td>${walletCell(e.address, resolve, names)}</td><td>${
         kind === "difficulty" ? fmtDiff(e.bestDiff ?? 0) : fmtInt(e.blocks ?? 0)
       }</td></tr>`,
     )
@@ -50,6 +50,8 @@ export async function renderOverview(): Promise<string> {
     getRecentBlocks(26).catch(() => []),
     getAddressResolver().catch(() => (() => null) as AddressResolver),
   ]);
+  // Profile names next to the wallets in the two top-8 tables (one batched lookup).
+  const names = await walletNames([...lb.difficulty.slice(0, 8), ...lb.loyalty.slice(0, 8)].map((e) => e.address), resolve);
   const pm = potMathFromOverview(o);
   const pot = o.potAge;
   const potClass = pot.verdict === "fresh" ? "green" : pot.verdict === "aging" ? "amber" : "red";
@@ -104,8 +106,8 @@ ${renderBlocksStrip(blocks)}
 
 <h2>Leaderboard — since last block</h2>
 <div class="grid" style="grid-template-columns:minmax(300px,1fr) minmax(300px,1fr)">
-  <div class="card"><div class="k">🥑 Top difficulty</div>${lbTable(lb.difficulty, "difficulty", resolve)}<p class="muted-note" style="margin:8px 0 0"><a href="/board">full Bravocado board →</a></p></div>
-  <div class="card"><div class="k">🏆 Top loyalty (blocks)</div>${lbTable(lb.loyalty, "loyalty", resolve)}</div>
+  <div class="card"><div class="k">🥑 Top difficulty</div>${lbTable(lb.difficulty, "difficulty", resolve, names)}<p class="muted-note" style="margin:8px 0 0"><a href="/board">full Bravocado board →</a></p></div>
+  <div class="card"><div class="k">🏆 Top loyalty (blocks)</div>${lbTable(lb.loyalty, "loyalty", resolve, names)}</div>
 </div>
 
 <p class="muted-note" style="margin-top:24px">

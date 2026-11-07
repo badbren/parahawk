@@ -1,0 +1,148 @@
+/* The reveal — a piece turning over. Tokens come from ../shell.css.
+   Built for software rendering: during the spin only .ph-reveal-card moves,
+   and only by transform; shadows and gradients here are static paint.
+
+   It has to fit whatever it is shown over — the Burn window (~860×630), the
+   game at its default size (stage ~540×560) and at its smallest (~360×340) —
+   with the button always on screen and no page scroll. So the overlay is a
+   size container, the card's height is solved from the room left over
+   (--card-h), and everything printed on the card is sized off the card. The
+   trait list scrolls inside itself only if a host is smaller still. */
+
+.ph-reveal{position:absolute;inset:0;z-index:5;box-sizing:border-box;display:flex;align-items:center;justify-content:center;
+  padding:0;overflow:hidden;container:reveal / size;
+  background:radial-gradient(ellipse at 50% 42%,rgba(18,16,10,.96),rgba(0,0,0,.985) 70%);opacity:0;transition:opacity .2s ease}
+.ph-reveal.is-on{opacity:1}
+.ph-reveal.is-still{transition:none}
+
+/* Layout knobs, overridden per host below. --chrome-h is the height of
+   everything that is not the card row (head, button, note, gaps and the
+   panel's own padding); --side-w the trait column beside the card. The padding
+   lives on the panel, not the overlay, because a container query can restyle
+   the overlay's descendants but never the overlay itself. */
+.ph-reveal-panel{
+  --pad:14px; --chrome-h:224px; --side-w:230px; --gap:18px;
+  --card-h:clamp(120px, min(calc(100cqh - var(--chrome-h)), calc((100cqw - 2 * var(--pad) - var(--side-w) - var(--gap)) / .76)), 316px);
+  box-sizing:border-box;display:flex;flex-direction:column;align-items:center;width:100%;max-width:668px;max-height:100%;padding:var(--pad);
+  text-align:center;font:13px/1.6 var(--ph-mono);color:var(--ph-fg)}
+
+.ph-reveal-kicker{margin:0 0 2px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ph-dim)}
+.ph-reveal.is-triumph .ph-reveal-kicker{color:var(--ph-accent)}
+.ph-reveal-title{margin:0 0 4px;font:900 30px/1 var(--ph-head);letter-spacing:.05em;text-transform:uppercase;color:var(--tier,var(--ph-accent))}
+.ph-reveal-count{margin:0;font-size:10px;line-height:1.6;letter-spacing:.16em;text-transform:uppercase;color:var(--ph-dim)}
+.ph-reveal-count:empty{display:none}
+
+.ph-reveal-body{display:flex;align-items:center;justify-content:center;gap:var(--gap);width:100%;margin:12px 0}
+.ph-reveal-foot{display:flex;flex-direction:column;align-items:center;gap:8px;width:100%}
+
+/* ── The card ─────────────────────────────────────────────────────────────── */
+.ph-reveal-stage{position:relative;flex:none;height:var(--card-h);width:calc(var(--card-h) * .76);perspective:calc(var(--card-h) * 2.85)}
+
+/* The landing flash: a square 1.5× the card's height, centred on it, behind
+   it. Animated (opacity + scale) only after the spin has ended. */
+.ph-reveal-burst{position:absolute;inset:-25% -49%;border-radius:50%;pointer-events:none;opacity:0;
+  background:radial-gradient(circle closest-side,color-mix(in srgb,var(--tier) 60%,transparent) 0,color-mix(in srgb,var(--tier) 20%,transparent) 34%,transparent 62%)}
+/* Prismatic flashes every colour below it, dealt round the ring, never blended. */
+.ph-reveal-burst.is-prism{
+  background:conic-gradient(from 20deg,#f2f6ff,#ffa02e,#19e894,#2b7bff,#ff3f33,#f2f6ff);
+  -webkit-mask:radial-gradient(circle closest-side,#000 0,rgba(0,0,0,.75) 28%,transparent 60%);
+          mask:radial-gradient(circle closest-side,#000 0,rgba(0,0,0,.75) 28%,transparent 60%)}
+
+.ph-reveal-card{position:absolute;inset:0;transform-style:preserve-3d;will-change:transform;cursor:pointer}
+/* Each face is a size container, so what is printed on it scales with the card
+   (cqw = 1% of the face's width; 240px wide at full size). */
+.ph-reveal-face{position:absolute;inset:0;box-sizing:border-box;overflow:hidden;border:2px solid var(--tier);background:#060606;
+  container-type:size;-webkit-backface-visibility:hidden;backface-visibility:hidden;
+  box-shadow:0 0 0 1px #000,0 18px 44px rgba(0,0,0,.85),0 0 26px color-mix(in srgb,var(--tier) 30%,transparent)}
+
+/* Back: dark, the tier glowing in from the edges, a field of hash. */
+.ph-reveal-face.is-back{transform:rotateY(180deg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4cqw;
+  background:linear-gradient(160deg,#141414,#050505 72%);
+  box-shadow:inset 0 0 34px color-mix(in srgb,var(--tier) 48%,transparent),0 0 0 1px #000,0 18px 44px rgba(0,0,0,.85)}
+.ph-reveal-hex{position:absolute;inset:0;padding:3.4cqw;font:max(6px,4.2cqw)/1.35 var(--ph-mono);color:var(--tier);opacity:.16;
+  word-break:break-all;text-align:left;pointer-events:none;user-select:none}
+.ph-reveal-mark{position:relative;width:31cqw;height:31cqw;color:var(--tier)}
+.ph-reveal-mark svg{display:block;width:100%;height:100%}
+.ph-reveal-brand{position:relative;font:900 11.7cqw/.95 var(--ph-head);letter-spacing:.08em;text-transform:uppercase;color:#f0f0f0;
+  text-shadow:0 0 14px color-mix(in srgb,var(--tier) 60%,transparent)}
+.ph-reveal-brand small{display:block;margin-top:2.5cqw;font:max(7px,4.2cqw)/1 var(--ph-mono);letter-spacing:.24em;color:var(--ph-dim);text-shadow:none}
+
+/* Front: the art, then a name band. */
+.ph-reveal-face.is-front{display:flex;flex-direction:column;background:#050308}
+.ph-reveal-art{display:block;width:100%;aspect-ratio:1/1;height:auto;background:#050308}
+.ph-reveal-band{flex:1;min-height:0;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2.5cqw;
+  padding:0 4.2cqw;border-top:1px solid color-mix(in srgb,var(--tier) 45%,#000);background:linear-gradient(180deg,#0e0e0e,#070707)}
+.ph-reveal-name{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font:900 max(10px,6.25cqw)/1 var(--ph-head);letter-spacing:.06em;text-transform:uppercase;color:#fff}
+.ph-reveal-chip{display:inline-flex;align-items:center;gap:2.5cqw;font-size:max(8px,4.2cqw);line-height:1;letter-spacing:.14em;text-transform:uppercase;color:var(--tier)}
+.ph-reveal-chip i{width:max(8px,4.2cqw);height:max(8px,4.2cqw);border:1px solid rgba(0,0,0,.7);box-shadow:0 0 0 1px rgba(230,230,230,.25)}
+/* The honesty ribbon, across the top-right corner of every card. Its centre
+   sits 23% of the card's width in from the corner, along the diagonal, which
+   leaves about two-thirds of the width of visible band for the words. */
+.ph-reveal-stamp{position:absolute;top:20.4cqw;right:-22.5cqw;width:91.7cqw;transform:rotate(45deg);padding:.8cqw 0;text-align:center;
+  font:700 max(6.5px,3.33cqw)/1.35 var(--ph-mono);letter-spacing:.12em;color:#111;background:var(--ph-amber);box-shadow:0 1px 0 #000}
+
+/* ── What it rolled ───────────────────────────────────────────────────────────
+   Default: compact tiles — the label over the value and its odds, which fit a
+   narrow column beside the card. Roomy hosts get one line per trait, with the
+   notes (see the wide block below). */
+.ph-reveal-traits{flex:0 1 var(--side-w);min-width:0;max-height:var(--card-h);overflow:auto;display:flex;flex-direction:column;gap:2px;
+  text-align:left;font-size:11px;scrollbar-width:thin}
+.ph-reveal-trait{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:8px;align-items:baseline;padding:3px 2px 4px;
+  border-top:1px solid rgba(230,230,230,.08);opacity:0;transition:opacity .28s ease}
+.ph-reveal-trait.is-in{opacity:1}
+.ph-reveal-trait span{grid-column:1 / -1;font-size:9px;line-height:1.3;letter-spacing:.12em;text-transform:uppercase;color:var(--ph-dim)}
+.ph-reveal-trait b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;line-height:1.35;font-weight:600;color:#fff}
+.ph-reveal-trait em{font-style:normal;font-size:11px;line-height:1.35;white-space:nowrap;color:var(--ph-dim)}
+.ph-reveal-trait small{display:none}
+.ph-reveal-trait.is-jackpot b,.ph-reveal-trait.is-jackpot em,.ph-reveal-trait.is-jackpot small{color:var(--ph-amber)}
+.ph-reveal-trait.is-rare{border-top-color:color-mix(in srgb,var(--tier) 35%,transparent)}
+.ph-reveal-trait.is-total{border-top-color:var(--ph-line)}
+.ph-reveal-trait.is-total b{color:var(--tier)}
+.ph-reveal.is-still .ph-reveal-trait{transition:none}
+
+.ph-reveal-note{margin:0;max-width:520px;font-size:11px;line-height:1.6;color:var(--ph-dim)}
+.ph-reveal-note strong{color:var(--ph-amber);font-weight:600}
+
+.ph-reveal-actions{display:flex;justify-content:center;gap:8px;min-height:32px}
+.ph-reveal-btn{min-width:120px;padding:8px 14px;font:700 12px/1 var(--ph-mono);letter-spacing:.1em;text-transform:uppercase;cursor:pointer;
+  color:#0b0b0b;background:var(--ph-accent);border:1px solid #000;box-shadow:inset 1px 1px 0 #c6f597,inset -1px -1px 0 #4d7a22}
+.ph-reveal-btn:active{box-shadow:inset 1px 1px 0 #4d7a22,inset -1px -1px 0 #c6f597}
+.ph-reveal-btn[hidden]{display:none}
+
+/* ── Roomy hosts (the Burn window, a maximised game): one line per trait. ─── */
+@container reveal (min-width:600px) and (min-height:481px){
+  .ph-reveal-panel{--side-w:300px}
+  .ph-reveal-trait{grid-template-columns:96px minmax(0,1fr) auto;padding:4px 2px}
+  .ph-reveal-trait span{grid-column:auto;font-size:10px}
+  .ph-reveal-trait small{display:block;grid-column:2 / 4;font-size:10px;line-height:1.4;color:var(--ph-dim)}
+}
+
+/* ── Tall and narrow (a phone): the card on top, the traits in two columns. ─ */
+@container reveal (max-width:439px) and (min-height:560px){
+  .ph-reveal-panel{--chrome-h:328px;--side-w:0px}
+  .ph-reveal-body{flex-direction:column}
+  .ph-reveal-traits{flex:none;width:100%;max-height:none;display:grid;grid-template-columns:1fr 1fr;column-gap:14px}
+}
+
+/* ── Short hosts (the game at its smallest): everything tightens. ─────────── */
+@container reveal (max-height:480px){
+  .ph-reveal-panel{--pad:8px;--chrome-h:134px;--side-w:160px;--gap:12px}
+  .ph-reveal-kicker{margin:0;font-size:10px;line-height:1.4}
+  .ph-reveal-title{margin:0 0 2px;font-size:20px}
+  .ph-reveal-count{font-size:9px;line-height:1.4}
+  .ph-reveal-body{margin:6px 0}
+  .ph-reveal-foot{gap:5px}
+  .ph-reveal-actions{min-height:28px}
+  .ph-reveal-btn{min-width:104px;padding:7px 12px;font-size:11px}
+  .ph-reveal-traits{gap:0}
+  .ph-reveal-trait{padding:2px 2px 3px}
+  .ph-reveal-trait span{line-height:1.25}
+  .ph-reveal-trait b{font-size:11px;line-height:1.3}
+  .ph-reveal-trait em{font-size:10px;line-height:1.3}
+  .ph-reveal-note{font-size:10px;line-height:1.4}
+  .ph-reveal-runs,.ph-reveal-more{display:none}
+}
+
+/* Read out by screen readers when a card lands; never seen. */
+.ph-sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}

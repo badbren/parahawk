@@ -7,7 +7,10 @@ import type { WindowManager, WindowState, WmMode } from "../wm/types";
 import type { TickFeed } from "../data/tick";
 import { fmtDifficulty } from "../data/tick";
 import type { WalletId, WalletSession } from "../session/wallet";
+import type { ProfileSession } from "../session/profile";
 import { shortAddress } from "../session/wallet";
+import { sameAddress } from "../../profile/rules";
+import { avatarEl } from "../apps/avatar";
 import { BRAND } from "./registry";
 import { h } from "../util/dom";
 import { openMenu, openPopover, type Floating, type MenuItem } from "./context-menu";
@@ -23,6 +26,8 @@ export interface TaskbarOptions {
   wallet?: WalletSession;
   /** Opens the Profile window (the tray's shortcut once signed in). */
   openProfile?: () => void;
+  /** Display name for the wallet button, when the signed-in person has one (session/profile.ts). */
+  profile?: ProfileSession;
 }
 
 export interface Taskbar {
@@ -110,14 +115,17 @@ export function createTaskbar(opts: TaskbarOptions): Taskbar {
 
   // ── Wallet ───────────────────────────────────────────────────────────────
   // Signed out: a picker of the wallets we support, each flagged installed or
-  // not. Signed in: the short address, with Profile / Disconnect behind it.
+  // not. Signed in: the display name (or the short address until there is one),
+  // with Profile / Disconnect behind it.
   const session = opts.wallet;
   let wallet: Floating | null = null;
   const walletFull = h("span", { class: "ph-tb-wallet-full" }, "Connect wallet");
   const walletShort = h("span", { class: "ph-tb-wallet-short", "aria-hidden": "true" }, "Wallet");
+  /** The signed-in person's little profile picture, when they have one. */
+  const walletPic = h("span", { class: "ph-tb-wallet-pic" });
   const walletBtn = h("button", {
     class: "ph-tb-btn ph-tb-wallet", type: "button", "aria-haspopup": session ? "menu" : "dialog", "aria-expanded": "false",
-  }, walletFull, walletShort);
+  }, walletPic, walletFull, walletShort);
 
   const closeWallet = () => { wallet?.close(); };
 
@@ -127,43 +135,72 @@ export function createTaskbar(opts: TaskbarOptions): Taskbar {
     { label: "Disconnect", onSelect: () => session?.disconnect() },
   ];
 
-  /** Signed-out picker. An uninstalled wallet links out instead of failing. */
+  /** A short note anchored to the wallet button — errors, and wallets that are not ready yet. */
+  const notice = (title: string, text: string) => {
+    wallet = openPopover({
+      label: "Wallet", anchor: walletBtn, ignore: [walletBtn], returnFocusTo: walletBtn,
+      body: [h("strong", {}, title), h("br"), text],
+      onClose: () => { wallet = null; walletBtn.setAttribute("aria-expanded", "false"); },
+    });
+  };
+
+  /**
+   * Signed-out picker, in the session's order (Xverse, then WalletConnect).
+   * A wallet that is not set up yet says so; an uninstalled one links out
+   * instead of failing.
+   */
   const signedOutItems = (): MenuItem[] => {
     const list = session?.providers() ?? [];
-    return list.map<MenuItem>((p) =>
-      p.installed
-        ? { label: p.label, onSelect: () => { void connect(p.id); } }
-        : { label: `${p.label} — install`, href: p.site, target: "_blank" });
+    return list.map<MenuItem>((p) => {
+      const icon = p.icon ? { icon: p.icon } : {};
+      if (!p.ready) {
+        return { label: `${p.label} — coming soon`, ...icon,
+          onSelect: () => notice(`${p.label} is coming soon`, "It needs a little setup on our side first. Xverse works today.") };
+      }
+      return p.installed
+        ? { label: p.label, ...icon, onSelect: () => { void connect(p.id); } }
+        : { label: `${p.label} — install`, ...icon, href: p.site, target: "_blank" };
+    });
   };
 
   const connect = async (id: WalletId) => {
     if (!session) return;
-    walletFull.textContent = "Connecting…";
+    walletFull.textContent = id === "xverse" ? "Check Xverse…" : "Connecting…";
     try {
       await session.connect(id);
       // render() runs off the session subscription and restores the label.
     } catch (err) {
       render();
       // Surface the wallet's own reason rather than failing silently.
-      wallet = openPopover({
-        label: "Wallet", anchor: walletBtn, ignore: [walletBtn], returnFocusTo: walletBtn,
-        body: [h("strong", {}, "Could not connect"), h("br"), (err as Error).message],
-        onClose: () => { wallet = null; walletBtn.setAttribute("aria-expanded", "false"); },
-      });
+      notice("Could not connect", (err as Error).message);
     }
   };
 
+  /** The signed-in wallet's display name — only when the profile is this same address (session/profile.ts). */
+  const nameOf = (address: string): string | null => {
+    const p = opts.profile?.current();
+    return p && p.displayName && sameAddress(p.address, address) ? p.displayName : null;
+  };
+
+  let lastPic: string | null = null;
   const render = () => {
     const acct = session?.account() ?? null;
     walletBtn.classList.toggle("is-on", acct != null);
+    const own = opts.profile?.current();
+    const pic = acct && own?.avatarUrl && sameAddress(own.address, acct.address) ? own.avatarUrl : null;
+    if (pic !== lastPic) {
+      lastPic = pic;
+      walletPic.replaceChildren(...(pic ? [avatarEl({ url: pic, name: null, seed: acct!.address, size: 16 })] : []));
+    }
     if (acct) {
-      walletFull.textContent = shortAddress(acct.address);
-      walletShort.textContent = shortAddress(acct.address, 3, 3);
-      walletBtn.title = `${acct.address} — click for Profile`;
+      const name = nameOf(acct.address);
+      walletFull.textContent = name ?? shortAddress(acct.address);
+      walletShort.textContent = name ? (name.length > 9 ? `${name.slice(0, 8)}…` : name) : shortAddress(acct.address, 3, 3);
+      walletBtn.title = `${name ? `${name} · ` : ""}${acct.address} — click for Profile`;
     } else {
       walletFull.textContent = "Connect wallet";
       walletShort.textContent = "Wallet";
-      walletBtn.title = session ? "Sign in with Phantom or MetaMask" : "Wallet login coming soon";
+      walletBtn.title = session ? "Sign in with Xverse" : "Wallet login coming soon";
     }
   };
 
@@ -174,7 +211,7 @@ export function createTaskbar(opts: TaskbarOptions): Taskbar {
     if (!session) {
       wallet = openPopover({
         label: "Wallet", anchor: walletBtn, ignore: [walletBtn], returnFocusTo: walletBtn,
-        body: [h("strong", {}, "Wallet login coming soon"), h("br"), "Phantom · MetaMask · Xverse"],
+        body: [h("strong", {}, "Wallet login coming soon"), h("br"), "Xverse · WalletConnect"],
         onClose,
       });
       return;
@@ -186,6 +223,8 @@ export function createTaskbar(opts: TaskbarOptions): Taskbar {
   });
 
   const offWallet = session?.subscribe(() => { render(); closeWallet(); });
+  // A new or changed display name relabels the button; the open menu can stay.
+  const offProfile = opts.profile?.subscribe(() => render());
   render();
 
   const clock = h("time", { class: "ph-tb-clock" }, "");
@@ -212,7 +251,7 @@ export function createTaskbar(opts: TaskbarOptions): Taskbar {
   return {
     setMode,
     destroy() {
-      offWm(); offTick(); offWallet?.();
+      offWm(); offTick(); offWallet?.(); offProfile?.();
       clearInterval(liveTimer); clearTimeout(clockTimeout);
       if (clockInterval != null) clearInterval(clockInterval);
       menu?.close(); wallet?.close();

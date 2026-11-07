@@ -1,0 +1,89 @@
+/* Suggestions window — same family as Leaderboard / Profile. Tokens come from ../shell.css. */
+.ph-sug{box-sizing:border-box;height:100%;overflow:auto;padding:0 0 22px;font:13px/1.6 var(--ph-mono);color:var(--ph-fg)}
+.ph-sug p{margin:0 0 8px}
+.ph-sug strong{color:#fff;font-weight:600}
+
+.ph-sug-head{padding:18px 22px 12px;border-bottom:1px solid var(--ph-line);background:linear-gradient(180deg,#0e0e0e,#080808)}
+.ph-sug-head h1{margin:0 0 6px;font:900 26px/1.1 var(--ph-head);letter-spacing:.04em;text-transform:uppercase;color:var(--ph-accent)}
+.ph-sug-head p{margin:0;color:var(--ph-dim)}
+
+/* Tabs (owner only): Win98 buttons; the selected one is pressed in. */
+.ph-sug-tabs{display:flex;gap:6px;padding:12px 22px 0}
+.ph-sug-tabs[hidden]{display:none}
+.ph-sug-tab{font:inherit;font-size:12px;letter-spacing:.06em;color:var(--ph-fg);background:#101010;border:1px solid #000;
+  box-shadow:inset 1px 1px 0 #2e2e2e,inset -1px -1px 0 #050505;padding:4px 14px;cursor:pointer}
+.ph-sug-tab:hover{background:#161616}
+.ph-sug-tab[aria-selected="true"]{color:var(--ph-accent);background:#0b0b0b;box-shadow:inset 1px 1px 0 #050505,inset -1px -1px 0 #2e2e2e}
+.ph-sug-tab:focus-visible{outline:1px dotted var(--ph-accent);outline-offset:-3px}
+
+.ph-sug-panel{padding:14px 22px 4px}
+.ph-sug-panel[hidden],.ph-sug-form[hidden],.ph-sug-thanks[hidden]{display:none}
+
+/* The form: sunken Win98 fields in the dark palette. */
+.ph-sug-form{display:flex;flex-direction:column;gap:12px}
+.ph-sug-field{display:flex;flex-direction:column;gap:5px}
+.ph-sug-label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ph-dim)}
+.ph-sug-input{box-sizing:border-box;width:100%;margin:0;font:13px/1.5 var(--ph-mono);color:var(--ph-fg);background:#050505;border:1px solid #000;border-radius:0;
+  box-shadow:inset 1px 1px 0 #000,inset -1px -1px 0 #2a2a2a,0 0 0 1px #1c1c1c;padding:7px 9px}
+.ph-sug-input::placeholder{color:#5c5c5c}
+.ph-sug-input:focus{outline:1px solid var(--ph-accent);outline-offset:0}
+.ph-sug-input[aria-invalid="true"]{outline:1px solid var(--ph-red);outline-offset:0}
+.ph-sug-notes{min-height:150px;resize:vertical}
+.ph-sug-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.ph-sug-as{margin:0;color:var(--ph-dim);overflow-wrap:anywhere}
+.ph-sug-count{flex:none;font-size:11px;color:var(--ph-dim);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ph-sug-count.is-near{color:var(--ph-amber)}
+.ph-sug-count.is-full{color:var(--ph-red)}
+.ph-sug-err{margin:0;color:var(--ph-red)}
+.ph-sug-err:empty{display:none}
+.ph-sug-actions{display:flex;align-items:center;gap:12px}
+.ph-sug-hint{font-size:11px;color:#5c5c5c}
+/* The honeypot: off-screen, never displayed to people. */
+.ph-sug-trap{position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden}
+
+.ph-sug-btn{font:inherit;color:var(--ph-fg);background:#101010;border:1px solid #000;box-shadow:inset 1px 1px 0 #2e2e2e,inset -1px -1px 0 #050505;padding:4px 14px;cursor:pointer}
+.ph-sug-btn:hover{background:#161616}
+.ph-sug-btn:active{box-shadow:inset 1px 1px 0 #050505,inset -1px -1px 0 #2e2e2e}
+.ph-sug-btn:focus-visible{outline:1px dotted var(--ph-accent);outline-offset:-3px}
+.ph-sug-btn[disabled]{opacity:.5;cursor:default}
+.ph-sug-btn-primary{color:var(--ph-accent);font-weight:600;padding:6px 24px}
+.ph-sug-btn-sm{font-size:11px;padding:2px 10px}
+.ph-sug-btn-del:hover,.ph-sug-btn.is-armed{color:var(--ph-red);border-color:var(--ph-red)}
+
+.ph-sug-thanks{padding:30px 4px;text-align:center}
+.ph-sug-thanks-h{margin:0 0 16px !important;font:900 19px/1.3 var(--ph-head);letter-spacing:.04em;color:var(--ph-accent)}
+
+/* Inbox */
+.ph-sug-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 10px}
+.ph-sug-meta{margin:0 !important;color:var(--ph-dim);font-size:11px}
+.ph-sug-list{display:flex;flex-direction:column;gap:8px}
+.ph-sug-empty{color:var(--ph-dim);padding:4px 0}
+.ph-sug-item{border:1px solid var(--ph-line);border-left:3px solid var(--ph-line);background:#0b0b0b;padding:9px 12px 10px}
+.ph-sug-item.is-new{border-left-color:var(--ph-accent);background:#0d110a}
+.ph-sug-item.is-done{opacity:.62}
+.ph-sug-item-head{display:flex;align-items:baseline;gap:8px}
+.ph-sug-item-title{margin:0;font:600 14px/1.4 var(--ph-mono);color:#fff;overflow-wrap:anywhere}
+.ph-sug-status{flex:none;font-size:10px;letter-spacing:.1em;padding:0 5px;border:1px solid currentColor;line-height:1.6}
+.ph-sug-status.is-new{color:var(--ph-accent)}
+.ph-sug-status.is-read{color:var(--ph-dim)}
+.ph-sug-status.is-done{color:var(--ph-amber)}
+.ph-sug-item-meta{margin:2px 0 6px !important;color:var(--ph-dim);font-size:11px}
+.ph-sug-notes-full{margin:0 !important;white-space:pre-wrap;overflow-wrap:anywhere}
+.ph-sug-more>summary{display:flex;gap:10px;align-items:baseline;cursor:pointer;list-style:none}
+.ph-sug-more>summary::-webkit-details-marker{display:none}
+.ph-sug-preview{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ph-sug-toggle{flex:none;font-size:11px;color:var(--ph-accent)}
+.ph-sug-toggle::after{content:"more ▾"}
+.ph-sug-more[open]>summary{margin:0 0 4px}
+.ph-sug-more[open] .ph-sug-preview{display:none}
+.ph-sug-more[open] .ph-sug-toggle::after{content:"less ▴"}
+.ph-sug-more>summary:focus-visible{outline:1px dotted var(--ph-accent);outline-offset:2px}
+.ph-sug-item-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+
+@media (max-width:600px){
+  .ph-sug-head{padding:14px}
+  .ph-sug-head h1{font-size:21px}
+  .ph-sug-tabs{padding:10px 14px 0}
+  .ph-sug-panel{padding:12px 14px 4px}
+  .ph-sug-hint{display:none}
+}

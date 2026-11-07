@@ -1,0 +1,57 @@
+/* Leaderboard window — same family as Profile (apps.css). Tokens come from ../shell.css. */
+.ph-lb{box-sizing:border-box;height:100%;overflow:auto;padding:0 0 24px;font:13px/1.7 var(--ph-mono);color:var(--ph-fg)}
+.ph-lb p{margin:0 0 8px}
+.ph-lb strong{color:#fff;font-weight:600}
+.ph-lb .ph-num{text-align:right}
+.ph-lb-dim{color:var(--ph-dim)}
+
+.ph-lb-head{padding:18px 22px 12px;border-bottom:1px solid var(--ph-line);background:linear-gradient(180deg,#0e0e0e,#080808)}
+.ph-lb-head h1{margin:0 0 6px;font:900 26px/1.1 var(--ph-head);letter-spacing:.04em;text-transform:uppercase;color:var(--ph-amber)}
+.ph-lb-note{color:var(--ph-dim)}
+.ph-lb-badge{display:inline-block;padding:1px 6px;margin-right:4px;font-size:10px;letter-spacing:.1em;color:var(--ph-amber);border:1px solid currentColor;line-height:1.5}
+
+.ph-lb-sec{padding:14px 22px 4px;border-bottom:1px solid var(--ph-line)}
+.ph-lb-sec h2{margin:0 0 12px;font:900 13px/1 var(--ph-head);letter-spacing:.14em;text-transform:uppercase;color:var(--ph-fg);
+  padding:6px 9px;background:#101010;border:1px solid #000;box-shadow:inset 1px 1px 0 #2e2e2e,inset -1px -1px 0 #050505}
+
+/* Tabs: Win98 buttons; the selected one is pressed in. */
+.ph-lb-tabs{display:flex;gap:6px;margin:0 0 10px}
+.ph-lb-tab{font:inherit;font-size:12px;letter-spacing:.06em;color:var(--ph-fg);background:#101010;border:1px solid #000;
+  box-shadow:inset 1px 1px 0 #2e2e2e,inset -1px -1px 0 #050505;padding:4px 14px;cursor:pointer}
+.ph-lb-tab:hover{background:#161616}
+.ph-lb-tab[aria-selected="true"]{color:var(--ph-accent);background:#0b0b0b;box-shadow:inset 1px 1px 0 #050505,inset -1px -1px 0 #2e2e2e}
+.ph-lb-tab:focus-visible{outline:1px dotted var(--ph-accent);outline-offset:-3px}
+
+.ph-lb-scroll{overflow-x:auto;margin:0 0 10px;border:1px solid var(--ph-line)}
+.ph-lb-table{border-collapse:collapse;width:100%;min-width:460px;font-variant-numeric:tabular-nums}
+.ph-lb-table th,.ph-lb-table td{padding:6px 10px;text-align:left;border-bottom:1px solid var(--ph-line);font-weight:400;white-space:nowrap}
+.ph-lb-table thead th{background:#101010;color:var(--ph-dim);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.ph-lb-table tbody tr:last-child th,.ph-lb-table tbody tr:last-child td{border-bottom:0}
+.ph-lb-table tbody tr:hover{background:rgba(230,230,230,.03)}
+.ph-lb-table tbody tr.is-you{background:rgba(143,209,79,.08)}
+.ph-lb-table .ph-num{text-align:right}
+
+.ph-lb-rank{width:2.5em;text-align:right;color:var(--ph-dim)}
+.ph-lb-rank.is-top1{color:#ffd24a;font-weight:700}
+.ph-lb-rank.is-top2{color:#d8dde6;font-weight:700}
+.ph-lb-rank.is-top3{color:#d08a4c;font-weight:700}
+.ph-lb-best{color:var(--ph-accent)}
+.ph-lb-you{margin-left:8px;padding:0 5px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ph-accent);border:1px solid currentColor}
+
+.ph-lb-meta{color:var(--ph-dim);font-size:11px}
+.ph-lb-empty{padding:4px 0 8px;color:var(--ph-fg)}
+
+.ph-lb-stats{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.ph-lb-stat{flex:1 1 140px;padding:10px 12px;border:1px solid var(--ph-line);background:#0c0c0c;display:flex;flex-direction:column;gap:1px}
+.ph-lb-stat-v{font:900 21px/1.1 var(--ph-head);letter-spacing:.03em;color:var(--ph-accent);font-variant-numeric:tabular-nums}
+.ph-lb-stat-l{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ph-fg)}
+.ph-lb-stat-n{font-size:11px;color:var(--ph-dim);line-height:1.5}
+
+.ph-lb-chip{display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.ph-lb-swatch{width:11px;height:11px;flex:none;border:1px solid rgba(0,0,0,.7);box-shadow:0 0 0 1px rgba(230,230,230,.25)}
+
+@media (max-width:600px){
+  .ph-lb-head{padding:14px}
+  .ph-lb-head h1{font-size:21px}
+  .ph-lb-sec{padding:12px 14px 4px}
+}

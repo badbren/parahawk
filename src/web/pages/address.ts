@@ -6,9 +6,9 @@ import { computeOdometer } from "../../math/work.js";
 import { oddsForWork } from "../../math/odds.js";
 import { potMathFromOverview } from "../../services/potmath.js";
 import { getBravocadoFloor } from "../../services/bravocado.js";
-import { stakeValue } from "../../math/potmath.js";
-import { PHD_TO_DIFF } from "../../math/constants.js";
+import { roundStake } from "../../services/round-stake.js";
 import { BADGE_DEFS } from "../../data/badges.js";
+import { profilePath, walletNames } from "../addr.js";
 import {
   fmtHashrate,
   fmtDiff,
@@ -65,13 +65,16 @@ export async function renderAddress(addressRaw: string): Promise<string> {
     });
   }
 
-  const [o, u, hits, snaps, floor] = await Promise.all([
+  const [o, u, hits, snaps, floor, names] = await Promise.all([
     getOverview(),
     getUserStats(address),
     getStore().getHitsForAddress(address, 25).catch(() => []),
     getStore().getAddressSnapshots(address, 500).catch(() => [] as AddressSnapshot[]),
     getBravocadoFloor().catch(() => null),
+    // The owner's Parahawk name, when they made a profile and left privacy off.
+    walletNames([address]),
   ]);
+  const ownerName = names.get(address) ?? null;
 
   // Record a snapshot of this visit so the hashrate timeline builds up over time
   // (Parasite has no historical per-address hashrate endpoint), and index this
@@ -105,51 +108,13 @@ export async function renderAddress(addressRaw: string): Promise<string> {
       ? `≈ ${cadoValueBtc.toFixed(4)} BTC${cadoValueUsd > 0 ? ` (~${fmtUsd(cadoValueUsd)})` : ""} at ${floor.floorBtc} BTC floor`
       : "10T+ shares that earned a Bravocado";
 
-  // Your stake in the CURRENT pot = (your work this round / pool work this round)
-  // × pot. Parasite exposes no per-wallet round work — but total_diff is this
-  // wallet's LIFETIME cumulative work (a monotonic counter we store in every
-  // snapshot), so work-this-round = current total_diff − total_diff at the last
-  // block. The delta of two total_diff readings is EXACT work done between them.
-  // We baseline each tracked wallet at round start; accurate for wallets tracked
-  // since the last block, a floor for ones we've only just started watching.
-  const lastBlockMs = Date.now() - o.potAge.hours * 3_600_000;
-  const roundMs = Math.max(1, Date.now() - lastBlockMs);
-  const wDiff = pm.W * 1e12; // pool's total round work, in difficulty units
-  const inRound = snaps
-    .filter((s) => s.ts >= lastBlockMs && s.totalWork > 0)
-    .sort((a, b) => a.ts - b.ts);
-  const baseline = inRound[0] ?? null;
-  // A baseline only helps if we captured it NEAR round start; otherwise it just
-  // marks when we began watching (mid-round) and would undercount badly.
-  const nearStart = baseline !== null && baseline.ts - lastBlockMs < 0.2 * roundMs;
-  let roundWorkDiff: number;
-  let assumedFull: boolean;
-  if (nearStart && u.totalWorkDiff >= baseline!.totalWork) {
-    // Exact: growth in total_diff since a round-start baseline.
-    roundWorkDiff = Math.max(0, u.totalWorkDiff - baseline!.totalWork);
-    assumedFull = false;
-  } else {
-    // No round-start baseline — treat this wallet's ALL-TIME work as this round's.
-    // Exact for anyone who started at/after the last block (most renters + new
-    // miners); an over-estimate for miners who ran in earlier rounds too. Capped
-    // at the pool's total round work as a sanity bound.
-    roundWorkDiff = Math.min(u.totalWorkDiff, wDiff);
-    assumedFull = true;
-  }
-  const roundG = roundWorkDiff / 1e9;
-  const roundPhd = roundWorkDiff / PHD_TO_DIFF;
-  const roundPct = wDiff > 0 ? (roundWorkDiff / wDiff) * 100 : 0;
-  const stakeSats = stakeValue(roundG, pm.W);
-  const stakeUsd = btc > 0 ? (stakeSats / 1e8) * btc : 0;
-
-  // Rental-based estimate: delivered work on this wallet's ACTIVE Refinery orders
-  // (running now = this round). A data-grounded figure for renters that works
-  // even before a total_diff baseline exists.
-  const rentalRoundPhd = u.orders
-    .filter((ord) => ord.status === "active")
-    .reduce((s, ord) => s + (ord.deliveredPhd ?? (ord.requestedPhd * ord.progressPercent) / 100), 0);
-  const rentalStakeSats = stakeValue((rentalRoundPhd * PHD_TO_DIFF) / 1e9, pm.W);
-  const rentalStakeUsd = btc > 0 ? (rentalStakeSats / 1e8) * btc : 0;
+  // Your stake in the CURRENT pot, and the same from active rentals alone — the
+  // math (and why it's measured this way) lives in services/round-stake.ts, which
+  // the Profile's Parahawk section shares.
+  const { wDiff, roundPhd, roundPct, assumedFull, stakeSats, stakeUsd, rentalRoundPhd, rentalStakeSats, rentalStakeUsd } = roundStake({
+    now: Date.now(), potAgeHours: o.potAge.hours, potW: pm.W, btcUsd: btc,
+    totalWorkDiff: u.totalWorkDiff, orders: u.orders, snapshots: snaps,
+  });
   const luck = odo.luckRatio >= 1.1 ? "🍀 luckier than expected" : odo.luckRatio <= 0.9 ? "🥲 below expectation" : "≈ on expectation";
   const luckClass = odo.luckRatio >= 1.1 ? "green" : odo.luckRatio <= 0.9 ? "red" : "amber";
 
@@ -227,11 +192,12 @@ export async function renderAddress(addressRaw: string): Promise<string> {
 <div class="wallethead">
   <div class="wh-l">
     <div class="k">Wallet · Parasite mining stats</div>
-    <h1 style="margin:4px 0 6px">${esc(shortAddr)}</h1>
+    <h1 style="margin:4px 0 6px">${esc(shortAddr)}${ownerName ? ` <span class="pname-h">(${esc(ownerName)})</span>` : ""}</h1>
     <div class="addr" style="word-break:break-all">${esc(address)}</div>
     ${u.lnAddress ? `<div class="muted-note" style="margin-top:4px">⚡ ${esc(u.lnAddress)}</div>` : ""}
   </div>
   <div class="wh-r">
+    ${ownerName ? `<a class="chip" href="${esc(profilePath(address))}" data-ph-open="${esc(profilePath(address))}">👤 View ${esc(ownerName)}'s profile →</a>` : ""}
     ${u.uptime ? `<span class="chip">up ${esc(u.uptime)}</span>` : ""}
     ${u.workers ? `<span class="chip">${fmtInt(u.workers)} workers</span>` : ""}
     <span class="chip ${u.hashratePhs > 0 ? "green" : "dim"}">${u.hashratePhs > 0 ? `${fmtHashrate(u.hashratePhs)} live` : "idle"}</span>
@@ -353,6 +319,9 @@ ${
 .wallethead .addr{color:var(--green);font-size:15px}
 .wh-r{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .chip{border:1px solid var(--line);background:#0d0d0d;padding:5px 12px;font-size:14px;color:var(--dim);white-space:nowrap}
+a.chip{color:var(--green);border-color:#33501f;text-decoration:none}
+a.chip:hover{background:#0d1408;color:#c7f59a}
+.pname-h{color:var(--green);font-size:.62em;font-weight:400;vertical-align:middle;white-space:nowrap}
 .chip.green{color:var(--green);border-color:#33501f}
 .badges{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px}
 .badge{border:1px solid var(--line);background:#0a0a0a;padding:14px 10px;text-align:center}

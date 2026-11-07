@@ -1,0 +1,13 @@
+/* Profile pictures (avatar.ts): round, with a lettered stand-in underneath that
+   shows when there's no picture or it fails to load. Size and stand-in hue come
+   from inline custom properties (--av, --av-h). */
+.ph-av{position:relative;flex:none;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;
+  width:var(--av,28px);height:var(--av,28px);border-radius:50%;overflow:hidden;
+  background:hsl(var(--av-h,90) 38% 24%);color:#f2f2f2;border:1px solid #000;box-shadow:0 0 0 1px rgba(230,230,230,.16);
+  font:700 calc(var(--av,28px) * .44)/1 var(--ph-mono);user-select:none;-webkit-user-select:none}
+.ph-av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+
+/* The taskbar wallet button's little picture (taskbar.ts). */
+.ph-tb-wallet .ph-av{margin-right:6px;vertical-align:-3px;box-shadow:none}
+.ph-tb-wallet-pic{display:inline-flex}
+.ph-tb-wallet-pic:empty{display:none}

@@ -4,17 +4,18 @@ import { getOverview } from "../../services/overview.js";
 import { computePoolHealth } from "../../services/poolhealth.js";
 import { getPoolStatsSeries, type PoolSeries } from "../../data/parasite.js";
 import { fmtInt, fmtDiff, fmtPhd, fmtDuration, esc, jsonForScript } from "../format.js";
+import { nameTag, walletNames, type WalletNames } from "../addr.js";
 
 function maskAddr(a: string): string {
   if (a.includes("...") || a.includes("…")) return a;
   return `${a.slice(0, 12)}…${a.slice(-4)}`;
 }
 
-function addrCell(a: string): string {
+function addrCell(a: string, names?: WalletNames): string {
   const masked = a.includes("...") || a.includes("…");
   return masked
     ? `<span class="dim">${esc(maskAddr(a))}</span>`
-    : `<a href="/address/${esc(a)}">${esc(maskAddr(a))}</a>`;
+    : `<a href="/address/${esc(a)}">${esc(maskAddr(a))}</a>${nameTag(a, names)}`;
 }
 
 function labelOf(ms: number): string {
@@ -143,21 +144,22 @@ export async function renderHistory(): Promise<string> {
     histCounts,
   });
 
+  // The 40 newest hits are what the table shows; their owners' names in one lookup.
+  const shownHits = h.hits.slice().sort((a, b) => b.ts - a.ts).slice(0, 40);
+  const names = await walletNames(shownHits.map((x) => x.address));
+
   const hitsTable =
     h.hits.length === 0
       ? `<p class="muted-note">No 10T+ hits collected in this window yet.</p>`
       : `<table>
           <tr><th>When</th><th>Tier</th><th>Address</th><th>Difficulty</th><th>Order</th><th>Worker</th></tr>
-          ${h.hits
-            .slice()
-            .sort((a, b) => b.ts - a.ts)
-            .slice(0, 40)
+          ${shownHits
             .map((x) => {
               const tierClass = x.tier === "21T" ? "amber" : x.tier === "10T" ? "red" : "dim";
               return `<tr>
                 <td class="dim">${esc(new Date(x.ts).toLocaleString("en-US"))}</td>
                 <td class="${tierClass}">${esc(x.tier)}</td>
-                <td>${addrCell(x.address)}</td>
+                <td>${addrCell(x.address, names)}</td>
                 <td>${fmtDiff(x.difficulty)}</td>
                 <td>${x.orderId ? esc(x.orderId) : "<span class='dim'>—</span>"}</td>
                 <td class="dim">${x.worker ? esc(x.worker) : "—"}</td>

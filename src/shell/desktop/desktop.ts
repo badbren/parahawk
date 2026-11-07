@@ -7,13 +7,18 @@
  * are kept in the store ("desktop.hidden") and listed inside the bin window.
  */
 import type { AppSpec } from "./registry";
-import { ICONS } from "./registry";
+import { DESKTOP_ORDER, ICONS, appForPath } from "./registry";
 import type { WindowId, WindowManager, WindowSpec, WmMode } from "../wm/types";
 import type { KeyValueStore } from "../session/store";
 import type { WalletSession } from "../session/wallet";
 import type { PracticeLedger } from "../session/ledger";
+import type { ServerSession } from "../session/me";
+import type { ProfileSession } from "../session/profile";
 import type { TickFeed } from "../data/tick";
 import { h } from "../util/dom";
+import { isMotionReduced, readMotionPref } from "../util/motion";
+import { iconBadges } from "./icon-badges";
+import { launchFor } from "./launch";
 import { createHiddenApps } from "./hidden";
 import { createTaskbar } from "./taskbar";
 import { mountRecycleBin } from "./recycle-bin";
@@ -30,8 +35,12 @@ export interface DesktopOptions {
   tick: TickFeed;
   /** Wallet sign-in. Apps flagged `requiresWallet` appear only while connected. */
   wallet?: WalletSession;
-  /** Practice progress — ore banked and Blacks claimed. */
+  /** Practice progress — ore banked and Whites claimed. */
   ledger?: PracticeLedger;
+  /** The server session. Apps flagged `requiresAdmin` appear only while it is the owner's. */
+  me?: ServerSession;
+  /** The signed-in person's Parahawk profile (display name). */
+  profile?: ProfileSession;
   mode: WmMode;
   /** Shell-level items appended to both the desktop context menu and the start menu (e.g. wallpaper motion). */
   extraMenuItems?: () => MenuItem[];
@@ -40,6 +49,8 @@ export interface DesktopOptions {
 export interface Desktop {
   /** Open an app by registry id; `path` is the deep link for iframe apps. Returns the window id or null if unknown/hidden. */
   openApp(id: string, path?: string | null): WindowId | null;
+  /** Open whichever app a site path belongs to (see registry appForPath). */
+  openPath(path: string): WindowId | null;
   setMode(mode: WmMode): void;
   destroy(): void;
 }
@@ -48,10 +59,9 @@ const BIN_ID = "recycle-bin";
 const DRAG_THRESHOLD_PX = 6;
 
 export function createDesktop(opts: DesktopOptions): Desktop {
-  const { iconsRoot, taskbarRoot, wm, apps, tick, wallet, ledger } = opts;
+  const { iconsRoot, taskbarRoot, wm, apps, tick, wallet, ledger, me, profile } = opts;
   const hidden = createHiddenApps(opts.store);
   const area = iconsRoot.parentElement ?? iconsRoot;
-  const classicHref = () => location.pathname + "?classic=1";
 
   iconsRoot.classList.add("ph-icons");
   if (!iconsRoot.getAttribute("role")) iconsRoot.setAttribute("role", "group");
@@ -60,15 +70,22 @@ export function createDesktop(opts: DesktopOptions): Desktop {
   const icons = new Map<string, HTMLButtonElement>();
   let selectedId: string | null = null;
 
-  /** An app the user can see right now: not feature-flagged off, not in the bin, wallet gate satisfied. */
+  /** An app the user can see right now: not feature-flagged off, not in the bin, wallet and owner gates satisfied. */
   const available = (a: AppSpec): boolean =>
-    !a.hidden && (!a.requiresWallet || wallet?.account() != null);
+    !a.hidden && (!a.requiresWallet || wallet?.account() != null) && (!a.requiresAdmin || me?.isAdmin() === true);
 
   const shownApps = (): AppSpec[] => {
-    const list = apps.filter((a) => available(a) && (a.system || !hidden.has(a.id)));
-    return [...list.filter((a) => a.system), ...list.filter((a) => !a.system)];
+    // noIcon apps (someone's public profile) open from links only.
+    const list = apps.filter((a) => available(a) && !a.noIcon && (a.system || !hidden.has(a.id)));
+    // DESKTOP_ORDER first (the owner's order), then anything unlisted in registry order.
+    const rank = (a: AppSpec) => { const i = DESKTOP_ORDER.indexOf(a.id); return i < 0 ? DESKTOP_ORDER.length + apps.indexOf(a) : i; };
+    const ordered = [...list].sort((x, y) => rank(x) - rank(y));
+    return [...ordered.filter((a) => a.system), ...ordered.filter((a) => !a.system)];
   };
-  const iconSrc = (app: AppSpec) => (app.id === BIN_ID && hidden.list().length > 0 ? ICONS.recycleBinFull : app.icon);
+  // Only apps that still exist count: an icon that was removed from the desktop
+  // (e.g. Pool, now a Parahawk tab) must not leave the bin looking full forever.
+  const binFull = () => hidden.list().some((id) => apps.some((a) => a.id === id));
+  const iconSrc = (app: AppSpec) => (app.id === BIN_ID && binFull() ? ICONS.recycleBinFull : app.icon);
 
   const select = (id: string | null, focus = false) => {
     selectedId = id;
@@ -88,7 +105,29 @@ export function createDesktop(opts: DesktopOptions): Desktop {
       h("img", { src: iconSrc(app), alt: "", draggable: "false" }),
       h("span", { class: "ph-icon-label", "aria-hidden": "true" }, app.label));
     if (app.system) el.dataset.system = "1";
+    // Not launched yet (AppSpec.comingSoon): greyed out, says so on hover and on click.
+    if (app.comingSoon) {
+      el.classList.add("is-soon");
+      el.title = `${app.label} — ${app.comingSoon}`;
+      el.setAttribute("aria-disabled", "true");
+    }
     return el;
+  };
+
+  /** The app's badge (icon-badges.ts), drawn on the icon's corner; read out with its name. */
+  const paintBadge = (app: AppSpec, el: HTMLButtonElement) => {
+    const badge = iconBadges.get(app.id);
+    let mark = el.querySelector<HTMLElement>(".ph-icon-badge");
+    if (!badge) {
+      mark?.remove();
+      el.setAttribute("aria-label", app.label);
+      return;
+    }
+    if (!mark) { mark = h("span", { class: "ph-icon-badge", "aria-hidden": "true" }); el.append(mark); }
+    mark.textContent = badge.text;
+    // The pulse follows the desktop's motion setting (util/motion.ts), not just the OS.
+    mark.toggleAttribute("data-pulse", badge.pulse === true && !isMotionReduced(readMotionPref(opts.store)));
+    el.setAttribute("aria-label", badge.label ? `${app.label} — ${badge.label}` : app.label);
   };
 
   const renderIcons = () => {
@@ -102,6 +141,7 @@ export function createDesktop(opts: DesktopOptions): Desktop {
       const img = el.querySelector("img");
       const src = iconSrc(app);
       if (img && img.getAttribute("src") !== src) img.src = src;
+      paintBadge(app, el);
       ordered.push(el);
     }
     iconsRoot.replaceChildren(...ordered);
@@ -109,17 +149,52 @@ export function createDesktop(opts: DesktopOptions): Desktop {
     select(selectedId);
   };
 
+  // ── Coming soon ──────────────────────────────────────────────────────────
+  /** A short "Coming soon" bubble beside a greyed-out icon; one at a time. */
+  let soonNote: { el: HTMLElement; timer: number } | null = null;
+  const showSoon = (app: AppSpec) => {
+    if (soonNote) { clearTimeout(soonNote.timer); soonNote.el.remove(); soonNote = null; }
+    const icon = icons.get(app.id);
+    if (!icon) return;
+    const el = h("span", { class: "ph-icon-soon", role: "status" }, app.comingSoon ?? "Coming soon");
+    icon.append(el);
+    const timer = window.setTimeout(() => { el.remove(); if (soonNote?.el === el) soonNote = null; }, 2200);
+    soonNote = { el, timer };
+  };
+
   // ── Open ─────────────────────────────────────────────────────────────────
   const buildSpec = (app: AppSpec, path: string | null, launcher: HTMLElement | null): WindowSpec => {
-    const spec = app.open({ path, launcher, tick, wallet, ledger });
+    const spec = app.open({
+      path, launcher, tick, wallet, ledger, me, profile,
+      openApp: (id) => { openApp(id); },
+      openPath: (p) => { openPath(p); },
+    });
     if (app.id !== BIN_ID) return spec;
     return { ...spec, content: { kind: "element", mount: (host) => mountRecycleBin(host, { apps, hidden }) } };
   };
 
   const openApp = (id: string, path: string | null = null): WindowId | null => {
     const app = apps.find((a) => a.id === id);
-    if (!app || !available(app)) return null;
-    return wm.open(buildSpec(app, path, icons.get(id) ?? null));
+    const launch = launchFor(app, available);
+    if (launch === "soon") { showSoon(app!); return null; }
+    if (launch !== "open" || !app) return null;
+    const win = wm.open(buildSpec(app, path, icons.get(id) ?? null));
+    if (win != null) iconBadges.notifyOpened(id);
+    return win;
+  };
+
+  const openPath = (path: string): WindowId | null => {
+    const id = appForPath(path);
+    const target = apps.find((a) => a.id === id);
+    if (target?.comingSoon) return openApp(id, path);
+    // An owner-only app (Admin) reached by a deep link before /api/me has
+    // answered: ask the server first, rather than dropping the link into the
+    // Parahawk window. Anyone else gets nothing opened.
+    if (target?.requiresAdmin && me && !me.isAdmin()) {
+      void me.refresh().then((now) => { if (now.admin) openApp(id, path); });
+      return null;
+    }
+    return openApp(id, path) ?? (id === "parahawk" ? null : openApp("parahawk", path));
   };
 
   // ── Selection + keyboard ─────────────────────────────────────────────────
@@ -181,7 +256,8 @@ export function createDesktop(opts: DesktopOptions): Desktop {
         { const r = el.getBoundingClientRect(); showContextMenu(r.left + r.width / 2, r.top + r.height / 2, el); }
         return;
       case "Delete":
-        if (!el.dataset.system) { ev.preventDefault(); hideApp(id); }
+        // Hiding goes through the bin; with no bin on the desktop, Delete does nothing.
+        if (!el.dataset.system && binEl()) { ev.preventDefault(); hideApp(id); }
         return;
     }
   };
@@ -219,7 +295,7 @@ export function createDesktop(opts: DesktopOptions): Desktop {
     }
     const id = appIdOf(el);
     select(id);
-    if (ev.button !== 0 || ev.pointerType === "touch" || el.dataset.system) return;
+    if (ev.button !== 0 || ev.pointerType === "touch" || el.dataset.system || !binEl()) return;
     drag = { el, id, pointerId: ev.pointerId, x0: ev.clientX, y0: ev.clientY, ghost: null, over: null };
   };
 
@@ -256,7 +332,11 @@ export function createDesktop(opts: DesktopOptions): Desktop {
   const onClick = (ev: MouseEvent) => {
     if (suppressClick) { suppressClick = false; ev.preventDefault(); ev.stopPropagation(); return; }
     const el = iconOf(ev.target);
-    if (el) select(appIdOf(el));
+    if (!el) return;
+    const id = appIdOf(el);
+    select(id);
+    const app = apps.find((a) => a.id === id);
+    if (app?.comingSoon) showSoon(app);
   };
   const onDblClick = (ev: MouseEvent) => {
     const el = iconOf(ev.target);
@@ -270,9 +350,8 @@ export function createDesktop(opts: DesktopOptions): Desktop {
   const menuItems = (): MenuItem[] => [
     { label: "Open Parahawk", onSelect: () => openApp("parahawk") },
     { label: "Refresh data", onSelect: () => { void tick.refresh(); } },
-    { label: "Show hidden apps", onSelect: () => openApp(BIN_ID) },
+    ...(binFull() ? [{ label: "Show hidden apps", onSelect: () => { openApp(BIN_ID); } }] : []),
     ...(opts.extraMenuItems?.() ?? []),
-    { label: "Classic site", href: classicHref(), target: "_top" },
   ];
   const showContextMenu = (x: number, y: number, returnFocusTo: HTMLElement | null) => {
     ctx?.close();
@@ -288,17 +367,28 @@ export function createDesktop(opts: DesktopOptions): Desktop {
 
   // ── Taskbar ──────────────────────────────────────────────────────────────
   const taskbar = createTaskbar({
-    root: taskbarRoot, wm, tick, mode: opts.mode, wallet,
+    root: taskbarRoot, wm, tick, mode: opts.mode, wallet, profile,
     openProfile: () => { openApp("profile"); },
     startItems: () => [
-      ...shownApps().filter((a) => !a.system).map<MenuItem>((a) => ({ label: a.label, icon: a.icon, onSelect: () => openApp(a.id) })),
-      { label: "Show hidden apps", icon: ICONS.recycleBin, onSelect: () => openApp(BIN_ID) },
+      ...shownApps().filter((a) => !a.system && !a.comingSoon).map<MenuItem>((a) => ({ label: a.label, icon: a.icon, onSelect: () => openApp(a.id) })),
+      ...(binFull() ? [{ label: "Show hidden apps", icon: ICONS.recycleBin, onSelect: () => { openApp(BIN_ID); } }] : []),
       ...(opts.extraMenuItems?.() ?? []),
-      { label: "Classic site", href: classicHref(), target: "_top" },
     ],
   });
 
   // ── Wire up ──────────────────────────────────────────────────────────────
+  // A site page (iframe) asks for a path to open in its own window, e.g. the
+  // "(name)" next to a wallet opens that person's profile: { ph: "open", path }.
+  // Same-origin senders and same-origin paths only.
+  const onFrameOpen = (ev: MessageEvent) => {
+    if (ev.origin !== location.origin) return;
+    const d = ev.data as { ph?: unknown; path?: unknown } | null;
+    if (!d || d.ph !== "open" || typeof d.path !== "string") return;
+    const p = d.path;
+    if (!p.startsWith("/") || p.startsWith("//") || p.startsWith("/\\")) return;
+    openPath(p);
+  };
+  window.addEventListener("message", onFrameOpen);
   area.addEventListener("pointerdown", onPointerDown);
   area.addEventListener("pointermove", onPointerMove);
   area.addEventListener("pointerup", onPointerUp);
@@ -308,6 +398,7 @@ export function createDesktop(opts: DesktopOptions): Desktop {
   iconsRoot.addEventListener("dblclick", onDblClick);
   iconsRoot.addEventListener("keydown", onKeyDown);
   const offHidden = hidden.subscribe(renderIcons);
+  const offBadges = iconBadges.subscribe(renderIcons);
   // Signing in adds the Profile icon; signing out takes it away — and closes the
   // window with it, so a signed-out desktop never leaves an orphaned Profile open.
   let sawAccount = wallet?.account() != null;
@@ -315,6 +406,11 @@ export function createDesktop(opts: DesktopOptions): Desktop {
     const has = acct != null;
     if (!has && sawAccount) wm.close("profile");
     sawAccount = has;
+    renderIcons();
+  });
+  // Same for owner-only icons, keyed off the server session.
+  const offMe = me?.subscribe((now) => {
+    if (!now.admin) for (const a of apps) if (a.requiresAdmin) wm.close(a.id);
     renderIcons();
   });
 
@@ -327,12 +423,17 @@ export function createDesktop(opts: DesktopOptions): Desktop {
 
   return {
     openApp,
+    openPath,
     setMode,
     destroy() {
       endDrag(false);
       ctx?.close();
       offHidden();
+      offBadges();
+      if (soonNote) { clearTimeout(soonNote.timer); soonNote = null; }
+      window.removeEventListener("message", onFrameOpen);
       offWallet?.();
+      offMe?.();
       taskbar.destroy();
       area.removeEventListener("pointerdown", onPointerDown);
       area.removeEventListener("pointermove", onPointerMove);

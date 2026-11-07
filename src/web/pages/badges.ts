@@ -3,7 +3,7 @@ import { getBadgesIndex, getBadgeHolders } from "../../services/badges.js";
 import { getAddressResolver } from "../../services/winners.js";
 import { getBadgeBaseline24h, recordBadgeSnapshot } from "../../services/badge-trends.js";
 import { BADGE_DEFS, BADGE_BY_KEY, badgeDefFor } from "../../data/badges.js";
-import { walletCell } from "../addr.js";
+import { walletCell, walletNames } from "../addr.js";
 import { fmtInt, esc } from "../format.js";
 
 /** 24h growth pill: how many MORE wallets hold this badge than ~24h ago. Shown
@@ -38,8 +38,12 @@ export async function renderBadges(): Promise<string> {
     getAddressResolver().catch(() => (() => null) as (m: string) => string | null),
     getBadgeBaseline24h().catch(() => null),
   ]);
-  // Record a throttled snapshot so the 24h series keeps building (best-effort).
-  await recordBadgeSnapshot(idx.totals, idx.holders).catch(() => {});
+  // Record a throttled snapshot so the 24h series keeps building (best-effort),
+  // and look up the profile names for the "most badges" board alongside it.
+  const [, names] = await Promise.all([
+    recordBadgeSnapshot(idx.totals, idx.holders).catch(() => {}),
+    walletNames(idx.mostBadges.map((m) => m.address), resolve),
+  ]);
 
   // Surface any badge key Parasite reports that we haven't hand-labelled yet, so
   // nothing (e.g. "3 different asset types collected") is invisible on the board.
@@ -74,7 +78,7 @@ export async function renderBadges(): Promise<string> {
             const icons = m.keys
               .map((k) => BADGE_BY_KEY[k]?.emoji ?? "•")
               .join(" ");
-            return `<tr><td class="dim">${i + 1}</td><td>${walletCell(m.address, resolve)}</td><td class="bemoji">${icons}</td><td>${m.distinct} type${m.distinct === 1 ? "" : "s"} <span class="dim">· ${fmtInt(m.total)} total</span></td></tr>`;
+            return `<tr><td class="dim">${i + 1}</td><td>${walletCell(m.address, resolve, names)}</td><td class="bemoji">${icons}</td><td>${m.distinct} type${m.distinct === 1 ? "" : "s"} <span class="dim">· ${fmtInt(m.total)} total</span></td></tr>`;
           })
           .join("");
 
@@ -114,6 +118,7 @@ export async function renderBadgeHolders(typeRaw: string): Promise<string> {
     getBadgeHolders(type),
     getAddressResolver().catch(() => (() => null) as (m: string) => string | null),
   ]);
+  const names = await walletNames(holders.map((h) => h.address), resolve);
 
   const rows =
     holders.length === 0
@@ -121,7 +126,7 @@ export async function renderBadgeHolders(typeRaw: string): Promise<string> {
       : holders
           .map(
             (h, i) =>
-              `<tr><td class="dim">${i + 1}</td><td>${walletCell(h.address, resolve)}</td><td>${h.count > 1 ? `×${fmtInt(h.count)}` : "✓"}</td></tr>`,
+              `<tr><td class="dim">${i + 1}</td><td>${walletCell(h.address, resolve, names)}</td><td>${h.count > 1 ? `×${fmtInt(h.count)}` : "✓"}</td></tr>`,
           )
           .join("");
 

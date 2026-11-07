@@ -9,6 +9,7 @@ import { renderHistory } from "./pages/history.js";
 import { renderAbout } from "./pages/about.js";
 import { renderChangelog } from "./pages/changelog.js";
 import { renderBadges, renderBadgeHolders } from "./pages/badges.js";
+import { renderLeaderboard, parseBoardWindow } from "./pages/leaderboard.js";
 import { renderPotMath } from "./pages/potmath.js";
 import { potMathFromOverview, getPotMathTrend } from "../services/potmath.js";
 import { potMathCard } from "./potmath-card.js";
@@ -41,11 +42,22 @@ import { nhCheckAuth, nhCreatePool, nhPlaceOrder } from "../data/venues/nicehash
 import { POOL_TARGETS } from "./marketplace-wizard.js";
 import { renderAddress } from "./pages/address.js";
 import { getOverview } from "../services/overview.js";
+import { blocksFound } from "../services/pool-blocks.js";
 import { getPoolStatsSeries, type PoolWindow } from "../data/parasite.js";
 import { getHistory, type Point } from "../services/history.js";
 import { POTMATH_CLIENT_JS } from "./potmath-client.js";
 import { renderPage } from "./layout.js";
 import { renderDesktopPage, sanitizeOpenPath, computeAssetVersion } from "./desktop-page.js";
+import { artRouter } from "./art-routes.js";
+import { gameRouter } from "./game-routes.js";
+import { profileRouter } from "./profile-routes.js";
+import { chatRouter } from "./chat-routes.js";
+import { suggestionsRouter } from "./suggestion-routes.js";
+import { activityRouter } from "./activity-routes.js";
+import { inscribeRouter } from "./inscribe-routes.js";
+import { priceRouter } from "./price-routes.js";
+import { adminRouter } from "./admin-routes.js";
+import { recordActivity } from "../activity/record.js";
 import { PHD_TO_DIFF } from "../math/constants.js";
 import { getBlockTimestamp } from "../data/mempool.js";
 
@@ -135,6 +147,10 @@ export function createServer(): express.Express {
     }),
   );
 
+  // The Snipers art (art-routes.ts). Ahead of the global limiter on purpose: a
+  // gallery is many small pictures, so it carries its own, more generous cap.
+  app.use("/art", artRouter());
+
   // Rate limiting (finding #2): a generous global cap plus a tighter cap on the
   // upstream-fanning /address and /api/* routes.
   const globalLimiter = rateLimit({
@@ -159,16 +175,22 @@ export function createServer(): express.Express {
     try {
       const o = await getOverview();
       const work = o.pool.workSinceLastBlockDiff ?? 0;
-      // Exact block time (same cached mempool lookup the pot-age code uses).
-      const lastFoundAtMs = await getBlockTimestamp(o.pool.lastFoundHeight).catch(() => null);
+      const lastFound = o.pool.lastFoundHeight > 0 ? o.pool.lastFoundHeight : null;
+      // Exact block time (same cached mempool lookup the pot-age code uses), and the all-time
+      // found-block count (services/pool-blocks.ts, cached 10 min) for the desktop intro + wallpaper.
+      const [lastFoundAtMs, found] = await Promise.all([
+        getBlockTimestamp(o.pool.lastFoundHeight).catch(() => null),
+        blocksFound(lastFound).catch(() => null),
+      ]);
       res.set("Cache-Control", "public, s-maxage=10, stale-while-revalidate=30");
       res.json({
         hashratePhs: o.pool.poolHashratePhs,
         avg1dPhs: o.pool.avg1dPhs > 0 ? o.pool.avg1dPhs : null,
         difficulty: o.pool.networkDifficulty,
         height: o.chain.height,
-        lastFoundHeight: o.pool.lastFoundHeight > 0 ? o.pool.lastFoundHeight : null,
+        lastFoundHeight: lastFound,
         lastFoundAtMs,
+        blocksFound: found,
         potBlocks: o.potAge.blocks,
         potHours: o.potAge.hours,
         potVerdict: o.potAge.verdict,
@@ -183,7 +205,37 @@ export function createServer(): express.Express {
     }
   });
 
+  // Who the server session says you are — the desktop asks once on load to
+  // decide whether to show owner-only icons. Never cached anywhere: it is
+  // per-person, and the desktop page itself is shared through the CDN.
+  app.get("/api/me", (req, res) => {
+    const session = getSession(req);
+    res.set("Cache-Control", "private, no-store");
+    res.json({ address: session?.address ?? null, admin: isAdmin(session) });
+  });
+
+  // Block Hunt leaderboard + stats (game-routes.ts). Behind the global limiter,
+  // ahead of the tighter upstream one: nothing here calls an upstream, and the
+  // posts carry their own per-wallet cooldown.
+  app.use("/api/game", gameRouter());
+
+  // Profiles (display names), Chat, Suggestions and site activity (the Parahawk
+  // badges). Same placement as /api/game: nothing here calls an upstream, Chat
+  // polls every few seconds, and each router carries its own per-wallet limits.
+  app.use("/api/profile", profileRouter());
+  app.use("/api/chat", chatRouter());
+  app.use("/api/suggestions", suggestionsRouter());
+  app.use("/api/activity", activityRouter());
+  // Trusted visitors updating a stale hand-typed venue price (the "Trusted" badge's perk).
+  app.use("/api/prices", priceRouter());
+  // The owner's dashboard numbers (owner-only).
+  app.use("/api/admin", adminRouter());
+
   app.use("/api", upstreamLimiter);
+
+  // Inscribe's same-origin proxies (fee rates, broadcast) — they DO call
+  // upstream, so they sit behind the tighter limiter.
+  app.use("/api/inscribe", inscribeRouter());
 
   // Static assets (wiki images, etc.) served from ./public at /assets.
   app.use("/assets", express.static("public", { maxAge: "1h" }));
@@ -192,10 +244,16 @@ export function createServer(): express.Express {
   // Top-level browser navigations (Sec-Fetch-Dest: document) get the desktop
   // shell, which then loads the requested page inside a same-origin iframe.
   // Frames, fetches, curl and bots (no Sec-Fetch-Dest) fall through to the
-  // plain site, as does ?classic=1. Every GET passing through here varies on
-  // Sec-Fetch-Dest so the edge caches the two variants separately.
+  // plain site. Every GET passing through here varies on Sec-Fetch-Dest so the
+  // edge caches the two variants separately.
+  //
+  // The classic VIEW is off for now (no menu entry, no sticky preference — see
+  // src/shell/main.ts). ?classic=1 still answers one request with the plain
+  // page, because the wallet pages need it: their "Open in a full tab" link is
+  // how Xverse reaches a page it cannot see inside the desktop's iframe. It is
+  // per-request only, so the next navigation is the desktop again.
   const assetVersion = computeAssetVersion();
-  const UNGATED = ["/api", "/assets", "/overview/gauge", "/potmath/card", "/potmath.js", "/hit", "/healthz", "/account/nonce"];
+  const UNGATED = ["/api", "/assets", "/art", "/overview/gauge", "/potmath/card", "/potmath.js", "/hit", "/healthz", "/account/nonce"];
   app.use((req, res, next) => {
     if (req.method !== "GET" && req.method !== "HEAD") return next();
     if (UNGATED.some((p) => req.path === p || req.path.startsWith(p + "/"))) return next();
@@ -231,6 +289,8 @@ export function createServer(): express.Express {
   }));
   app.get("/board", page(renderBoard));
   app.get("/badges", page(renderBadges));
+  // The Block Hunt board, as a Parahawk tab (?window=today|week|all).
+  app.get("/leaderboard", (req, res) => page(() => renderLeaderboard(parseBoardWindow(req.query.window)))(req, res));
   app.get("/badges/:type", async (req, res) => {
     try {
       res.type("html").send(await renderBadgeHolders(req.params.type));
@@ -404,7 +464,10 @@ export function createServer(): express.Express {
   app.get("/admin", async (req, res) => {
     try {
       res.set("Cache-Control", "private, no-cache");
-      res.type("html").send(await renderAdmin(getSession(req), String(req.query.msg ?? "")));
+      // Inside the desktop, /admin is the Admin window's Prices tab (a frame):
+      // no site header. ?bare=1 asks for the same from anywhere.
+      const bare = req.query.bare === "1" || req.get("sec-fetch-dest") === "iframe";
+      res.type("html").send(await renderAdmin(getSession(req), String(req.query.msg ?? ""), { bare }));
     } catch (err) {
       console.error("[/admin] failed:", err);
       res.status(500).type("text").send("internal error");
@@ -478,6 +541,9 @@ export function createServer(): express.Express {
 
   app.get("/address/:addr", async (req, res) => {
     try {
+      // A signed-in visitor looking up a wallet counts toward their Parahawk badges.
+      const viewer = getSession(req);
+      if (viewer) void recordActivity(viewer.address, viewer.address === req.params.addr ? "self_search" : "wallet_search", req.params.addr).catch(() => {});
       res.type("html").send(await renderAddress(req.params.addr));
     } catch (err) {
       console.error("[/address] failed:", err);

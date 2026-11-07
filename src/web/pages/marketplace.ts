@@ -4,6 +4,7 @@ import { wizardSection } from "../marketplace-wizard.js";
 import { fmtSats, fmtUsd, fmtInt, timeAgo, esc } from "../format.js";
 import { csrfToken, type Session } from "../../services/auth.js";
 import { getLinkedAccounts } from "../../services/linked.js";
+import { manualPriceUi } from "../price-update-ui.js";
 
 /** Verdict chip: 🟢 good ≤52k · ⚪ normal 52–58k · 🔴 expensive >58k. */
 function verdictChip(row: BoardRow): string {
@@ -53,6 +54,8 @@ function vsRefineryCell(row: BoardRow): string {
 export async function renderMarketplace(session: Session | null = null): Promise<string> {
   const board = await getMarketBoard();
   const linked = session ? await getLinkedAccounts(session.address).catch(() => []) : [];
+  // Hand-typed price rows: who set them, and the Trusted badge's "Update price" box.
+  const manual = await manualPriceUi(session, board.btcPriceUsd);
   const wizardCtx = {
     connected: Boolean(session),
     linkedVenues: linked.map((l) => l.venue),
@@ -74,7 +77,7 @@ export async function renderMarketplace(session: Session | null = null): Promise
       const cap = r.capacityPhd ? `${r.capacityPhd.toFixed(1)} PHd` : "—";
       const rowCls = r.best ? ' class="best-row"' : r.satsPerPhd <= 0 ? ' class="dead-row"' : "";
       return `<tr${rowCls}>
-        <td>${nameCell}${badge}${soloBadge}${note}</td>
+        <td>${nameCell}${badge}${soloBadge}${note}${manual.row(r)}</td>
         <td>${priceCell(r)}</td>
         <td>${r.usdPerPhd > 0 ? fmtUsd(r.usdPerPhd, 2) : "<span class='dim'>—</span>"}</td>
         <td>${cap}</td>
@@ -196,7 +199,8 @@ table.board td:first-child{min-width:200px}
 .badge-best{background:var(--green);color:#04120a;font-size:12px;font-weight:900;padding:2px 8px;letter-spacing:1px;border-radius:3px;vertical-align:middle}
 .badge-solo{background:#2a1a00;color:var(--amber);border:1px solid #50411f;font-size:12px;padding:2px 7px;letter-spacing:.5px;border-radius:3px;vertical-align:middle}
 </style>
-<script>setTimeout(function(){location.reload();},60000);</script>
+${manual.tail}
+<script>(function t(){setTimeout(function(){if(document.querySelector('details.pu[open]'))t();else location.reload();},60000);})();</script>
 `;
 
   return renderPage({ title: "Marketplace", active: "marketplace", body });

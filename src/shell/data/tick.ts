@@ -20,6 +20,8 @@ export interface Tick {
   lastFoundHeight: number | null;
   /** Unix ms of that block (null if unknown). */
   lastFoundAtMs: number | null;
+  /** Blocks Parasite has found, all time (null if unknown; older servers omit it). */
+  blocksFound?: number | null;
   potBlocks: number;
   potHours: number;
   potVerdict: string;

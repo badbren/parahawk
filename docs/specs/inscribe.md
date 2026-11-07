@@ -1,195 +1,192 @@
-# Spec — Inscribe (network-fee-only Ordinals on mainnet, via Xverse)
+# Spec — Inscribe (Ordinals on mainnet, paid from the user's Xverse)
 
-## Goal
-Let a user inscribe an Ordinal on Bitcoin **mainnet** paying **only the network fee** — no
-marketplace markup and, critically, **not** paying the service fee that Xverse's built-in
-inscription flow charges. Connect Xverse (sats-connect), enter content (text or an image/file),
-pick a fee rate, see a **live, itemized cost estimate**, and (eventually) inscribe.
+## Status (2026-11-06): finished; owner-only until the owner has done 20 test inscriptions
 
-Status of the shipped page (`src/web/pages/inscribe.ts`):
-- **Real:** wallet connect + address retrieval (sats-connect from jsdelivr), and the live
-  size/fee estimate with the math shown on screen.
-- **Gated off (not live):** the commit-PSBT build → `signPsbt` → broadcast reveal flow. Pressing
-  *Inscribe* only `console.log()`s the intended plan and broadcasts nothing. This is deliberate —
-  see [Risks](#funds--security-risks). Do not remove the gate until the phased plan below is done.
+The owner's call: "we'll use xverse to pay for the inscribe, we just need it all to work."
+Then: "make it so when they are inside there they can't actually inscribe anything yet. basically the
+step where they'd pay for xverse is where we stop… Admin will inscribe 20x before releasing."
+See **Release gate** below.
 
----
+- **Inscribe is a native desktop window**: `src/shell/apps/inscribe.ts` + `inscribe.css`, registered
+  in `src/shell/desktop/registry.ts` with `paths: ["/inscribe"]`, so the deep link opens it.
+  It runs in the desktop's top page because **Xverse injects its provider into the top page only,
+  never into iframes**. The old iframe'd `/inscribe` page could not reach the wallet from inside
+  the desktop.
+- **Xverse does the Bitcoin part end to end.** It builds the commit + reveal, pays from the
+  wallet, broadcasts, and returns a txid. Parahawk never sees a key and never builds, signs or
+  broadcasts a transaction.
+- **Parahawk adds no fee.** The request carries no `appFee`.
+- **Mainnet only**: that is all Xverse's inscription flow supports (Xverse docs: "Inscriptions
+  currently only support Mainnet"). There is no free test-network rehearsal.
+- `/inscribe` as a plain page (frames, `?classic=1`, bots) is now a short explainer with an
+  "Open Inscribe →" link (`target="_top"` to `/inscribe`, which opens the desktop window).
 
-## How an Ordinal inscription works (commit / reveal)
+## Release gate (src/inscribe/release.ts)
 
-An inscription is created with **two transactions**, because the inscription content is embedded in
-a **taproot script-path spend** and Bitcoin only reveals a taproot leaf script when it is *spent*.
+Until release, the whole window works for everyone (wallet, content, file, fee, cost) and nothing is
+greyed out, but only the **owner's** press reaches Xverse:
 
-### 1. The reveal script (the "envelope")
-Ord stores content inside an unexecuted branch of a taproot leaf script:
+- **Owner** (the server session says admin, `me.isAdmin()`): "Inscribe with Xverse" goes to Xverse for
+  real, and a line under the button says so ("this one is real: Xverse will ask you to pay").
+- **Everyone else**: the request is still built and checked (so a bad file still gets its real error),
+  then the window stops at the step where Xverse would ask for payment. It shows "Almost there —
+  inscribing opens to everyone soon. The admin is doing 20 test inscriptions first." `createInscription`
+  is never called, and the button stays orange and pressable.
+- **Banner** at the top: "Inscribe is finished ✓ — the admin is doing 20 test inscriptions before it opens
+  to everyone." It has an ✕, and closing it is remembered per browser (`ph.inscribe.banner`). Bump
+  `BANNER_ID` in inscribe.ts to show a new banner to everyone again.
 
-```
-<32-byte internal pubkey> OP_CHECKSIG      # so the leaf is spendable with a signature
-OP_FALSE
-OP_IF
-  OP_PUSH "ord"                            # protocol marker
-  OP_PUSH 0x01  OP_PUSH <content-type>     # tag 1 = content-type, e.g. text/plain;charset=utf-8
-  OP_0                                      # body separator (empty push)
-  OP_PUSH <chunk-1> ... OP_PUSH <chunk-n>  # body, split into <=520-byte pushes
-OP_ENDIF
-```
+The gate is client-side by nature: Parahawk never touches the transaction, so someone who calls Xverse
+from their own console only spends their own money. It exists to keep normal visitors from paying
+before the owner has tested it, not as a security boundary.
 
-`OP_FALSE OP_IF … OP_ENDIF` is never executed, so arbitrary data rides along for free (script-wise).
-The body is chunked into **≤520-byte** pushes (Bitcoin's max element push), so large content adds a
-small per-chunk push-opcode overhead (`OP_PUSHDATA2` = 3 bytes per full 520-byte chunk).
+**To release:** set `INSCRIBE_OPEN_TO_ALL = true` in `src/inscribe/release.ts`. The banner, the stop
+note and the owner line all go away with it. Add a changelog entry when you do.
 
-### 2. Commit tx
-A normal transaction whose output is a **P2TR (taproot) address** whose tweaked output key commits
-to the reveal leaf script above. It funds that output with `reveal_fee + postage` sats. Its size (and
-fee) depend on which UTXOs the wallet selects — for the estimate we assume **1 taproot input + 2
-outputs** (commit + change).
+## The Xverse API (read from the published source, not guessed)
 
-### 3. Reveal tx
-Spends the commit output via the **script path**, putting the envelope in the **witness**. The
-witness stack is `[schnorr-signature, reveal-script, control-block]`. Because witness data is
-discounted **4×** in weight, the content is cheap: 1 witness byte = ¼ vbyte.
-
-- **Weight** = `base_size × 4 + witness_size` (segwit marker+flag count as 2 witness bytes).
-- **vbytes** = `ceil(weight / 4)`.
-
-The reveal's single output is the **inscription output**, sent to the user's **ordinals** address and
-carrying the **postage**.
-
-### Postage / dust
-The inscription "lives" on a specific sat inside the reveal output. That output must be ≥ the dust
-limit. We use **546 sats** (the shipped `POSTAGE_SATS`). This is **not a fee** — it's the user's own
-sats, now owned as the inscription's UTXO; they get it back if they ever move the inscription. (P2TR
-dust is technically ~330 sats; 546 is the conventional, wallet-safe default.)
-
-### The estimate implemented on the page
-`estimateReveal(contentBytes, contentType)` in `inscribe.ts` computes, live:
-`content bytes → reveal leaf-script bytes → witness bytes → weight → reveal vbytes`, then
-`reveal_fee = reveal_vB × rate`, `commit_fee = commit_vB × rate` (commit_vB ≈ `11 + 58 + 43 + 43`),
-`total ≈ commit_fee + reveal_fee + postage`. The page prints every intermediate number so it can be
-checked by hand. Numbers are **estimates** — the true commit size depends on real UTXO selection.
-
----
-
-## Is "network-fee-only" achievable? (and its limits)
-
-**Yes — but only by building the commit/reveal ourselves.** The user then pays exactly:
+Source: `@sats-connect/core@0.19.0`, the `createInscription` that sats-connect 3.x and 4.x export,
+and `jsontokens@4.0.1`.
 
 ```
-commit_fee (vB × rate) + reveal_fee (vB × rate) + postage (returned to them as the inscription)
+window.XverseProviders.BitcoinProvider.createInscription(token: string) → Promise<{ txId: string }>
 ```
 
-Nothing accrues to Parahawk. The catch is that **you must not use a wallet's turnkey "inscribe"
-API**, because those bundle a service fee (see next section). Limits / honesty:
+- `token` is jsontokens' `createUnsecuredToken(payload)`:
+  `base64url({"typ":"JWT","alg":"none"}) + "." + base64url(JSON payload, UTF-8) + "."`.
+- `payload` is
+  `{ network: { type: "Mainnet" }, contentType, content, payloadType: "PLAIN_TEXT" | "BASE_64",
+  suggestedMinerFeeRate?, appFee?, appFeeAddress? }`.
+- When the person refuses in Xverse, the promise rejects. sats-connect maps that to `onCancel`.
+- There is no JSON-RPC (`request(...)`) method for inscribing. The `ord_*` RPC methods are only
+  `ord_getInscriptions` and `ord_sendInscriptions`, so the legacy provider method is the only way.
+- sats-connect checks the payload before sending it, and `src/inscribe/payload.ts` mirrors those
+  checks so a bad request fails with a readable message instead of failing inside the wallet:
+  - content type `^[a-z]+\/[a-z0-9\-.+]+(?=;.*|$)`
+  - non-empty content
+  - content of at most 400,000 characters on mainnet (base64 for files, so a file of ≈292 KB)
+- We call the provider directly, the same way `src/shell/session/wallet.ts` already talks to
+  Xverse. **No CDN script is loaded**: the old page imported sats-connect from jsdelivr, which this
+  removes.
 
-- **You can't beat the fee floor.** Two transactions (commit + reveal) is inherent to ordinals; a
-  tiny text inscription is still ~300–500 vB total. There is no one-tx shortcut on mainnet today.
-- **Estimate ≠ exact.** Real commit size depends on the wallet's coin selection; our estimate assumes
-  one taproot input. Multiple/legacy inputs cost more.
-- **Fee-rate accuracy** needs a live mempool feed, which the browser can't fetch directly (CSP) — see
-  the proxy requirement below.
-- **We build unsigned PSBTs; the wallet signs.** Parahawk never holds keys or funds. The user
-  approves every signature in Xverse.
+Fees: Xverse's docs list no Xverse charge on top of network fees (only the optional `appFee` a site
+can add, which we don't). We don't claim either way. The UI says Xverse shows the exact total before
+you approve, which it does.
 
----
+The returned `txId` is what we link to on mempool.space. The inscription id isn't returned. It
+appears in Xverse → Collectibles once the reveal confirms.
 
-## What Xverse **can** and **can't** do via sats-connect
+## What Parahawk runs
 
-sats-connect is Xverse's (and other wallets') JS bridge. The page loads it from
-`https://cdn.jsdelivr.net/npm/sats-connect@3/+esm` and reaches it via `window.SatsConnect`
-(no npm dependency added). The API surface differs by version, so the page **feature-detects**:
-modern `request('wallet_connect', …)` first, then legacy `getAddress({ payload, onFinish, onCancel })`.
+- `GET /api/inscribe/fees` (`src/web/inscribe-routes.ts`): proxies mempool.space's
+  `/api/v1/fees/recommended`, because the CSP is `connect-src 'self'`.
+  - Parsed by `src/inscribe/fees.ts`: sanity-checked, rounded up to whole sat/vB.
+  - Cached 30 s in-process plus `s-maxage=30` at the edge, with one upstream request at a time.
+  - Serves the last good answer, marked `stale`, for up to 10 min while upstream is down, then a
+    plain 503.
+  - Mainnet only; any other `?network=` gets a 400.
+  - Sits behind the 30/min `/api` limiter.
+- No broadcast or UTXO route: Xverse broadcasts.
 
-| Capability | Method | Use for us |
-| --- | --- | --- |
-| Connect + get addresses | `request('wallet_connect')` / legacy `getAddress` | ✅ **Used.** Retrieve the user's **payment** and **ordinals** addresses + public keys. |
-| Sign a PSBT | `request('signPsbt', { psbt, signInputs, broadcast })` / legacy `signTransaction` | ✅ **The correct path.** We hand Xverse an unsigned commit (and later reveal) PSBT; the user signs. Fee = whatever the PSBT encodes → **network-fee-only**. |
-| Send BTC | `request('sendTransfer')` / legacy `sendBtc` | ⚠️ Could fund the commit address, but gives us less control over inputs/fee than a PSBT. Prefer `signPsbt`. |
-| **Turnkey inscribe** | `request('ord_inscribe')` / legacy `createInscription` | ❌ **Do NOT use.** Convenient, but Xverse **adds its own service fee** on top of the network fee. Using it defeats the entire "network-fee-only" premise. |
-| Sign a message | `request('signMessage')` / legacy `signMessage` | Not needed here (Parahawk already has BIP-322 sign-in elsewhere). |
+## The window (what the person sees)
 
-**Bottom line:** `wallet_connect`/`getAddress` + `signPsbt` give us network-fee-only inscription;
-`createInscription` does not. That is exactly why the shipped plan avoids `createInscription`.
+1. **Wallet**:
+   - Signed in with Xverse: where the inscription goes (the ordinals address) and what pays (the
+     payment address).
+   - Not signed in: a Connect Xverse button. This is the normal sign-in (one free BIP-322
+     message).
+   - Signed in with any other wallet: just "Inscribing needs Xverse — taskbar → Connect wallet."
+   - No Xverse: "Get Xverse", plus the phone hint (open the site in the Xverse app's browser).
+2. **What to inscribe**: Text or File, with a live byte count and content type. Image files get a
+   still preview from a `data:` URL, since the CSP allows `data:` images but not `blob:`.
+3. **Fee rate**: Fast / Normal / Slow from the proxy, or Custom (1–2,000 sat/vB). If rates can't
+   load, it falls back to Custom.
+4. **Cost**: an estimate in sats and USD (the price comes from the tick feed), with a "How we got
+   this" table, and the note that Xverse shows the exact total.
+5. **Inscribe with Xverse** (the Bitcoin-orange button).
+   - Disabled with a reason until everything is ready.
+   - While pending: "Waiting for Xverse…".
+   - On success: the txid with a mempool.space link. The button then locks, so a second press
+     can't pay twice, until the content changes or "Inscribe something else" is pressed.
+   - A refusal shows "Cancelled in Xverse — nothing was sent."
+6. **Sent from this browser**: the last 12 txids, in localStorage `ph.inscribe.history`. A txid is
+   saved even if the window was closed while Xverse was open.
 
-Broadcasting: `signPsbt` *can* broadcast (`broadcast: true`), but for a commit→reveal we want to
-broadcast the commit ourselves, wait for confirmation, then build/sign/broadcast the reveal — so we
-sign locally and broadcast via our own proxy (below).
+## The estimate (src/inscribe/cost.ts)
 
----
+An inscription is two transactions:
 
-## CSP: `connect-src 'self'` → same-origin proxy required
+- The **commit** pays into a one-off taproot address that commits to the inscription script.
+- The **reveal** spends it through that script, which puts the content in the witness and sends
+  the inscription to the ordinals address.
 
-`src/web/server.ts` sets `connect-src 'self'`. So **the browser cannot `fetch`/XHR to any external
-host** — mempool.space, an ord indexer, a broadcast API: all blocked. Anything network-facing must go
-through a **same-origin Parahawk endpoint** that proxies upstream server-side.
+Leaf script:
 
-Two proxies this feature needs (both **stubbed client-side today, not implemented server-side**):
+```
+<32-byte key> OP_CHECKSIG OP_FALSE OP_IF "ord" 01 <content-type> 00 <body in ≤520-byte pushes> OP_ENDIF
+```
 
-- **`GET /api/inscribe/fees`** — proxy `mempool.space/api/v1/fees/recommended`, returning
-  `{ fastestFee, halfHourFee, hourFee, minimumFee }`. The page calls it for the "↻ recommended"
-  button and **falls back to the manual rate** when it 404s (current behavior — shown honestly on
-  the page).
-- **`POST /api/inscribe/broadcast`** — accept a raw signed tx hex, proxy it to
-  `mempool.space/api/tx` (or a self-hosted node), return the txid. Used for both commit and reveal.
-- (Likely also **`GET /api/inscribe/utxos?address=`** — proxy the user's spendable UTXOs so we can
-  build the commit PSBT with real inputs.)
+- **Reveal**: the base part is 94 bytes (1 input, 1 taproot output). Witness =
+  `[sig 64, script, control block 33]` + marker/flag. Weight = `base×4 + witness`;
+  vB = `ceil(weight/4)`. Content costs ≈¼ vB per byte.
+- **Commit**: 1 input of the payment address's type, plus the commit output (P2TR 43 vB) and change.
+  - Input sizes: P2TR 57.5, P2WPKH 68, P2SH-P2WPKH 91 (Xverse's classic payment address), P2PKH 148.
+  - Real coin selection may add inputs.
+- **Total** = `ceil(commit vB × rate) + ceil(reveal vB × rate) + 546` postage. The postage is an
+  assumption: Xverse picks the real value.
+- Worked example: a 21-byte text at 3 sat/vB with a bc1q payment address is 143 + 153 vB →
+  429 + 459 + 546 = **1,434 sats** (≈ $1.09 at $76k).
 
-Note: **wallet connect is not affected by `connect-src`.** Xverse injects a provider object into the
-page and communicates over `window.postMessage` / extension messaging, not the network — so connect
-works despite the strict CSP. Loading the sats-connect **module** from jsdelivr is governed by
-`script-src` (which allows `cdn.jsdelivr.net`), not `connect-src`, so that's fine too.
+## Risks that remain
 
-When these endpoints are built, keep them tight: cache the fees response briefly; validate the
-broadcast body is hex and length-bounded; rate-limit (the app already puts `/api/*` behind
-`upstreamLimiter`); never echo upstream error bodies verbatim.
+- **Real money, irreversible.** The window says so in its header, and Xverse's own pop-up is the
+  final confirmation.
+- **The estimate is not the bill.** Xverse's postage, coin selection and any fee of its own decide
+  the real total. The window says this next to every number.
+- **A wallet error after broadcast** would show as an error while a transaction exists. The message
+  tells the person to check Xverse's activity tab before trying again.
+- **Xverse could drop the legacy `createInscription`.** If that happens, the window says to update
+  Xverse rather than failing silently. Re-check `@sats-connect/core`'s exports when upgrading.
 
----
+## Parked: the network-fee-only builder
 
-## Funds & security risks (why the gate exists)
+The original plan was to build commit/reveal ourselves, sign via `signPsbt`, and broadcast through
+our own proxy, so that no turnkey service is involved. It is parked: Xverse's flow does the job, and
+a hand-built taproot commit/reveal touches user funds.
 
-This feature **touches user funds** — a bug can permanently lose money. Concrete failure modes:
+If it's ever revived:
 
-- **Malformed reveal → stuck/unspendable commit.** If the reveal script or control block is wrong,
-  the sats parked in the commit output can be **unrecoverable**.
-- **Fee mistakes.** Underpay → tx never confirms (commit funds parked indefinitely). Overpay / a units
-  bug (sats vs BTC, vB vs bytes, forgetting the 4× witness discount) → user overpays badly.
-- **Wrong postage / dust.** Below dust → reveal is non-standard and won't relay.
-- **Wrong recipient.** Inscription must land on the **ordinals** address, not the payment address, or
-  it can be swept as ordinary change and lost.
-- **Address/UTXO confusion.** Spending an ordinals UTXO that already holds an inscription can burn it.
-- **CDN / supply-chain.** sats-connect is loaded from jsdelivr at runtime. Pin the version (done:
-  `@3`); consider self-hosting/SRI before mainnet go-live.
+- Build it on signet first (Xverse supports Signet/Testnet4 for PSBT signing, unlike its inscribe
+  flow).
+- Add `POST /api/inscribe/broadcast` and a UTXO proxy.
+- Keep mainnet behind a config flag that defaults off (like `config.orderingLive`).
+- Persist the commit's recovery data so a failed reveal can be retried.
 
-**Mitigations already in place:** the whole build/sign/broadcast step is gated — *Inscribe* logs the
-plan and broadcasts nothing; connect + estimate are safe (read-only). **Never** ship the PSBT builder
-straight to mainnet.
-
----
-
-## Phased plan
-
-1. **Estimate + connect (shipped).** UI, wallet connect, live cost math. No PSBT, no broadcast.
-2. **Proxies.** Implement `GET /api/inscribe/fees`, `GET /api/inscribe/utxos`, and
-   `POST /api/inscribe/broadcast` server-side (mempool.space passthroughs; cached + rate-limited).
-   Wire "↻ recommended" to real data.
-3. **Builder on signet/testnet.** Build commit+reveal PSBTs (e.g. `@scure/btc-signer` /
-   `bitcoinjs-lib` + a small ord-envelope encoder) **server-side or in a reviewed client module**.
-   Sign via `signPsbt`. Prove round-trips end-to-end **on signet first**, then testnet. Add unit
-   tests for the size model vs. real broadcast vbytes, and for envelope encoding.
-4. **Mainnet behind a flag.** Gate real broadcast behind an explicit config flag (mirror the existing
-   `config.orderingLive` dry-run pattern used for venue orders). Default **off**. Require an on-page
-   confirm that restates the exact total. Consider a max-fee guardrail and a max-content-size cap.
-5. **Harden.** Pin/SRI or self-host sats-connect; add broadcast idempotency; surface commit txid so a
-   user can recover if the reveal step fails midway.
-
-Only after step 4 verifies on signet **and** testnet should the client gate in `inscribe.ts`
-(`onInscribe` → currently `console.log` only) be replaced with the real build/sign/broadcast calls.
-
----
+The size model above is the one that builder would need.
 
 ## Files
-- `src/web/pages/inscribe.ts` — the page (`renderInscribe`). New file.
-- `docs/specs/inscribe.md` — this doc.
-- **To wire in (not done here):** a route in `src/web/server.ts` and a nav entry in
-  `src/web/layout.ts` (see the handoff notes in the task response).
-- **Future:** `/api/inscribe/{fees,utxos,broadcast}` handlers in `server.ts`; a PSBT/envelope builder
-  module; a `config` flag for mainnet go-live.
+
+- `src/shell/apps/inscribe.ts`, `inscribe.css`: the window.
+- `src/inscribe/cost.ts`: the estimate. `src/inscribe/payload.ts`: the Xverse request + token.
+  `src/inscribe/fees.ts`: rate parsing. `src/inscribe/inscribe.test.ts`.
+- `src/inscribe/release.ts` (+ `release.test.ts`): the release gate (`INSCRIBE_OPEN_TO_ALL`).
+- `src/web/inscribe-routes.ts` (+ `.test.ts`): `/api/inscribe/fees`.
+- `src/web/pages/inscribe.ts`: the plain-page explainer.
+- `src/shell/desktop/registry.ts`: the `inscribe` entry is native (was `sitePage`).
+
+## Owner test (real wallet, mainnet)
+
+Only the owner can do this until release: sign in with the owner's Xverse (the admin address), or the
+press stops at the pay step. Anyone else, including the owner signed out, sees the stop note.
+
+1. Open the local site in a browser that has Xverse, and connect Xverse from the taskbar.
+2. Open **Inscribe**. Check that "Inscription goes to" shows your `bc1p…` ordinals address.
+3. Type a short text such as `gm`. Pick **Slow**. The window estimates ≈1.3–1.5k sats at today's
+   ~1–3 sat/vB.
+4. Press **Inscribe with Xverse**. In the Xverse pop-up, read the total, then approve.
+5. Check the result:
+   - The window shows the txid and a mempool.space link.
+   - The transaction appears on mempool.space.
+   - Once it confirms, the inscription shows in Xverse → Collectibles.
+6. Also try **Cancel** in the pop-up once. The window should say "Cancelled in Xverse — nothing was
+   sent."

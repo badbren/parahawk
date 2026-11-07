@@ -1,0 +1,34 @@
+/* Someone's public profile (user-profile.ts): picture, name, wallet, then their
+   stats and badges (public-stats.ts). Same look as the Profile window. */
+.ph-up{box-sizing:border-box;height:100%;overflow:auto;font:13px/1.7 var(--ph-mono);color:var(--ph-fg)}
+.ph-up p{margin:0 0 6px}
+.ph-up-head{display:flex;align-items:flex-start;gap:18px;padding:18px 22px 16px;border-bottom:1px solid var(--ph-line);background:linear-gradient(180deg,#0e0e0e,#080808)}
+.ph-up-who{flex:1;min-width:0}
+.ph-up-name{margin:2px 0 6px;font:900 30px/1.1 var(--ph-head);letter-spacing:.04em;color:var(--ph-accent);overflow-wrap:anywhere}
+.ph-up-name.is-plain{font:700 20px/1.2 var(--ph-mono);letter-spacing:0;color:var(--ph-fg)}
+.ph-up-tags{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
+.ph-up-tags:empty{display:none}
+.ph-up-tag{padding:1px 7px;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--ph-dim);border:1px solid var(--ph-line);background:#0c0c0c}
+.ph-up-tag.is-you{color:var(--ph-accent);border-color:rgba(143,209,79,.5)}
+.ph-up-tag.is-owner{color:var(--ph-amber);border-color:rgba(245,196,81,.5)}
+.ph-up-wallet{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 6px}
+.ph-up-addr{padding:4px 8px;border:1px solid var(--ph-line);background:#0c0c0c;font:12px var(--ph-mono);color:var(--ph-fg)}
+.ph-up-dim{color:var(--ph-dim)}
+.ph-up-btn{flex:none;font:inherit;color:var(--ph-fg);background:#101010;border:1px solid #000;box-shadow:inset 1px 1px 0 #2e2e2e,inset -1px -1px 0 #050505;padding:4px 12px;cursor:pointer}
+.ph-up-btn:hover{background:#161616}
+.ph-up-btn:active{box-shadow:inset 1px 1px 0 #050505,inset -1px -1px 0 #2e2e2e}
+.ph-up-btn:focus-visible{outline:1px dotted var(--ph-accent);outline-offset:-3px}
+.ph-up-btn:disabled{opacity:.5;cursor:default}
+.ph-up-btn[hidden]{display:none}
+.ph-up-btn-go{color:var(--ph-accent)}
+.ph-up-btn-link{background:none;border-color:transparent;box-shadow:none;color:var(--ph-dim);text-decoration:underline;padding:2px 4px}
+.ph-up-btn-link:hover{background:none;color:var(--ph-red)}
+.ph-up-mod{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:6px;font-size:11px;color:var(--ph-amber)}
+.ph-up-stats{padding:14px 22px 22px}
+.ph-up-msg{padding:26px 22px;color:var(--ph-dim)}
+.ph-up-msg .ph-up-btn{margin-top:6px}
+@media (max-width:600px){
+  .ph-up-head{gap:12px;padding:14px}
+  .ph-up-name{font-size:24px}
+  .ph-up-stats{padding:12px 14px 18px}
+}

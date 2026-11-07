@@ -1,0 +1,40 @@
+/*
+ * Orange text (owner, 2026-11-06: "everything is white" → "go thru every app
+ * and change the white to orange"). The desktop's white and near-white text
+ * becomes Bitcoin orange, the wallpaper's colour; headings and emphasis a
+ * lighter orange so they still stand out. Greys (--ph-dim) and the
+ * green/amber/red signal colours are unchanged.
+ *
+ * main.ts imports this file LAST, so these rules win over the apps' own at
+ * equal specificity without touching their stylesheets. An app that hard-codes
+ * white text again: add its selector to the list below.
+ */
+:root{--ph-fg:#f7931a;--ph-hi:#ffab40}
+
+/* the apps' hard-coded white */
+.ph-about strong,
+.ph-adm strong,.ph-adm-card-v,.ph-adm-name,.ph-adm-av-txt,
+.ph-burn-scroll strong,.ph-burn-chip b,.ph-burn-piece.is-on span,.ph-burn-panel h3,.ph-burn-empty h3,
+.ph-chat-signin strong,
+.ph-col-tier.is-on,.ph-col-name,.ph-col-chip,.ph-col-fact dd,.ph-col-pct,.ph-col-fill-name b,.ph-col-row-name,
+.ph-ins b,.ph-ins strong,.ph-ins-total b,
+.ph-lb strong,
+.ph-phk-msg strong,.ph-phk-b-nm,
+.ph-prof strong,.ph-prof-input,
+.ph-reveal-brand,.ph-reveal-name,.ph-reveal-trait b,
+.ph-sug strong,.ph-sug-item-title{color:var(--ph-hi)}
+
+/* Chat messages were light grey (near-white): body text is orange like everywhere else. */
+.ph-chat-body{color:var(--ph-fg)}
+
+/*
+ * Desktop icon labels (owner: "kinda hard to read… make use a easier to read
+ * font and increase the size of the text a tad without making it double
+ * lined"): a UI sans instead of the mono, 13px semibold, one line. They stay
+ * white (owner tried orange, preferred white).
+ */
+.ph-icon-label{
+  display:block;-webkit-line-clamp:unset;line-clamp:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  font:600 13px/1.25 "Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;letter-spacing:.2px;color:#e6e6e6;
+}
+.ph-icon-ghost{font:600 13px/1.25 "Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;color:#e6e6e6}

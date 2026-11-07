@@ -36,7 +36,10 @@ export interface WindowSpec {
   /** URL of the title-bar icon (also used by the taskbar button). */
   icon: string;
   content: WindowContent;
-  /** Default: 75% of the desktop area, centred. */
+  /**
+   * Opens at this size, centred (small tools like the Recycle Bin). Leave it out
+   * to open big beside the desktop icons (WindowManagerOptions.largeArea).
+   */
   defaultSize?: Size;
   /** Default: 420 × 320. */
   minSize?: Size;
@@ -116,6 +119,12 @@ export interface WindowManagerOptions {
   mode?: WmMode;
   /** Offset for second and subsequent windows. Default 28. */
   cascadeStep?: number;
+  /**
+   * Where a window without a `defaultSize` opens the first time: the big area
+   * beside the desktop icons (desktop/large-area.ts), so the icons stay in view.
+   * Absent or null → 75% of the area, centred.
+   */
+  largeArea?: () => Rect | null;
 }
 
 /** Message an iframe'd page posts to the shell on load (see layout.ts framed script). */

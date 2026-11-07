@@ -12,9 +12,9 @@
  * actually ship.
  */
 import {
-  BLACK,
-  BLACKS_PER_PHD,
-  BLACK_PRICE_SATS,
+  WHITE,
+  WHITES_PER_PHD,
+  MINT_PRICE_SATS,
   FULL_MINT_PHD,
   FULL_MINT_SATS,
   GAME_RESERVE,
@@ -22,7 +22,7 @@ import {
   MAX_ORE_PER_RUN,
   MAX_PLAYS_PER_WALLET,
   MAX_SPEND_PER_WALLET_SATS,
-  ORE_PER_BLACK,
+  ORE_PER_WHITE,
   PLAY_PRICE_SATS,
   SATS_PER_BTC,
   TIERS,
@@ -31,7 +31,7 @@ import {
   fmtSatsUsd,
   type Tier,
 } from "../../econ/tokenomics";
-import { BLOCK_BONUS, MAX_NONCES, RUN_SECONDS } from "./game/blockrun";
+import { BLOCK_BONUS, MAX_NONCES, RUN_SECONDS } from "../../game/blockrun";
 import type { TickFeed } from "../data/tick";
 import { h } from "../util/dom";
 
@@ -73,30 +73,13 @@ export function mountAbout(host: HTMLElement, tick?: TickFeed): () => void {
     p("This desktop is the front door. The stats site is one app in a window; the rest is what we are building on top: ",
       strong("an NFT collection whose whole purpose is to buy the pool more hashpower"), "."));
 
-  // ── Status (the honest bit) ──────────────────────────────────────────────
-  const statusRow = (state: "live" | "soon" | "planned", label: string, note: string) =>
-    h("li", { class: `ph-about-status is-${state}` },
-      h("span", { class: "ph-about-badge" }, state === "live" ? "LIVE" : state === "soon" ? "SOON" : "PLANNED"),
-      h("span", {}, strong(label), " ", dim(note)));
-
-  const status = section("Status — read this first",
-    p("The numbers below are the ", strong("published design"), ", not a live product. Nothing can be bought yet."),
-    h("ul", { class: "ph-about-statuses" },
-      statusRow("live", "The stats site", "— pot, hashprice, luck audit, odometers. Free, working, no wallet needed."),
-      statusRow("live", "This desktop", "— open to everyone as a guest. There is no login wall and there never will be."),
-      statusRow("live", "Wallet sign-in", "— connect Phantom or MetaMask to get a Profile. Read-only: it proves who you are, it never moves funds."),
-      statusRow("live", "The game", "— Block Hunt is on the desktop and playable now, free, as a practice run. Nothing is charged and no ore is claimed."),
-      statusRow("planned", "The mint and the forge", "— the economics are locked (below). No contract is deployed and the chain is not final."),
-    ),
-    p(dim("If any of that changes, this window changes with it — it is generated from the same file the contracts will be.")));
-
   // ── The mint ─────────────────────────────────────────────────────────────
   const mint = section("The mint",
-    p("One tier is mintable: ", chip(BLACK), ". Everything above it is forged, never sold."),
+    p("One tier is mintable: ", chip(WHITE), ". Everything above it is forged, never sold."),
     h("div", { class: "ph-about-anchor" },
-      h("div", { class: "ph-about-big" }, satsText(BLACK_PRICE_SATS), h("span", {}, " per Black")),
+      h("div", { class: "ph-about-big" }, satsText(MINT_PRICE_SATS), h("span", {}, " per Black")),
       h("div", { class: "ph-about-eq" },
-        h("span", {}, `${BLACKS_PER_PHD} Blacks buy 1 PHd of Parasite hashpower`),
+        h("span", {}, `${WHITES_PER_PHD} Blacks buy 1 PHd of Parasite hashpower`),
         h("span", {}, `${GENESIS_SUPPLY.toLocaleString("en-US")} Blacks = ${(FULL_MINT_SATS / SATS_PER_BTC).toFixed(2)} BTC = ${FULL_MINT_PHD.toLocaleString("en-US")} PHd`))),
     p("That is the whole idea in one line: ", strong("the full mint is exactly one bitcoin, and it buys the pool 2,000 petahash-days."),
       " Supply was picked to make that true, not the other way round."),
@@ -109,9 +92,9 @@ export function mountAbout(host: HTMLElement, tick?: TickFeed): () => void {
     h("tr", {},
       h("th", { scope: "row" }, chip(t)),
       h("td", {}, t.rung === 0 ? dim("mint or game") : `${t.burn} × ${TIERS[t.rung - 1]!.name}`),
-      h("td", { class: "ph-num" }, t.blacks.toLocaleString("en-US")),
+      h("td", { class: "ph-num" }, t.whites.toLocaleString("en-US")),
       h("td", { class: "ph-num" }, t.maxSupply.toLocaleString("en-US")),
-      h("td", { class: "ph-num" }, t.rung === 0 ? dim("—") : satsText(t.forgeFeeSats)),
+      h("td", { class: "ph-num" }, t.rung === 0 ? dim("—") : satsText(t.upgradeFeeSats)),
       h("td", { class: "ph-num" }, t.weight.toLocaleString("en-US", { maximumFractionDigits: 2 }))));
 
   const ladder = section("The ladder — burn two, get one",
@@ -151,11 +134,11 @@ export function mountAbout(host: HTMLElement, tick?: TickFeed): () => void {
     h("ul", { class: "ph-about-list" },
       h("li", {}, satsText(PLAY_PRICE_SATS, "ph-about-k"), " a run — a tenth of a Black."),
       h("li", {}, h("span", { class: "ph-about-k" }, `${MAX_PLAYS_PER_WALLET} runs`), " per wallet, ever. That is ", satsText(MAX_SPEND_PER_WALLET_SATS), " all-in."),
-      h("li", {}, h("span", { class: "ph-about-k" }, `${ORE_PER_BLACK.toLocaleString("en-US")} ore`), " claims one ", chip(BLACK), " from the game reserve."),
+      h("li", {}, h("span", { class: "ph-about-k" }, `${ORE_PER_WHITE.toLocaleString("en-US")} ore`), " claims one ", chip(WHITE), " from the game reserve."),
       h("li", {}, `A first run banks around 100. A decent one is about 130, and even flawless play is capped at ${MAX_ORE_PER_RUN}. So ${MAX_PLAYS_PER_WALLET} runs is roughly `,
         strong("2 Blacks"), " for most people, and 4 at the absolute limit.")),
     p(strong("The game is never a cheaper mint."), " The ore rate is set so an ordinary player earns Blacks at ",
-      satsText(BLACK_PRICE_SATS), " each — exactly the mint price. Skill earns a discount; the run cap and the per-run ceiling bound it."),
+      satsText(MINT_PRICE_SATS), " each — exactly the mint price. Skill earns a discount; the run cap and the per-run ceiling bound it."),
     p(strong("It is deliberately not winner-take-all."), " Because every run is the same length and everyone who reaches the block banks the same bonus, the gap between a first run and an expert one stays near ",
       strong("2×"), " rather than running away. Being good helps; being new is never worthless."),
     p(dim("The per-wallet cap is not sybil-proof — wallets are free. It does not need to be: runs are paid, and the rate matches the mint, so spinning up wallets buys effort, not discount. The cap is there for fairness and to meter the faucet.")));
@@ -170,7 +153,7 @@ export function mountAbout(host: HTMLElement, tick?: TickFeed): () => void {
   const footer = h("footer", { class: "ph-about-foot" },
     p(dim("Numbers on this page are generated from the project's tokenomics module and covered by tests. If you spot a contradiction between this window and anything else we publish, this window is the one that is right.")));
 
-  host.replaceChildren(hero, status, mint, ladder, game, proceeds, footer);
+  host.replaceChildren(hero, mint, ladder, game, proceeds, footer);
 
   // ── Live USD ─────────────────────────────────────────────────────────────
   // Sats are the unit of account; USD is a courtesy that appears once we have a

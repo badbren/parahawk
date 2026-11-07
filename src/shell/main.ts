@@ -10,36 +10,44 @@
  */
 import "./shell.css";
 import { createWindowManager } from "./wm/window-manager";
+import { largeAreaBeside } from "./desktop/large-area";
 import { createDesktop } from "./desktop/desktop";
 import { APPS } from "./desktop/registry";
-import { createWallpaper } from "./desktop/wallpaper";
+import { createHorizonWallpaper } from "./desktop/wallpaper-horizon";
 import { createTickFeed } from "./data/tick";
 import { createLocalStore } from "./session/store";
 import { createWalletSession } from "./session/wallet";
 import { createPracticeLedger } from "./session/ledger";
+import { createServerSession } from "./session/me";
+import { createProfileSession } from "./session/profile";
+import { startActivityTracker } from "./session/activity";
+import { watchChatUnread } from "./apps/chat";
+import { watchSuggestionsInbox } from "./apps/suggestions";
+import { watchChangelog } from "./apps/changelog-badge";
+import { watchAbout } from "./apps/about-badge";
 import { playBoot } from "./boot/boot";
 import { h, isMobileViewport, prefersReducedMotion } from "./util/dom";
+import { MOTION_KEY, isMotionReduced, readMotionPref, type MotionPref } from "./util/motion";
 import type { WmMode } from "./wm/types";
+// Last, so its orange text and icon labels win over every stylesheet above (theme.css).
+import "./theme.css";
 
 const BOOTED_KEY = "ph.booted";
 const CLASSIC_KEY = "ph.classic";
-const MOTION_KEY = "desktop.motion";
 
-/**
- * Wallpaper/intro motion preference. "auto" follows the OS
- * prefers-reduced-motion setting (Windows "Show animations" off → static);
- * "on" / "off" override it. Persisted per browser via the store.
- */
-type MotionPref = "auto" | "on" | "off";
+/** Wallpaper/intro motion preference (util/motion.ts); the desktop menu cycles it. */
 const MOTION_CYCLE: Record<MotionPref, MotionPref> = { auto: "on", on: "off", off: "auto" };
 
 /**
- * Classic-site opt-out. The plain pages set/clear localStorage["ph.classic"]
- * when they see ?classic=1 / ?classic=0 (see layout.ts). If it's set, this
- * top-level visit should be the plain site: bounce to the same URL with
- * ?classic=1 (the server's desktop gate lets that through). Cache-safe: the
- * CDN never has to know about the preference.
+ * The classic view is switched off for now (owner's call, 2026-10-22): every
+ * visit is the desktop. It used to be a sticky per-browser choice, and with no
+ * way back from the plain site it trapped people there. Browsers that still
+ * carry the old flag get it cleared here, so they come back to the desktop.
  */
+function clearClassicFlag(): void {
+  try { localStorage.removeItem(CLASSIC_KEY); } catch { /* storage blocked: nothing to clear */ }
+}
+
 /** data-open comes from the request URL. The server sanitizes it; this is defence in depth. */
 function sameOriginPath(raw: string | undefined): string | null {
   if (!raw || raw[0] !== "/" || raw.startsWith("//") || raw.startsWith("/\\")) return null;
@@ -52,22 +60,10 @@ function sameOriginPath(raw: string | undefined): string | null {
   }
 }
 
-function classicRedirect(): boolean {
-  try {
-    if (localStorage.getItem(CLASSIC_KEY) !== "1") return false;
-  } catch {
-    return false;
-  }
-  const u = new URL(location.href);
-  u.searchParams.set("classic", "1");
-  location.replace(u.pathname + u.search + u.hash);
-  return true;
-}
-
 function main(): void {
   const rootEl = document.getElementById("ph-root");
   if (!rootEl) return;
-  if (classicRedirect()) return;
+  clearClassicFlag();
   document.body.classList.add("ph-body");
 
   const openPath = sameOriginPath(rootEl.dataset.open);
@@ -77,11 +73,8 @@ function main(): void {
   const store = createLocalStore();
   // Default is "on": the owner wants the motion for everyone. "auto" (follow the
   // OS reduced-motion setting) and "off" are one click away in the desktop menu.
-  const readMotion = (): MotionPref => {
-    const v = store.get<string>(MOTION_KEY);
-    return v === "auto" || v === "off" ? v : "on";
-  };
-  const effectiveReduced = (pref: MotionPref): boolean => (pref === "on" ? false : pref === "off" ? true : osReducedMotion);
+  const readMotion = (): MotionPref => readMotionPref(store);
+  const effectiveReduced = (pref: MotionPref): boolean => isMotionReduced(pref, osReducedMotion);
   // ?motion=on|off|auto sets the preference from a link (demo / support).
   try {
     const q = new URLSearchParams(location.search).get("motion");
@@ -101,24 +94,29 @@ function main(): void {
   rootEl.replaceChildren(canvas, desktopArea, taskbar);
 
   // ── Modules ──────────────────────────────────────────────────────────────
-  let wallpaper = createWallpaper(canvas, { reducedMotion, quietBottomPx: 0 });
+  // The Hash Globe (desktop/wallpaper-horizon.ts), the owner's pick on 2026-11-06.
+  const makeWallpaper = (reduced: boolean) => createHorizonWallpaper(canvas, { reducedMotion: reduced, quietBottomPx: 0 });
+  let wallpaper = makeWallpaper(reducedMotion);
   const applyTick = (t: import("./data/tick").Tick) =>
     wallpaper.update({
       poolHashratePhs: t.hashratePhs, avg1dPhs: t.avg1dPhs, networkDifficulty: t.difficulty,
       potAgeBlocks: t.potBlocks, potAgeHours: t.potHours, potVerdict: t.potVerdict,
-      btcPriceUsd: t.btcUsd, phdBanked: t.phdBanked, chainHeight: t.height,
+      btcPriceUsd: t.btcUsd, phdBanked: t.phdBanked, chainHeight: t.height, blocksFound: t.blocksFound ?? null,
     });
-  /** Swap the wallpaper for one with the new motion setting, keeping data and dim state. */
-  const setMotion = (pref: MotionPref) => {
-    motion = pref;
-    store.set(MOTION_KEY, pref);
+  /** Rebuild the wallpaper (new motion setting), keeping data and dim state. */
+  const swapWallpaper = () => {
     wallpaper.destroy();
-    wallpaper = createWallpaper(canvas, { reducedMotion: effectiveReduced(pref), quietBottomPx: 0 });
+    wallpaper = makeWallpaper(effectiveReduced(motion));
     wallpaper.resize();
     const last = tick.latest();
     if (last) applyTick(last);
     wallpaper.setDimmed(wm.list().some((w) => !w.minimized));
     wallpaper.resume();
+  };
+  const setMotion = (pref: MotionPref) => {
+    motion = pref;
+    store.set(MOTION_KEY, pref);
+    swapWallpaper();
   };
   const motionLabel = (): string => {
     const state = effectiveReduced(motion) ? "static" : "animated";
@@ -126,17 +124,32 @@ function main(): void {
     return `Wallpaper motion: ${pref} · ${state}`;
   };
   const tick = createTickFeed({ url: rootEl.dataset.tick || "/api/tick" });
-  const wm = createWindowManager({ root: windowsRoot, storage: store, mode });
+  // Windows open big beside the icon columns, so the icons stay in view (desktop/large-area.ts).
+  const wm = createWindowManager({ root: windowsRoot, storage: store, mode, largeArea: () => largeAreaBeside(iconsRoot, windowsRoot) });
   // Identity only — reads an address, never moves funds. A previous session is
   // resumed silently (no popup) so the Profile icon survives a reload.
-  const wallet = createWalletSession(store);
+  // The server's view of who this is — only it can say "owner" (session/me.ts).
+  // Made first: an Xverse sign-in IS a server session, so the wallet resumes from it.
+  const me = createServerSession();
+  const wallet = createWalletSession(store, { server: me });
   // Practice progress follows the signed-in wallet, falling back to a per-browser
   // record for guests. Nothing here is an NFT; every screen that reads it says so.
   const ledger = createPracticeLedger(store, wallet.account());
   wallet.subscribe((acct) => ledger.setIdentity(acct));
+  // The display name follows the server session; site activity feeds the Parahawk badges.
+  const profile = createProfileSession(me);
+  startActivityTracker(me);
+  // Icon badges that keep running while their windows are closed (desktop/icon-badges.ts).
+  watchChatUnread(me);
+  watchSuggestionsInbox(me);
+  watchChangelog(store);
+  watchAbout(store);
+  void me.refresh();
   const desktop = createDesktop({
-    iconsRoot, taskbarRoot: taskbar, wm, apps: APPS, store, tick, wallet, ledger, mode,
-    extraMenuItems: () => [{ label: motionLabel(), onSelect: () => setMotion(MOTION_CYCLE[motion]) }],
+    iconsRoot, taskbarRoot: taskbar, wm, apps: APPS, store, tick, wallet, ledger, me, profile, mode,
+    extraMenuItems: () => [
+      { label: motionLabel(), onSelect: () => setMotion(MOTION_CYCLE[motion]) },
+    ],
   });
 
   tick.subscribe((t, meta) => {
@@ -144,15 +157,36 @@ function main(): void {
     if (meta.blockFound) wallpaper.blockFound();
   });
 
-  // Dim the wallpaper whenever any window is visible; mirror the Parahawk window's path into the URL bar.
+  // Dim the wallpaper whenever any window is visible, and mirror the page a
+  // site window is showing into the URL bar, so the address is always a link
+  // back to what is on screen. Whichever site window navigated last owns it.
+  let urlOwner: string | null = null;
   wm.on((e) => {
     const anyVisible = wm.list().some((w) => !w.minimized);
     wallpaper.setDimmed(anyVisible);
-    if (e.type === "navigate" && e.id === "parahawk") {
+    if (e.type === "navigate") {
+      urlOwner = e.id;
       history.replaceState(null, "", e.path);
-    } else if (e.type === "close" && e.id === "parahawk") {
+      // Signing in or out happens on /account; ask the server who we are now.
+      void me.refresh();
+    } else if (e.type === "close" && e.id === urlOwner) {
+      urlOwner = null;
       history.replaceState(null, "", "/");
     }
+    // A closed game can no longer say it stopped playing; resume for it.
+    if (e.type === "close" && e.id === "game" && gamePlaying) { gamePlaying = false; wallpaper.resume(); }
+  });
+
+  // A live Block Hunt run wants the whole frame budget (the owner's Edge
+  // rasterises in software), so the wallpaper holds still while one is in play
+  // and picks up again the moment it ends. The game announces it with a
+  // bubbling `ph:game-playing` event.
+  let gamePlaying = false;
+  rootEl.addEventListener("ph:game-playing", (ev) => {
+    const playing = (ev as CustomEvent<{ playing?: boolean }>).detail?.playing === true;
+    if (playing === gamePlaying) return;
+    gamePlaying = playing;
+    if (playing) wallpaper.pause(); else wallpaper.resume();
   });
 
   // ── Responsive mode ──────────────────────────────────────────────────────
@@ -172,7 +206,7 @@ function main(): void {
   const reveal = () => {
     rootEl.removeAttribute("data-booting");
     wallpaper.resume();
-    if (openPath) desktop.openApp("parahawk", openPath);
+    if (openPath) desktop.openPath(openPath);
   };
 
   let seenBoot = false;
@@ -191,6 +225,8 @@ function main(): void {
       short: mode === "mobile" || (navigator as { connection?: { saveData?: boolean } }).connection?.saveData === true,
       // wantBoot already accounts for the OS setting and the user's motion preference.
       ignoreReducedMotion: true,
+      // "BLOCK N IMMINENT" counts itself: the first tick is already in flight (tick.start() above).
+      poolBlocks: () => tick.latest()?.blocksFound ?? null,
       onComplete: () => {
         try { sessionStorage.setItem(BOOTED_KEY, "1"); } catch { /* ignore */ }
         reveal();
@@ -230,7 +266,7 @@ function main(): void {
   }
 
   // Debug handle.
-  (window as unknown as { ph: unknown }).ph = { wm, desktop, get wallpaper() { return wallpaper; }, tick, wallet, ledger, apps: APPS, setMotion, getMotion: () => motion };
+  (window as unknown as { ph: unknown }).ph = { wm, desktop, get wallpaper() { return wallpaper; }, tick, wallet, ledger, me, profile, apps: APPS, setMotion, getMotion: () => motion };
 }
 
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", main);

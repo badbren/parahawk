@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "dev:web": "tsx watch --clear-screen=false scripts/dev-web.ts",
     "build": "npm run build:server && npm run build:shell",
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p src/shell/tsconfig.json",

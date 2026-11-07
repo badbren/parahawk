@@ -95,7 +95,10 @@ export async function recordVisit(req: HitRequest): Promise<void> {
   try {
     const day = dayKey();
     const ipHash = hashIp(clientIp(req));
-    const client = db();
+    // Only the deployed site counts toward the live numbers: a local run uses the
+    // production .env, and its own page views must not inflate "visitors today"
+    // (same rule as src/game/store.ts). Locally they're counted in memory.
+    const client = process.env.VERCEL ? db() : null;
     if (client) {
       await client.rpc("parahawk_track_hit", { p_day: day, p_ip_hash: ipHash });
       return;

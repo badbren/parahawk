@@ -2,7 +2,7 @@ import { renderPage } from "../layout.js";
 import { getRouterOrders } from "../../data/parasite.js";
 import { getOverview } from "../../services/overview.js";
 import { getAddressResolver } from "../../services/winners.js";
-import { walletCell } from "../addr.js";
+import { walletCell, walletNames } from "../addr.js";
 import {
   fmtDiff,
   fmtHashrate,
@@ -67,6 +67,11 @@ export async function renderOrderBooks(): Promise<string> {
   const topRenters = [...byAddr.values()]
     .sort((a, b) => b.hashratePhs - a.hashratePhs || b.requestedPhd - a.requestedPhd)
     .slice(0, 15);
+  // Profile names for the top renters and the 50 orders the table shows, in one lookup.
+  const names = await walletNames(
+    [...topRenters.map((r) => r.address), ...orders.slice(0, 50).map((o) => o.address)],
+    resolve,
+  );
 
   const renterRows =
     topRenters.length === 0
@@ -76,7 +81,7 @@ export async function renderOrderBooks(): Promise<string> {
             const spend = spendFor(r.deliveredPhd, hashprice, btcPrice);
             return `<tr>
               <td class="dim">${i + 1}</td>
-              <td>${walletCell(r.address, resolve)}</td>
+              <td>${walletCell(r.address, resolve, names)}</td>
               <td class="dim">${fmtInt(r.orders)}</td>
               <td>${fmtHashrate(r.hashratePhs)}</td>
               <td>${fmtPhd(r.requestedPhd)} <span class="dim">/ ${fmtPhd(r.deliveredPhd)} del</span></td>
@@ -114,7 +119,7 @@ export async function renderOrderBooks(): Promise<string> {
             const provClass = prov === "Refinery" ? "green" : "dim";
             return `<tr>
               <td class="dim">${esc(o.id)}</td>
-              <td>${addr ? walletCell(addr, resolve) : "<span class='dim'>—</span>"}</td>
+              <td>${addr ? walletCell(addr, resolve, names) : "<span class='dim'>—</span>"}</td>
               <td class="${provClass}">${esc(prov)}</td>
               <td class="${sc}">${o.status}</td>
               <td>${fmtHashrate(o.hashratePhs)}</td>

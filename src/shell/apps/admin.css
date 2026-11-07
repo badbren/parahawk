@@ -1,0 +1,95 @@
+/* Admin window — the owner's dashboard. Same family as Suggestions / Profile. Tokens come from ../shell.css. */
+.ph-adm{box-sizing:border-box;height:100%;display:flex;flex-direction:column;min-height:0;font:13px/1.55 var(--ph-mono);color:var(--ph-fg)}
+.ph-adm p{margin:0 0 8px}
+.ph-adm strong{color:#fff;font-weight:600}
+
+.ph-adm-head{flex:none;padding:14px 20px 10px;border-bottom:1px solid var(--ph-line);background:linear-gradient(180deg,#0e0e0e,#080808)}
+.ph-adm-head-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.ph-adm-head h1{margin:0;font:900 24px/1.1 var(--ph-head);letter-spacing:.04em;text-transform:uppercase;color:var(--ph-accent)}
+.ph-adm-head-sub{color:var(--ph-dim);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.ph-adm-spacer{flex:1 1 auto}
+.ph-adm-updated{color:var(--ph-dim);font-size:11px;white-space:nowrap}
+.ph-adm-notice{margin:8px 0 0 !important;color:var(--ph-amber);font-size:12px}
+.ph-adm-notice[hidden]{display:none}
+
+/* Tabs: Win98 buttons; the selected one is pressed in. */
+.ph-adm-tabs{flex:none;display:flex;flex-wrap:wrap;gap:6px;padding:10px 20px 0}
+.ph-adm-tab,.ph-adm-btn{font:inherit;font-size:12px;letter-spacing:.06em;color:var(--ph-fg);background:#101010;border:1px solid #000;
+  box-shadow:inset 1px 1px 0 #2e2e2e,inset -1px -1px 0 #050505;padding:4px 14px;cursor:pointer}
+.ph-adm-tab:hover,.ph-adm-btn:hover{background:#161616}
+.ph-adm-tab[aria-selected="true"]{color:var(--ph-accent);background:#0b0b0b;box-shadow:inset 1px 1px 0 #050505,inset -1px -1px 0 #2e2e2e}
+.ph-adm-btn:active{box-shadow:inset 1px 1px 0 #050505,inset -1px -1px 0 #2e2e2e}
+.ph-adm-tab:focus-visible,.ph-adm-btn:focus-visible{outline:1px dotted var(--ph-accent);outline-offset:-3px}
+
+.ph-adm-body{flex:1 1 auto;min-height:0;overflow:auto}
+.ph-adm-panel{padding:14px 20px 22px}
+.ph-adm-panel[hidden]{display:none}
+.ph-adm-panel-prices{padding:0;height:100%}
+.ph-adm-frame{display:block;width:100%;height:100%;min-height:420px;border:0;background:#000}
+.ph-adm-msg{color:var(--ph-dim);padding:6px 0}
+.ph-adm-lead{margin:0 0 10px !important}
+.ph-adm-dim{color:var(--ph-dim)}
+.ph-adm-mono{font-family:var(--ph-mono);white-space:nowrap}
+.ph-adm-num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ph-adm-h2,.ph-adm-box h2{margin:18px 0 8px;font:600 11px/1.4 var(--ph-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ph-dim)}
+.ph-adm-box h2{margin-top:0}
+
+/* Overview cards */
+.ph-adm-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin:0 0 16px}
+.ph-adm-card{display:flex;flex-direction:column;gap:2px;text-align:left;font:inherit;color:inherit;background:#0b0b0b;border:1px solid var(--ph-line);
+  border-top:2px solid #1d2a14;padding:12px 14px}
+.ph-adm-card.is-link{cursor:pointer}
+.ph-adm-card.is-link:hover{background:#0f130b;border-color:#2c4a1c}
+.ph-adm-card.is-link:focus-visible{outline:1px dotted var(--ph-accent);outline-offset:-3px}
+.ph-adm-card-v{font:900 30px/1.1 var(--ph-head);letter-spacing:.02em;color:#fff;font-variant-numeric:tabular-nums}
+.ph-adm-card-l{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ph-accent)}
+.ph-adm-card-n{font-size:11px;color:var(--ph-dim)}
+
+.ph-adm-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.ph-adm-box{border:1px solid var(--ph-line);background:#080808;padding:12px 14px}
+
+/* Short lists (recently active, latest badges) */
+.ph-adm-mini{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.ph-adm-mini li{border-bottom:1px solid #151515}
+.ph-adm-mini li:last-child{border-bottom:0}
+.ph-adm-rowbtn{display:flex;align-items:center;gap:8px;width:100%;text-align:left;font:inherit;color:inherit;background:none;border:0;padding:6px 2px;cursor:pointer}
+.ph-adm-rowbtn:hover{background:#101010}
+.ph-adm-rowbtn:focus-visible{outline:1px dotted var(--ph-accent);outline-offset:-2px}
+.ph-adm-right{margin-left:auto;white-space:nowrap;font-size:11px}
+.ph-adm-emoji{font-size:15px;line-height:1}
+
+/* People */
+.ph-adm-av{flex:none;width:22px;height:22px;border-radius:50%;object-fit:cover;border:1px solid #000;box-shadow:0 0 0 1px #2a2a2a}
+.ph-adm-av-txt{display:inline-flex;align-items:center;justify-content:center;font:700 11px/1 var(--ph-mono);color:#fff}
+.ph-adm-who{display:inline-flex;align-items:baseline;gap:6px;min-width:0}
+.ph-adm-name{color:#fff;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ph-adm-tag{flex:none;font-size:10px;letter-spacing:.08em;padding:0 5px;border:1px solid var(--ph-accent);color:var(--ph-accent);line-height:1.6}
+.ph-adm-tag-priv{border-color:var(--ph-amber);color:var(--ph-amber)}
+
+/* Tables */
+.ph-adm-scroll{overflow:auto;border:1px solid var(--ph-line)}
+.ph-adm-table{width:100%;border-collapse:collapse}
+.ph-adm-table th,.ph-adm-table td{padding:6px 10px;border-bottom:1px solid #151515;text-align:left;vertical-align:middle}
+.ph-adm-table th{position:sticky;top:0;background:#0d0d0d;font-weight:600;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ph-dim);z-index:1}
+.ph-adm-table th.ph-adm-num,.ph-adm-table td.ph-adm-num{text-align:right}
+.ph-adm-tr{cursor:pointer}
+.ph-adm-tr:hover{background:#0f130b}
+.ph-adm-tr:focus-visible{outline:1px dotted var(--ph-accent);outline-offset:-2px}
+.ph-adm-tr.is-owner{background:#0b0b0b}
+.ph-adm-cell-who{display:flex;align-items:center;gap:8px}
+.ph-adm-badges{white-space:nowrap;letter-spacing:2px}
+
+/* Traffic bars */
+.ph-adm-barcell{width:28%;min-width:80px}
+.ph-adm-bar{display:block;height:8px;background:#121212;border:1px solid #1d1d1d}
+.ph-adm-bar i{display:block;height:100%;background:var(--ph-accent)}
+.ph-adm-bar.is-visitors i{background:var(--ph-amber)}
+
+@media (max-width:600px){
+  .ph-adm-head{padding:12px 14px 8px}
+  .ph-adm-head h1{font-size:20px}
+  .ph-adm-tabs{padding:8px 14px 0}
+  .ph-adm-panel{padding:12px 14px 18px}
+  .ph-adm-cards{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .ph-adm-card-v{font-size:24px}
+}

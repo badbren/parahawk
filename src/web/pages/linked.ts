@@ -1,6 +1,7 @@
 import { renderPage } from "../layout.js";
 import { config } from "../../config.js";
 import { esc } from "../format.js";
+import { nameTag, walletNames } from "../addr.js";
 import { csrfToken, type Session } from "../../services/auth.js";
 import { getLinkedAccounts, type LinkedAccountView, type Venue } from "../../services/linked.js";
 import { isVaultReady } from "../../services/vault.js";
@@ -187,7 +188,7 @@ export async function renderLinked(session: Session | null, msg?: string): Promi
   if (!session) {
     inner = `${flash(msg)}${connectCard()}`;
   } else {
-    const linked = await getLinkedAccounts(session.address);
+    const [linked, names] = await Promise.all([getLinkedAccounts(session.address), walletNames([session.address])]);
     const byVenue = new Map(linked.map((l) => [l.venue, l]));
     const csrf = csrfToken(session.address);
 
@@ -200,7 +201,7 @@ ${flash(msg)}
 <div class="card" style="max-width:760px;margin-bottom:22px">
   <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
     <div><div class="k" style="color:var(--dim);font-size:14px;text-transform:uppercase;letter-spacing:1px">Connected as</div>
-      <div style="font-size:20px;color:#fff;word-break:break-all;margin-top:4px">${esc(session.address)}</div></div>
+      <div style="font-size:20px;color:#fff;word-break:break-all;margin-top:4px">${esc(session.address)}${nameTag(session.address, names)}</div></div>
     <form method="POST" action="/account/disconnect"><button type="submit" style="background:#141414;color:var(--dim)">Disconnect</button></form>
   </div>
 </div>

@@ -2,6 +2,7 @@ import { config } from "../config.js";
 import { tipQrDataUrl } from "./qr.js";
 import { esc } from "./format.js";
 import { parahawkLogo } from "./logo.js";
+import { THEME_CSS } from "./theme.js";
 
 export interface PageOpts {
   title: string;
@@ -12,6 +13,11 @@ export interface PageOpts {
   body: string;
   /** Optional stale banner text. */
   staleBanner?: string | null;
+  /**
+   * Just the page itself — no site header, nav or footer — for a page shown
+   * inside a desktop app of its own (e.g. the Admin window's Prices tab).
+   */
+  bare?: boolean;
 }
 
 /**
@@ -26,17 +32,14 @@ const NAV_GROUPS: Array<Array<[string, string]>> = [
   [
     ["/potmath", "calculator"],
     ["/marketplace", "marketplace"],
-    ["/inscribe", "inscribe"],
   ],
   [
     ["/board", "bravocados"],
     ["/badges", "badges"],
-    ["/community", "community"],
+    ["/leaderboard", "leaderboard"],
   ],
   [
     ["/account", "account"],
-    ["/about", "about"],
-    ["/changelog", "changelog"],
   ],
 ];
 
@@ -54,6 +57,9 @@ body{
 }
 a{color:var(--accent); text-decoration:none; border-bottom:1px dotted #4a5a33}
 a:hover{color:#c7f59a}
+/* "(badbren)" after a wallet: its owner's Parahawk name, opens their profile (src/web/addr.ts). */
+a.pname{color:#e6e6e6; border-bottom-color:#555; white-space:nowrap}
+a.pname:hover{color:#fff; border-bottom-color:var(--accent)}
 .wrap{max-width:1760px; margin:0 auto; padding:0 40px}
 header.top{border-bottom:1px solid var(--line); padding:18px 0; position:sticky; top:0; background:var(--bg); z-index:5}
 .toprow{display:flex; align-items:center; gap:24px; flex-wrap:wrap}
@@ -187,7 +193,7 @@ ${opts.head ?? ""}
     <feDisplacementMap in="SourceGraphic" in2="n" scale="4" xChannelSelector="R" yChannelSelector="G"/>
   </filter>
 </defs></svg>
-<header class="top"><div class="wrap">
+${opts.bare ? "" : `<header class="top"><div class="wrap">
   <div class="toprow">
     <a class="brand" href="/" aria-label="Parahawk home">${parahawkLogo({ height: 80 })}</a>
     <button class="navtoggle" type="button" aria-label="Toggle menu" aria-controls="nav" aria-expanded="false" onclick="var n=document.getElementById('nav');var o=n.classList.toggle('open');this.setAttribute('aria-expanded',o);this.querySelector('.nticon').textContent=o?'✕':'☰';"><span class="nticon">☰</span> Menu</button>
@@ -198,24 +204,23 @@ ${opts.head ?? ""}
     <a class="discord" href="https://discord.gg/mCTsFC3MEH" target="_blank" rel="noopener" aria-label="Join the Parahawk Discord" title="Join the Parahawk Discord for alerts &amp; updates"><svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true"><path d="M20.317 4.369a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.211.375-.446.865-.608 1.249a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.249.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.369a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.291a.077.077 0 0 1-.006.128 12.3 12.3 0 0 1-1.873.891.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.673-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.331c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg></a>
   </div>
   <nav id="nav">${nav}</nav>
-</div></header>
+</div></header>`}
 <main><div class="wrap">
 ${stale}
 ${opts.body}
 </div></main>
-<footer class="bot"><div class="wrap">
+${opts.bare ? "" : `<footer class="bot"><div class="wrap">
   <div>
     <div>Parahawk — free stats &amp; alerts for the <a href="https://parasite.space" target="_blank" rel="noopener">Parasite Pool</a> 🥑</div>
     <div style="margin-top:6px">
       <a href="https://github.com/badbren/parahawk" target="_blank" rel="noopener">⧉ open source on GitHub</a> ·
-      <a href="/changelog">changelog</a> ·
       <a href="https://ordinalmaxibiz.wiki/bravocados" target="_blank" rel="noopener">🥑 Bravocados wiki</a> ·
       <a href="https://ordinalmaxibiz.wiki/explorer" target="_blank" rel="noopener">OMB explorer</a>
     </div>
     <div class="muted-note">not affiliated with Parasite Pool or OMB · data is best-effort · no financial advice</div>
   </div>
   ${tipBlock}
-</div></footer>
+</div></footer>`}
 <script>
 (function(){
   try{
@@ -226,17 +231,37 @@ ${opts.body}
 })();
 (function(){
   // Desktop shell hooks: tell the parent window where we are (title-bar +
-  // history sync), and persist the ?classic flag the shell honours.
+  // history sync). The classic view is off for now, so the old sticky
+  // ph.classic flag is cleared rather than set (see src/shell/main.ts).
   try{
     if(window.self!==window.top){
       var post=function(){ try{ parent.postMessage({ph:'nav',path:location.pathname+location.search,title:document.title},location.origin); }catch(e){} };
       post(); addEventListener('pageshow',post);
     }
-    var m=/[?&]classic=([01])(?:&|$)/.exec(location.search);
-    if(m){ try{ if(m[1]==='1') localStorage.setItem('ph.classic','1'); else localStorage.removeItem('ph.classic'); }catch(e){} }
+    try{ localStorage.removeItem('ph.classic'); }catch(e){}
+  }catch(e){}
+})();
+(function(){
+  // Links that open another desktop window, e.g. the "(name)" after a wallet
+  // opens that person's profile: inside the desktop, ask the shell to open the
+  // path in its own window ({ph:'open'}, src/shell/desktop/desktop.ts) instead
+  // of navigating this one. Outside the desktop, or with a modifier key, the
+  // href just works.
+  try{
+    if(window.self===window.top) return;
+    document.addEventListener('click',function(ev){
+      if(ev.defaultPrevented||ev.button!==0||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey) return;
+      var t=ev.target, el=t&&t.closest?t.closest('[data-ph-open]'):null;
+      if(!el) return;
+      var p=el.getAttribute('data-ph-open')||'';
+      if(p.charAt(0)!=='/'||p.charAt(1)==='/'||p.charCodeAt(1)===92) return;
+      ev.preventDefault();
+      try{ parent.postMessage({ph:'open',path:p},location.origin); }catch(e){ location.href=p; }
+    });
   }catch(e){}
 })();
 </script>
+<style>${THEME_CSS}</style>
 </body>
 </html>`;
 }

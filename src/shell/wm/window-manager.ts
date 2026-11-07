@@ -18,6 +18,12 @@ const DEFAULT_MIN: Size = { w: 420, h: 320 };
 const KEEP = 40;
 const SNAP_PX = 8;
 const SAVE_DEBOUNCE_MS = 150;
+/**
+ * Where a window's size and place are remembered, per window id. "wm2." since
+ * 2026-11-06, when windows started opening big beside the icons: sizes saved
+ * under the old "wm." key were the old small defaults, so everyone starts fresh once.
+ */
+const geomKey = (id: string): string => `wm2.${id}`;
 
 type HandleDir = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 const HANDLES: HandleDir[] = ["n", "s", "e", "w", "ne", "nw", "se", "sw"];
@@ -107,11 +113,19 @@ export function createWindowManager(opts: WindowManagerOptions): WindowManager {
   };
 
   const defaultRect = (spec: WindowSpec, rw: number, rh: number, min: Size): Rect => {
+    const n = [...wins.values()].filter((o) => !o.state.minimized).length;
+    const off = n * cascadeStep;
+    // Big by default: the area beside the icons. Later windows step down and in,
+    // shrinking by the step so they never hang off the right or bottom edge.
+    const large = spec.defaultSize ? null : opts.largeArea?.() ?? null;
+    if (large) {
+      const w = clamp(Math.max(large.w - off, min.w), 1, rw);
+      const hh = clamp(Math.max(large.h - off, min.h), 1, rh);
+      return constrain({ x: large.x + off, y: large.y + off, w, h: hh }, rw, rh);
+    }
     const size = spec.defaultSize ?? { w: Math.round(rw * 0.75), h: Math.round(rh * 0.75) };
     const w = clamp(Math.max(size.w, min.w), 1, rw);
     const hh = clamp(Math.max(size.h, min.h), 1, rh);
-    const n = [...wins.values()].filter((o) => !o.state.minimized).length;
-    const off = n * cascadeStep;
     return constrain({ x: Math.round((rw - w) / 2) + off, y: Math.round((rh - hh) / 2) + off, w, h: hh }, rw, rh);
   };
 
@@ -148,7 +162,7 @@ export function createWindowManager(opts: WindowManagerOptions): WindowManager {
     if (w.saveTimer != null) clearTimeout(w.saveTimer);
     w.saveTimer = window.setTimeout(() => {
       w.saveTimer = null;
-      storage.set<Persisted>(`wm.${w.state.id}`, { rect: w.state.rect, maximized: w.state.maximized });
+      storage.set<Persisted>(geomKey(w.state.id), { rect: w.state.rect, maximized: w.state.maximized });
     }, SAVE_DEBOUNCE_MS);
   };
 
@@ -327,7 +341,7 @@ export function createWindowManager(opts: WindowManagerOptions): WindowManager {
   const build = (spec: WindowSpec): Win => {
     const min = spec.minSize ?? DEFAULT_MIN;
     const { rw, rh } = rootSize();
-    const saved = storage?.get<Persisted>(`wm.${spec.id}`) ?? null;
+    const saved = storage?.get<Persisted>(geomKey(spec.id)) ?? null;
     let rect: Rect;
     let maximized = false;
     if (saved && validRect(saved.rect, min, rw, rh)) {
@@ -437,7 +451,7 @@ export function createWindowManager(opts: WindowManagerOptions): WindowManager {
       const w = wins.get(id);
       if (!w) return;
       if (gesture?.w === w) abortGesture();
-      if (w.saveTimer != null) { clearTimeout(w.saveTimer); w.saveTimer = null; storage?.set<Persisted>(`wm.${id}`, { rect: w.state.rect, maximized: w.state.maximized }); }
+      if (w.saveTimer != null) { clearTimeout(w.saveTimer); w.saveTimer = null; storage?.set<Persisted>(geomKey(id), { rect: w.state.rect, maximized: w.state.maximized }); }
       if (typeof w.cleanup === "function") { try { w.cleanup(); } catch (err) { console.error("[wm] cleanup failed", err); } }
       w.dispose();
       w.el.remove();

@@ -2,9 +2,17 @@ import { renderPage } from "../layout.js";
 import { config } from "../../config.js";
 import { esc, timeAgo, fmtInt, fmtUsd } from "../format.js";
 import { csrfToken, type Session } from "../../services/auth.js";
-import { getAllManualPrices } from "../../services/manual-prices.js";
+import {
+  addressKey,
+  getAllManualPrices,
+  getPriceChanges,
+  getPriceEditorBans,
+  type PriceBan,
+  type PriceChange,
+} from "../../services/manual-prices.js";
+import { isOwnerAddress } from "../../services/price-updates.js";
+import { displayNamesFor, shortAddress } from "../../profile/names.js";
 import { getOverview } from "../../services/overview.js";
-import { getTrafficSummary, type TrafficSummary } from "../../services/traffic.js";
 
 /** Venues that take an admin-set manual price (no public feed). */
 export const MANUAL_VENUES: Array<{ slug: string; name: string; hint: string }> = [
@@ -23,43 +31,76 @@ export function usdPerPhdToSatsPerPhd(usd: number, btcPriceUsd: number): number 
   return (usd / btcPriceUsd) * 1e8;
 }
 
-/** Owner-only daily-traffic panel: headline cards + a 30-day visitors/views table. */
-function renderTrafficSection(t: TrafficSummary): string {
-  const maxViews = Math.max(1, ...t.days.map((d) => d.views));
-  const rows = [...t.days]
-    .reverse() // newest first in the table
-    .map((d) => {
-      const pct = Math.round((d.views / maxViews) * 100);
+/**
+ * Owner-only: every change to a hand-typed price — yours and Trusted members'
+ * (src/web/price-routes.ts) — newest first, with Revert, and Block for
+ * whoever made it. Blocked wallets are listed underneath with Unblock.
+ */
+function renderPriceUpdatesSection(
+  changes: PriceChange[],
+  bans: PriceBan[],
+  names: Map<string, string>,
+  csrf: string,
+): string {
+  const venueName = (slug: string) => MANUAL_VENUES.find((v) => v.slug === slug)?.name ?? slug;
+  const blocked = new Set(bans.map((b) => addressKey(b.address)));
+  const who = (addr: string) =>
+    isOwnerAddress(addr)
+      ? `<span class="green">you</span>`
+      : `${names.get(addr) ? `${esc(names.get(addr)!)} ` : ""}<span class="dim" title="${esc(addr)}">${esc(shortAddress(addr))}</span>`;
+  const sats = (n: number | null) => (n == null || n <= 0 ? `<span class="dim">none</span>` : fmtInt(n));
+  const form = (action: string, label: string, address?: string) =>
+    `<form method="POST" action="${action}" style="display:inline;margin:0 4px 0 0"><input type="hidden" name="csrf" value="${esc(csrf)}"/>${
+      address ? `<input type="hidden" name="address" value="${esc(address)}"/>` : ""
+    }<button type="submit" style="padding:3px 10px;font-size:13px">${label}</button></form>`;
+
+  const rows = changes
+    .map((c) => {
+      const isBlocked = blocked.has(addressKey(c.by));
+      const actions = [
+        c.kind === "update" ? form(`/api/prices/history/${encodeURIComponent(c.id)}/revert`, "Revert") : "",
+        !isOwnerAddress(c.by) && !isBlocked ? form("/api/prices/bans", "Block", c.by) : "",
+      ].join("");
       return `<tr>
-  <td>${esc(d.day)}</td>
-  <td>${fmtInt(d.visitors)}</td>
-  <td>${fmtInt(d.views)} <span class="bar" style="width:120px;margin-left:8px"><span style="width:${pct}%"></span></span></td>
+  <td>${timeAgo(c.at)}</td>
+  <td>${esc(venueName(c.venue))}</td>
+  <td>${sats(c.oldSats)} → <strong>${sats(c.newSats)}</strong> <span class="dim">sats/PHd${c.usd != null ? ` · $${c.usd.toFixed(2)}` : ""}${c.kind === "revert" ? " · put back" : ""}</span></td>
+  <td>${who(c.by)}${isBlocked ? ` <span class="red">blocked</span>` : ""}</td>
+  <td style="white-space:nowrap">${actions}</td>
 </tr>`;
     })
     .join("");
-  const devNote =
-    t.backend === "memory"
-      ? ` <span class="dim" style="font-size:14px;text-transform:none;letter-spacing:0">(dev — not persisted)</span>`
-      : "";
-  const card = (k: string, v: string, sub: string) =>
-    `<div class="card"><div class="k">${k}</div><div class="v">${esc(v)}</div><div class="sub">${esc(sub)}</div></div>`;
+
+  const banList = bans.length
+    ? `<ul style="margin:8px 0 0;padding-left:20px">${bans
+        .map((b) => `<li style="margin:6px 0">${who(b.address)} <span class="dim">· blocked ${timeAgo(b.at)}</span> ${form("/api/prices/bans/remove", "Unblock", b.address)}</li>`)
+        .join("")}</ul>`
+    : `<p class="dim" style="margin:6px 0 0">Nobody.</p>`;
+
   return `
-<h2>Traffic${devNote}</h2>
-<p class="lead">Unique visitors (by IP) and page views per UTC day. Counted by a client beacon on public pages; this dashboard is excluded.</p>
-<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-bottom:22px">
-  ${card("Today · visitors", fmtInt(t.today.visitors), `${fmtInt(t.today.views)} views`)}
-  ${card("Last 7d · visitors", fmtInt(t.last7.visitors), `${fmtInt(t.last7.views)} views`)}
-  ${card("Last 30d · visitors", fmtInt(t.last30.visitors), `${fmtInt(t.last30.views)} views`)}
-</div>
-<div class="card" style="padding:0;overflow-x:auto">
-  <table style="margin:0">
-    <thead><tr><th>Date (UTC)</th><th>Visitors</th><th>Views</th></tr></thead>
-    <tbody>${rows}</tbody>
-  </table>
-</div>`;
+<h2>Community price updates</h2>
+<p class="lead">Members with the <strong>Trusted</strong> badge can update a stale hand-typed price from the Marketplace. Every change — theirs and yours — is listed here. <strong>Revert</strong> puts back the price it replaced; <strong>Block</strong> stops that wallet editing prices (it keeps its badge).</p>
+${changes.length
+    ? `<div class="card" style="padding:0;overflow-x:auto;margin-bottom:16px"><table style="margin:0">
+  <thead><tr><th>When</th><th>Venue</th><th>Change</th><th>Who</th><th></th></tr></thead>
+  <tbody>${rows}</tbody>
+</table></div>`
+    : `<div class="card" style="margin-bottom:16px"><span class="dim">No price changes logged yet.</span></div>`}
+<h3 style="margin:0">Blocked from editing prices</h3>
+${banList}`;
 }
 
-export async function renderAdmin(session: Session | null, msg?: string): Promise<string> {
+export interface AdminPageOptions {
+  /**
+   * Just the price tools, no site header — the Admin window's Prices tab
+   * (src/shell/apps/admin.ts). Traffic and the rest of the owner's numbers live
+   * in that window now.
+   */
+  bare?: boolean;
+}
+
+export async function renderAdmin(session: Session | null, msg?: string, opts: AdminPageOptions = {}): Promise<string> {
+  const bare = opts.bare === true;
   if (!isAdmin(session)) {
     const why = !session
       ? `Connect the owner wallet on the <a href="/account">Account</a> page first.`
@@ -67,17 +108,20 @@ export async function renderAdmin(session: Session | null, msg?: string): Promis
         ? `No owner is configured yet (set <code>ADMIN_ADDRESS</code>).`
         : `This wallet isn't the owner.`;
     const body = `<h1>Admin</h1><p class="lead">Owner-only.</p><div class="card" style="max-width:620px">${why}</div>`;
-    return renderPage({ title: "Admin", active: "", body });
+    return renderPage({ title: "Admin", active: "", body, bare });
   }
 
-  const [prices, overview, traffic] = await Promise.all([
+  const [prices, overview, priceChanges, priceBans] = await Promise.all([
     getAllManualPrices().catch(() => []),
     getOverview().catch(() => null),
-    getTrafficSummary().catch(() => null),
+    getPriceChanges({ limit: 30 }).catch(() => [] as PriceChange[]),
+    getPriceEditorBans().catch(() => [] as PriceBan[]),
   ]);
   const btc = overview?.pool.btcPriceUsd ?? 0;
   const byVenue = new Map(prices.map((p) => [p.venue, p]));
   const csrf = csrfToken(session!.address);
+  const editorNames = await displayNamesFor([...priceChanges.map((c) => c.by), ...priceBans.map((b) => b.address)])
+    .catch(() => new Map<string, string>());
 
   const flash = msg
     ? `<div class="stale" style="background:#0c1408;border-color:#2c4a1c;color:#c7f59a">${esc(msg === "saved" ? "✅ Price updated." : msg)}</div>`
@@ -106,12 +150,12 @@ export async function renderAdmin(session: Session | null, msg?: string): Promis
   }).join("");
 
   const body = `
-<h1>Admin</h1>
+<h1>${bare ? "Prices" : "Admin"}</h1>
 <p class="lead">Enter what a venue's <strong>1 PH / 24h</strong> quote costs in USD; Parahawk converts to sats/PHd at the live BTC price (${btc > 0 ? fmtUsd(btc) : "—"}) and shows it on the board as <strong>"manual · updated Xm ago"</strong>.</p>
 ${flash}
 <div class="card" style="max-width:640px;margin-bottom:22px">Signed in as owner <span class="green" style="word-break:break-all">${esc(session!.address)}</span></div>
 <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(340px,1fr))">${cards}</div>
-${traffic ? renderTrafficSection(traffic) : ""}
+${renderPriceUpdatesSection(priceChanges, priceBans, editorNames, csrf)}
 <script>
 (function(){
   var BTC = ${btc > 0 ? btc : 0};
@@ -124,5 +168,5 @@ ${traffic ? renderTrafficSection(traffic) : ""}
 })();
 </script>
 `;
-  return renderPage({ title: "Admin", active: "", body });
+  return renderPage({ title: "Admin", active: "", body, bare });
 }

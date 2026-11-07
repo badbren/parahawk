@@ -1,5 +1,6 @@
 import { satsPerPhdToUsd } from "../../math/hashprice.js";
 import { getOverview } from "../../services/overview.js";
+import { onManualPriceChange } from "../../services/manual-prices.js";
 import { boardVerdict, type BoardVerdict, type VenueContext, type VenueQuote } from "./types.js";
 import { fetchNiceHashQuote } from "./nicehash.js";
 import { fetchMrrQuote } from "./miningrigrentals.js";
@@ -80,6 +81,9 @@ async function quoteFor(a: Adapter, ctx: VenueContext): Promise<VenueQuote> {
 // the venue APIs on every hit (each serverless instance keeps its own).
 let boardCache: { board: MarketBoard; at: number } | null = null;
 const BOARD_TTL_MS = 45_000;
+// A hand-typed price just changed (the owner in /admin, or a Trusted visitor on
+// the Marketplace): rebuild on the next read so the new figure shows at once.
+onManualPriceChange(() => { boardCache = null; });
 
 export async function getMarketBoard(): Promise<MarketBoard> {
   if (boardCache && Date.now() - boardCache.at < BOARD_TTL_MS) return boardCache.board;

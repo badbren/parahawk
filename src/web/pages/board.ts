@@ -5,7 +5,7 @@ import { getCadoData } from "../../services/cados.js";
 import { getCadoWinners, getAddressResolver } from "../../services/winners.js";
 import { getBravocadoFloor } from "../../services/bravocado.js";
 import { getStore } from "../../db/index.js";
-import { walletCell } from "../addr.js";
+import { nameTag, walletCell, walletNames } from "../addr.js";
 import { fmtDiff, fmtInt, fmtDuration, timeAgo, esc } from "../format.js";
 import type { LeaderboardEntry } from "../../data/types.js";
 import type { HitRow } from "../../db/types.js";
@@ -38,6 +38,17 @@ export async function renderBoard(): Promise<string> {
     : "";
 
   const tenTHits = storedHits.filter((h) => h.difficulty >= TEN_T).sort((a, b) => b.ts - a.ts);
+  // Profile names for every wallet this page shows, in one lookup: the winners,
+  // this round's 10T+ club, the live big-share feed and the top 100.
+  const names = await walletNames(
+    [
+      ...winners.winners.map((w) => w.fullAddress),
+      ...lb.difficulty.slice(0, 100).map((e) => e.address),
+      ...lb.difficulty.filter((e) => (e.bestDiff ?? 0) >= TEN_T).map((e) => e.address),
+      ...tenTHits.slice(0, 25).map((h) => h.address),
+    ],
+    resolve,
+  );
   // Authoritative all-time count: every 10T+ share that earned a Bravocado,
   // reconstructed from complete on-chain dispensary history.
   const cadoCount = cadoData?.count ?? 0;
@@ -53,7 +64,7 @@ export async function renderBoard(): Promise<string> {
               ? `${w.fullAddress.slice(0, 10)}…${w.fullAddress.slice(-4)}`
               : w.maskedAddress;
             const cell = w.fullAddress
-              ? `<a href="/address/${esc(w.fullAddress)}">${esc(label)}</a> <span class="green" style="font-size:12px">▶ stats</span>`
+              ? `<a href="/address/${esc(w.fullAddress)}">${esc(label)}</a>${nameTag(w.fullAddress, names)} <span class="green" style="font-size:12px">▶ stats</span>`
               : `<span class="dim">${esc(label)}</span>`;
             return `<tr><td class="dim">${w.rank}</td><td>${cell}</td><td>${fmtDiff(
               w.bestDiff,
@@ -69,7 +80,7 @@ export async function renderBoard(): Promise<string> {
       ? `<tr><td colspan="4" class="dim">no 10T+ miners this round yet</td></tr>`
       : bravocados
           .map(
-            (e, i) => `<tr><td class="dim">${i + 1}</td><td>${walletCell(e.address, resolve)}</td><td>${fmtDiff(
+            (e, i) => `<tr><td class="dim">${i + 1}</td><td>${walletCell(e.address, resolve, names)}</td><td>${fmtDiff(
               e.bestDiff ?? 0,
             )}</td><td>${bravoBadge(e.bestDiff ?? 0)}</td></tr>`,
           )
@@ -120,7 +131,7 @@ export async function renderBoard(): Promise<string> {
     const rows = recent
       .map(
         (h) =>
-          `<tr><td class="dim">${timeAgo(h.ts)}</td><td>${walletCell(h.address, resolve)}</td><td>${fmtDiff(
+          `<tr><td class="dim">${timeAgo(h.ts)}</td><td>${walletCell(h.address, resolve, names)}</td><td>${fmtDiff(
             h.difficulty,
           )}</td><td>${bravoBadge(h.difficulty)}</td></tr>`,
       )
@@ -135,7 +146,7 @@ export async function renderBoard(): Promise<string> {
     .slice(0, 100)
     .map(
       (e: LeaderboardEntry) =>
-        `<tr><td class="dim">${e.rank}</td><td>${walletCell(e.address, resolve)}</td><td>${fmtDiff(e.bestDiff ?? 0)}</td></tr>`,
+        `<tr><td class="dim">${e.rank}</td><td>${walletCell(e.address, resolve, names)}</td><td>${fmtDiff(e.bestDiff ?? 0)}</td></tr>`,
     )
     .join("");
 

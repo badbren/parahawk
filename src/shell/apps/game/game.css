@@ -1,0 +1,178 @@
+/* Block Hunt — the game window. Tokens come from ../../shell.css.
+   Lives in its own file so the game can be restyled without touching the
+   other app windows (apps.css). The claim reveal stays in apps.css: it is
+   the collection's card, shown over the game. */
+
+.ph-game{box-sizing:border-box;height:100%;display:flex;flex-direction:column;gap:8px;padding:10px;background:#000;font:13px/1.6 var(--ph-mono);color:var(--ph-fg);overflow:hidden;container-type:inline-size}
+
+/* ── HUD: where you are on the left, what you are carrying on the right ── */
+.ph-game-hud{flex:none;display:flex;align-items:stretch;gap:14px;padding:7px 10px;border:1px solid var(--ph-line);background:#0b0b0b;
+  box-shadow:inset 1px 1px 0 #161616,inset -1px -1px 0 #050505}
+.ph-game-hud-l{flex:none;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ph-dim)}
+
+.ph-game-depth{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:4px}
+
+/* The lamp: your life down here. Amber when healthy, red and pulsing when low. */
+.ph-game-lamp{display:flex;align-items:center;gap:7px;min-width:0}
+.ph-game-lamp-l{flex:none;font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#d9a441}
+.ph-game-lamp b{position:relative;flex:1;min-width:30px;height:9px;border:1px solid #000;background:#140d04;box-shadow:inset 1px 1px 0 #050505,inset -1px -1px 0 #2a1d0b;overflow:hidden}
+.ph-game-lamp-fill{position:absolute;inset:0;display:block;transform-origin:left center;
+  background:linear-gradient(90deg,#c9761f,#ffcf5a);box-shadow:0 0 8px rgba(255,190,80,.5)}
+.ph-game-lamp-v{flex:none;min-width:2.6ch;text-align:right;font:700 11px/1 var(--ph-mono);color:#ffcf7a;font-variant-numeric:tabular-nums}
+.ph-game-lamp.is-low .ph-game-lamp-fill{background:linear-gradient(90deg,#a3221e,#ff5c4a);animation:ph-game-lamp-low .5s steps(2) infinite}
+.ph-game-lamp.is-low .ph-game-lamp-v,.ph-game-lamp.is-low .ph-game-lamp-l{color:#ff6b5a}
+@keyframes ph-game-lamp-low{50%{opacity:.45}}
+@media (prefers-reduced-motion:reduce){.ph-game-lamp.is-low .ph-game-lamp-fill{animation:none}}
+
+/* Sound on/off — a speaker, struck through when off. */
+.ph-game-mute{flex:none;align-self:center;width:30px;height:30px;padding:0;cursor:pointer;background:#111;border:1px solid #000;
+  box-shadow:inset 1px 1px 0 #2a2a2a,inset -1px -1px 0 #050505;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e6e6e6' stroke-width='2' stroke-linejoin='round' stroke-linecap='round'%3E%3Cpath d='M4 9h4l5-4v14l-5-4H4z'/%3E%3Cpath d='M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:center;background-size:18px}
+.ph-game-mute.is-off{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a8a8a' stroke-width='2' stroke-linejoin='round' stroke-linecap='round'%3E%3Cpath d='M4 9h4l5-4v14l-5-4H4z'/%3E%3Cpath d='M16 9l5 6M21 9l-5 6' stroke='%23ff6b6b'/%3E%3C/svg%3E")}
+.ph-game-mute:active{box-shadow:inset 1px 1px 0 #050505,inset -1px -1px 0 #2a2a2a}
+.ph-game-mute:focus-visible{outline:2px dotted var(--ph-accent);outline-offset:1px}
+.ph-game-depth-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;min-width:0}
+.ph-game-stratum{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ph-dim);transition:color .4s}
+.ph-game-time{flex:none;font-size:11px;color:var(--ph-dim);font-variant-numeric:tabular-nums}
+.ph-game-air{position:relative;height:4px;border:1px solid #000;background:#080808;box-shadow:inset 1px 1px 0 #050505,inset -1px -1px 0 #222;overflow:hidden}
+/* Scaled, not resized: no layout per frame. */
+.ph-game-air-fill{position:absolute;inset:0;display:block;background:var(--ph-accent);transform:scaleX(0);transform-origin:left center}
+/* The block window: the last stretch, where finds pay double. Payday, so gold. */
+.ph-game-air-window{position:absolute;top:0;bottom:0;right:0;display:block;background:rgba(245,196,81,.16);border-left:1px solid rgba(245,196,81,.45)}
+.ph-game-air.is-window .ph-game-air-fill{background:var(--ph-amber)}
+
+/* Fixed width, so nothing in here (the overclock chip, a three-digit score) can shove the depth bar about. */
+.ph-game-score{flex:none;width:132px;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:4px;font-variant-numeric:tabular-nums}
+.ph-game-score-top{display:flex;align-items:baseline;gap:8px}
+.ph-game-ore-v{font:900 22px/1 var(--ph-head);letter-spacing:.04em;color:var(--ph-accent);min-width:2.2ch;text-align:right}
+.ph-game-mult{font:900 13px/1 var(--ph-head);letter-spacing:.05em;color:#555;min-width:4ch;padding:2px 4px;border:1px solid #222;text-align:center}
+.ph-game-mult.is-up{color:#000;background:var(--ph-amber);border-color:#000}
+.ph-game-mult.is-max{background:#ffd24a;box-shadow:0 0 10px rgba(255,210,74,.45)}
+.ph-game-score-bot{display:flex;align-items:center;gap:8px;min-height:10px}
+/* Progress to the next multiplier step: one pip per clean find. */
+.ph-game-pips{display:flex;gap:2px}
+.ph-game-pips i{width:6px;height:6px;background:#1c1c1c;box-shadow:inset 0 0 0 1px #000}
+.ph-game-pips i.on{background:var(--ph-accent)}
+.ph-game-pips.is-max i{background:#ffd24a}
+/* Overclock: a bolt and the time left on it, in the space the pips leave. */
+.ph-game-oc{display:flex;align-items:center;gap:4px}
+.ph-game-oc[hidden]{display:none}
+.ph-game-oc::before{content:"";width:7px;height:11px;
+  background:center/contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 22'%3E%3Cpath d='M9 0L0 13h5.5L3 22l10-13.5H7.5z' fill='%235ce1ff'/%3E%3C/svg%3E")}
+.ph-game-oc b{position:relative;display:block;width:30px;height:4px;background:#0b2a31;overflow:hidden}
+.ph-game-oc b i{position:absolute;inset:0;display:block;background:#5ce1ff;transform-origin:left center}
+
+/* ── Stage ──
+   A window wider than the canvas is ever drawn (CANVAS_MAX_PX) shows rock
+   either side of it: the same rock, still, going darker outward from where
+   the canvas leaves off. .8 at the seam is the canvas's own edge darkness
+   (SIDE_DARK in blockhunt.ts): keep them in step. blockhunt.ts supplies the
+   tile (--ph-game-rock, painted once) and the strip width (--ph-game-bar, on
+   resize). The rock is on two strips beside the canvas rather than on the
+   stage itself, so nothing is painted under the canvas: with hardware
+   acceleration off, whatever sits under it is repainted with every frame. */
+.ph-game-stage{position:relative;flex:1;min-height:0;display:flex;align-items:stretch;justify-content:center;background:#000}
+.ph-game-side{position:absolute;top:0;bottom:0;width:calc(var(--ph-game-bar,0px) + 1px);pointer-events:none}
+.ph-game-side.is-l{left:0;background:linear-gradient(90deg,rgba(0,0,0,.96),rgba(0,0,0,.87) 50%,rgba(0,0,0,.8)),var(--ph-game-rock,none) 0 0/256px 256px repeat,#000}
+.ph-game-side.is-r{right:0;background:linear-gradient(270deg,rgba(0,0,0,.96),rgba(0,0,0,.87) 50%,rgba(0,0,0,.8)),var(--ph-game-rock,none) 100% 0/256px 256px repeat,#000}
+.ph-game-canvas{display:block;border:0;background:#0d0d0c;outline:none;touch-action:none;cursor:crosshair;align-self:stretch}
+.ph-game-canvas:focus-visible{box-shadow:0 0 0 1px var(--ph-accent)}
+
+.ph-game-overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;padding:12px;background:rgba(0,0,0,.8)}
+.ph-game-overlay.is-on{display:flex}
+.ph-game-card{box-sizing:border-box;max-width:440px;width:100%;max-height:100%;overflow:auto;padding:14px 18px;border:1px solid #2a2a2a;background:#0b0b0b;
+  box-shadow:inset 1px 1px 0 #1b1b1b,0 18px 50px rgba(0,0,0,.9)}
+.ph-game-card--small{max-width:300px;text-align:center}
+.ph-game-card h2{margin:0 0 8px;font:900 24px/1 var(--ph-head);letter-spacing:.05em;text-transform:uppercase;color:var(--ph-accent)}
+.ph-game-card p{margin:0 0 8px}
+.ph-game-kicker{margin:0 0 4px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ph-dim)}
+.ph-game-kicker.is-best{color:#ffd24a}
+.ph-game-lede{color:#cfcfcf}
+
+/* What a run pays, up front. */
+.ph-game-payout{display:flex;gap:8px;margin:0 0 12px}
+.ph-game-payout span{flex:1;padding:6px 9px;border:1px solid #2a2a2a;background:#0f0f0f;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ph-dim)}
+.ph-game-payout b{display:block;margin-top:2px;font:900 16px/1 var(--ph-head);letter-spacing:.04em;text-transform:none}
+.ph-game-payout .is-win b{color:var(--ph-accent)}
+.ph-game-payout .is-lose b{color:#ffcf7a}
+
+/* The outcome, on the finish card. */
+.ph-game-card--win{border-color:rgba(143,209,79,.45)}
+.ph-game-card--lose{border-color:rgba(255,138,92,.45)}
+.ph-game-card--lose h2{color:#ff8a5c}
+.ph-game-result{font-size:13px;color:#d6d6d6}
+/* Whether the server has replayed the run: amber while unverified, green once it has. */
+.ph-game-verify{margin:-4px 0 10px!important;font-size:11px;color:#d9a441}
+.ph-game-verify.is-ok{color:var(--ph-accent)}
+.ph-game-result b{color:var(--ph-accent)}
+.ph-game-card--lose .ph-game-result b{color:#ffcf7a}
+
+/* What is in the passage, with what each thing looks like. */
+.ph-game-legend{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:7px}
+.ph-game-legend li{display:grid;grid-template-columns:22px 1fr;gap:9px;align-items:start;font-size:12px;line-height:1.5;color:#bdbdbd}
+.ph-game-legend b{color:var(--ph-fg);font-weight:700}
+.ph-game-sw{box-sizing:border-box;display:grid;place-items:center;width:22px;height:22px;margin-top:1px;font:700 14px/1 var(--ph-mono);font-style:normal}
+/* A hash: the cut green stone the shaft shows, digit on its table. */
+.ph-game-sw.is-hash{width:19px;height:22px;margin:0 1px 0 2px;font:800 10px/1 var(--ph-mono);color:#123604;
+  clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);background:linear-gradient(135deg,#effee0,#b2ec7c 45%,#4c9625)}
+.ph-game-sw.is-nonce{color:#ffe08a;border:1px solid #ffd24a;border-radius:50%;font-size:12px}
+.ph-game-sw.is-stale{color:#ff7e8a;background:#3a060c;border:1.5px solid #ff4f5f;border-radius:4px;font-size:12px}
+.ph-game-sw.is-boost{border:1.5px solid #5ce1ff;border-radius:50%;
+  background:center/11px 15px no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 22'%3E%3Cpath d='M9 0L0 13h5.5L3 22l10-13.5H7.5z' fill='%23d4f8ff'/%3E%3C/svg%3E")}
+.ph-game-sw.is-wall{border-left:3px solid #4a3218;border-right:3px solid #4a3218;width:16px;margin-left:3px;background:#050403}
+.ph-game-sw.is-rock{border-radius:46% 54% 50% 42%;background:radial-gradient(circle at 35% 30%,#8a8178,#4a443e 60%,#2a2622);box-shadow:inset 0 0 0 1px rgba(0,0,0,.6)}
+.ph-game-sw.is-gas{border-radius:50%;background:radial-gradient(circle,rgba(150,230,110,.75),rgba(150,230,110,.15) 65%,transparent 70%)}
+
+.ph-game-keys{font-size:11px;color:var(--ph-dim)}
+.ph-game-card .ph-game-keys{margin:8px 0 12px;text-align:center}
+.ph-game-kbd{display:inline-block;min-width:18px;padding:0 4px;margin:0 1px;font:700 11px/16px var(--ph-mono);text-align:center;color:var(--ph-fg);
+  background:#141414;border:1px solid #000;box-shadow:inset 1px 1px 0 #2a2a2a,inset -1px -1px 0 #050505}
+
+.ph-game-btn{width:100%;font:900 14px/1 var(--ph-head);letter-spacing:.1em;text-transform:uppercase;color:#000;background:var(--ph-accent);
+  border:1px solid #000;box-shadow:inset 1px 1px 0 rgba(255,255,255,.35),inset -1px -1px 0 rgba(0,0,0,.35);padding:12px;cursor:pointer}
+.ph-game-btn:hover{filter:brightness(1.1)}
+.ph-game-btn:active{box-shadow:inset 1px 1px 0 rgba(0,0,0,.35),inset -1px -1px 0 rgba(255,255,255,.35)}
+.ph-game-btn:focus-visible{outline:2px dotted var(--ph-accent);outline-offset:2px}
+
+.ph-game-tally{margin:0 0 10px;border:1px solid var(--ph-line)}
+/* Tight rows: the run's numbers come after its payoff, and should fit the default window without scrolling. */
+.ph-game-row{display:flex;justify-content:space-between;gap:12px;padding:3px 10px;line-height:1.45;border-bottom:1px solid var(--ph-line);font-variant-numeric:tabular-nums}
+.ph-game-row:last-child{border-bottom:0}
+.ph-game-row.is-dim{color:var(--ph-dim)}
+.ph-game-row.is-gold{color:var(--ph-amber)}
+.ph-game-row.is-good b{color:var(--ph-accent)}
+.ph-game-row.is-bad b{color:#ff7e8a}
+.ph-game-row.is-cyan b{color:#5ce1ff}
+.ph-game-row.is-total{background:#101010;color:var(--ph-accent)}
+.ph-game-row.is-total b{font:900 18px/1 var(--ph-head);letter-spacing:.04em}
+.ph-game-worth{color:var(--ph-fg)}
+.ph-game-dim{color:var(--ph-dim)}
+/* .ph-game-progress (ore toward a White) is styled in apps.css with the claim UI. */
+
+.ph-game-free{margin:10px 0 0!important;color:var(--ph-dim);font-size:11px;line-height:1.6}
+.ph-game-badge{display:inline-block;padding:1px 6px;margin-right:5px;font-size:10px;letter-spacing:.1em;color:var(--ph-amber);border:1px solid currentColor}
+
+/* Steering pad. Moving the mouse or dragging the shaft also works, so this is
+   a convenience for thumbs rather than the only control — coarse pointers only. */
+.ph-game-pad{display:none;flex:none;grid-template-columns:repeat(2,minmax(84px,120px));grid-auto-rows:52px;gap:8px;justify-content:center;padding-top:2px}
+.ph-game-pad-b{font:17px/1 var(--ph-mono);color:var(--ph-fg);background:#101010;border:1px solid #000;
+  box-shadow:inset 1px 1px 0 #2e2e2e,inset -1px -1px 0 #050505;cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent}
+.ph-game-pad-b:active{background:#0b0b0b;color:var(--ph-accent);box-shadow:inset 1px 1px 0 #050505,inset -1px -1px 0 #2e2e2e}
+@media (pointer:coarse){.ph-game-pad--lr{display:grid}}
+
+/* ── Narrow windows: drop the labels before anything else gives way ── */
+@container (max-width: 470px){
+  .ph-game{padding:8px;gap:6px}
+  .ph-game-hud{gap:10px;padding:6px 8px}
+  .ph-game-hud-l{display:none}
+  .ph-game-score{width:104px}
+  .ph-game-ore-v{font-size:19px}
+  .ph-game-card{padding:13px 14px}
+  .ph-game-card h2{font-size:21px}
+  .ph-game-legend li{font-size:11px}
+}
+@container (max-width: 380px){
+  .ph-game-time{display:none}
+  .ph-game-pips i{width:4px}
+}
