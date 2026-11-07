@@ -96,16 +96,52 @@ async function getPoolHistory(
   return { points, unit: "PH/s", label: "Pool hashrate" };
 }
 
+/**
+ * Rendered pages kept in memory where no CDN sits in front (local dev, any
+ * host but Vercel). Fresh for 20 s, like the edge; after that the old copy is
+ * served at once while one re-render runs, for up to 10 min. page() routes are
+ * public by declaration (their Cache-Control says so), so this is the page the
+ * edge would hand out anyway. Without it every click re-fetched Parasite,
+ * mempool and Supabase: 0.3–1.1 s per page (owner, 2026-11-06: "a lot of delay
+ * and lag going thru pages"). Off on Vercel (the edge does this job) and under
+ * vitest (tests expect a fresh render).
+ */
+const PAGE_MEMO = !process.env.VERCEL && !process.env.VITEST;
+const PAGE_FRESH_MS = 20_000, PAGE_STALE_MS = 10 * 60_000, PAGE_MEMO_MAX = 200;
+const pageMemo = new Map<string, { html: string; at: number }>();
+const pageRenders = new Map<string, Promise<string>>();
+function renderMemo(key: string, render: () => Promise<string>): Promise<string> {
+  const rerender = (): Promise<string> => {
+    let p = pageRenders.get(key);
+    if (!p) {
+      p = render()
+        .then((html) => {
+          pageMemo.delete(key);
+          pageMemo.set(key, { html, at: Date.now() });
+          if (pageMemo.size > PAGE_MEMO_MAX) pageMemo.delete(pageMemo.keys().next().value as string);
+          return html;
+        })
+        .finally(() => pageRenders.delete(key));
+      pageRenders.set(key, p);
+    }
+    return p;
+  };
+  const hit = pageMemo.get(key), age = hit ? Date.now() - hit.at : Infinity;
+  if (hit && age < PAGE_FRESH_MS) return Promise.resolve(hit.html);
+  if (hit && age < PAGE_STALE_MS) { rerender().catch(() => { /* logged by the next request that waits on it */ }); return Promise.resolve(hit.html); }
+  return rerender();
+}
+
 /** Wrap an async page renderer with error handling. */
 function page(render: () => Promise<string>) {
-  return async (_req: express.Request, res: express.Response) => {
+  return async (req: express.Request, res: express.Response) => {
     try {
       // Let Vercel's edge CDN serve the rendered page for ~20s (and stale for a
       // bit while revalidating), so navigating between pages is instant and cold
       // serverless instances don't re-fetch upstream on every hit. All pages are
       // public and their own scripts refresh live bits client-side.
       res.set("Cache-Control", "public, s-maxage=20, stale-while-revalidate=60");
-      res.type("html").send(await render());
+      res.type("html").send(await (PAGE_MEMO ? renderMemo(req.originalUrl, render) : render()));
     } catch (err) {
       // Log server-side; never echo err.message (it can leak upstream URLs).
       console.error("[page] render failed:", err);

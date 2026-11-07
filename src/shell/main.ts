@@ -14,6 +14,7 @@ import { largeAreaBeside } from "./desktop/large-area";
 import { createDesktop } from "./desktop/desktop";
 import { APPS } from "./desktop/registry";
 import { createHorizonWallpaper } from "./desktop/wallpaper-horizon";
+import { createCornerProfile } from "./desktop/corner-profile";
 import { createTickFeed } from "./data/tick";
 import { createLocalStore } from "./session/store";
 import { createWalletSession } from "./session/wallet";
@@ -151,6 +152,8 @@ function main(): void {
       { label: motionLabel(), onSelect: () => setMotion(MOTION_CYCLE[motion]) },
     ],
   });
+  // Your profile opens from the round button by the corner logo; there is no Profile or Account icon.
+  createCornerProfile({ area: desktopArea, before: windowsRoot, wallet, profile, openProfile: () => { desktop.openApp("profile"); } });
 
   tick.subscribe((t, meta) => {
     applyTick(t);

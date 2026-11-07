@@ -31,7 +31,7 @@ import {
   BTC, Heartbeat, TAU, clamp, createHashGlobe, easeOut, fbm, mkCanvas, mulberry32, rgba, smooth, vnoise,
   type CoreFrame,
 } from "./horizon-core";
-import { createLogoFx, LOGO_ASPECT, type LogoFx } from "../brand/logo-fx";
+import { createLogoFx, LOGO_ASPECT, LOGO_INK_DROP, type LogoFx } from "../brand/logo-fx";
 
 /* ── constants ─────────────────────────────────────────────────────────── */
 /**
@@ -67,6 +67,12 @@ const SLOW_GAP_MS = 34;
  * frames to climb back once the tab was in front again.
  */
 const THROTTLED_GAP_MS = 120;
+/**
+ * Behind an open window (dimmed) the wallpaper runs at ~24 fps: the window's
+ * page is a same-origin iframe on this same thread, and a dimmed backdrop
+ * doesn't need 60 (owner, 2026-11-06: lag switching pages).
+ */
+const DIM_FRAME_MS = 1000 / 24 - 4;
 const HEX = "0123456789abcdef";
 
 /** Software rendering (GPU acceleration off, SwiftShader, RDP…) — start low instead of discovering it over the first seconds. */
@@ -80,6 +86,18 @@ function softwareRenderer(): { software: boolean; renderer: string } {
   } catch {
     return { software: true, renderer: "unknown" };
   }
+}
+
+/** The profile button beside the corner logo (corner-profile.ts), css px. */
+export const CORNER_BUTTON_PX = 40;
+/**
+ * The corner logo's box on a W-wide desktop, css px, with room at its right
+ * for the profile button. corner-profile.ts uses it too, so the two line up.
+ */
+export function cornerLogoBox(W: number): { cx: number; cy: number; w: number; h: number; edge: number; inkCy: number } {
+  const w = clamp(W * 0.15, 220, 420), h = w / LOGO_ASPECT, edge = clamp(W * 0.012, 18, 34);
+  const cx = W - edge - CORNER_BUTTON_PX - 14 - w / 2, cy = edge * 0.8 + h * 0.5;
+  return { cx, cy, w, h, edge, inkCy: cy - h * LOGO_INK_DROP };
 }
 
 /* ── helpers (the shared ones live in horizon-core.ts) ── */
@@ -789,9 +807,8 @@ export function createHorizonWallpaper(canvas: HTMLCanvasElement, opts: Wallpape
     rdW = Rc * 2; rdTop = 0.7 * Rc; rdH = rdTop + 0.36 * Rc;
     reading = mkCanvas(rdW * DPR, rdH * DPR)[0]; readingKey = "";
     if (!mobile) {
-      lgW = clamp(W * 0.15, 220, 420);
-      const lgH = lgW / LOGO_ASPECT, edge = clamp(W * 0.012, 18, 34);
-      lgX = W - edge - lgW / 2; lgY = edge * 0.8 + lgH * 0.5;
+      const box = cornerLogoBox(W);
+      lgW = box.w; lgX = box.cx; lgY = box.cy;
       const want = Math.round(lgW * Math.max(1, DPR));
       if (!logo || want > logoDevW * 1.25) {
         logoDevW = want;
@@ -1076,6 +1093,7 @@ export function createHorizonWallpaper(canvas: HTMLCanvasElement, opts: Wallpape
   function loop(ts: number): void {
     if (!running) return;
     raf = requestAnimationFrame(loop);
+    if (dimmed && lastTs && ts - lastTs < DIM_FRAME_MS) return;
     const gapMs = lastTs ? Math.min(200, ts - lastTs) : 16;
     const dt = lastTs ? Math.min(0.1, gapMs / 1000) : 0.016;
     lastTs = ts;
@@ -1086,7 +1104,7 @@ export function createHorizonWallpaper(canvas: HTMLCanvasElement, opts: Wallpape
     // Pacing (time between frames) catches what our own timer can't: raster/present cost when the GPU is off.
     const throttled = gapMs > THROTTLED_GAP_MS;
     if (!throttled) gapEma += (gapMs - gapEma) * 0.1;
-    if (pinned || throttled) return;
+    if (pinned || throttled || dimmed) return; // capped frames would read as slow ones
     const slow = ema > 14 || gapEma > SLOW_GAP_MS;
     const fast = ema < 8 && gapEma < 20;
     if (slow) { loSince = -1; if (hiSince < 0) hiSince = ts; else if (ts - hiSince > 1000 && level < LEVEL_MAX) setLevel(level + 1); }

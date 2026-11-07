@@ -38,9 +38,6 @@ const NAV_GROUPS: Array<Array<[string, string]>> = [
     ["/badges", "badges"],
     ["/leaderboard", "leaderboard"],
   ],
-  [
-    ["/account", "account"],
-  ],
 ];
 
 const STYLE = `

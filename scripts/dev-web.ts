@@ -75,6 +75,11 @@ async function main(): Promise<void> {
     console.log(`\n  Parahawk (web only — no pollers, no bot)`);
     console.log(`  site    http://localhost:${config.port}`);
     console.log(`  admin   http://localhost:${config.port}/dev/login   (signs in as ${config.adminAddress})\n`);
+    // Warm the server's page memo (server.ts) so the first click on each heavy page is instant too.
+    // Plain requests (no Sec-Fetch-Dest) get the page itself, the same as a desktop window's iframe.
+    for (const p of ["/", "/history", "/potmath", "/marketplace", "/board", "/badges", "/leaderboard"]) {
+      fetch(`http://127.0.0.1:${config.port}${p}`).catch(() => { /* the server is restarting; the next start warms it */ });
+    }
   });
 }
 

@@ -170,7 +170,7 @@ function sitePage(id: string, label: string, icon: string, path: string, opts: P
  */
 export const DESKTOP_ORDER: readonly string[] = [
   "parahawk", "site-about", "changelog", "chat", "inscribe",
-  "community", "suggestions", "profile", "admin",
+  "community", "suggestions", "admin",
   "collection", "burn", "game", "about",
 ];
 
@@ -389,6 +389,8 @@ export const APPS: AppSpec[] = [
     label: "Profile",
     icon: ICONS.profile,
     requiresWallet: true,
+    // No desktop icon: it opens from the round button by the corner logo (desktop/corner-profile.ts).
+    noIcon: true,
     open: ({ launcher, wallet, ledger, me, profile, tick, openApp, openPath }) => ({
       id: "profile",
       title: "Profile",
