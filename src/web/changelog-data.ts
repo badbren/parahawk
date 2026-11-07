@@ -43,7 +43,7 @@ export interface Release {
   sections?: ReleaseSection[];
 }
 
-// ── 2.0 — the Desktop (2026-11-06) ──────────────────────────────────────────
+// ── 2.0 (2026-11-06) ───────────────────────────────────────────────────────────────────────────────────────────────────
 // Everything since 1.3: the desktop OS (live since Aug 29, never logged) and the
 // whole of the Nov 6 push. Text is plain HTML-safe copy (no < or >).
 
@@ -196,7 +196,7 @@ const V2_SECTIONS: ReleaseSection[] = [
 export const RELEASES: Release[] = [
   {
     version: "2.0",
-    name: "Parahawk 2.0 — The Desktop",
+    name: "Parahawk 2.0",
     date: "2026-11-06",
     current: true,
     summary:
