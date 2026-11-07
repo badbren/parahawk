@@ -179,7 +179,6 @@ const V2_SECTIONS: ReleaseSection[] = [
       { tag: "Security", text: "Profile pictures are checked byte by byte (PNG, JPEG or WebP only) and size-capped." },
       { tag: "Security", text: "Chat and Suggestions have spam guards: rate limits and a bot trap." },
       { tag: "Fixed", text: "Visits from development copies of the site no longer count toward the live visitor numbers." },
-      { tag: "Improved", text: "Behind the scenes, a new owner dashboard keeps an eye on traffic, sign-ups and badges, so problems get spotted fast." },
     ],
   },
   {

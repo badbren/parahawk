@@ -497,7 +497,9 @@ export function createServer(): express.Express {
   });
 
   // ── Owner-only admin: manual venue prices ─────────────────────────────────
-  app.get("/admin", async (req, res) => {
+  app.get("/admin", async (req, res, next) => {
+    // Nobody but the owner learns this page exists: anyone else gets the plain 404.
+    if (!isAdmin(getSession(req))) return next();
     try {
       res.set("Cache-Control", "private, no-cache");
       // Inside the desktop, /admin is the Admin window's Prices tab (a frame):

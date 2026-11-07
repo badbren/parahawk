@@ -71,8 +71,17 @@ export function createDesktop(opts: DesktopOptions): Desktop {
   let selectedId: string | null = null;
 
   /** An app the user can see right now: not feature-flagged off, not in the bin, wallet and owner gates satisfied. */
+  // Owner-only apps (Admin) need BOTH: the server session says it's the owner,
+  // AND the owner's wallet is connected in this window (owner, 2026-11-06: "it
+  // should only show up when MY wallet connects"). A sign-in cookie left over
+  // from an earlier visit is not enough on its own.
+  const ownerConnected = (): boolean => {
+    const acct = wallet?.account();
+    const sessionAddr = me?.current().address;
+    return me?.isAdmin() === true && acct != null && sessionAddr != null && acct.address.toLowerCase() === sessionAddr.toLowerCase();
+  };
   const available = (a: AppSpec): boolean =>
-    !a.hidden && (!a.requiresWallet || wallet?.account() != null) && (!a.requiresAdmin || me?.isAdmin() === true);
+    !a.hidden && (!a.requiresWallet || wallet?.account() != null) && (!a.requiresAdmin || ownerConnected());
 
   const shownApps = (): AppSpec[] => {
     // noIcon apps (someone's public profile) open from links only.
@@ -404,7 +413,10 @@ export function createDesktop(opts: DesktopOptions): Desktop {
   let sawAccount = wallet?.account() != null;
   const offWallet = wallet?.subscribe((acct) => {
     const has = acct != null;
-    if (!has && sawAccount) wm.close("profile");
+    if (!has && sawAccount) {
+      wm.close("profile");
+      for (const a of apps) if (a.requiresAdmin) wm.close(a.id);
+    }
     sawAccount = has;
     renderIcons();
   });
