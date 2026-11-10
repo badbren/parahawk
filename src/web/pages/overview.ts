@@ -5,6 +5,7 @@ import { getLeaderboard } from "../../data/parasite.js";
 import { getRecentBlocks, renderBlocksStrip } from "../../data/blocks.js";
 import { hashrateGauge, gaugeScaleFor } from "../gauge.js";
 import { getAddressResolver, type AddressResolver } from "../../services/winners.js";
+import { lifetimeWork } from "../../services/pool-blocks.js";
 import { walletCell, walletNames, type WalletNames } from "../addr.js";
 import type { LeaderboardEntry } from "../../data/types.js";
 import {
@@ -51,7 +52,11 @@ export async function renderOverview(): Promise<string> {
     getAddressResolver().catch(() => (() => null) as AddressResolver),
   ]);
   // Profile names next to the wallets in the two top-8 tables (one batched lookup).
-  const names = await walletNames([...lb.difficulty.slice(0, 8), ...lb.loyalty.slice(0, 8)].map((e) => e.address), resolve);
+  // …and the pool's Lifetime Work (every finished round + this one; cached rounds list).
+  const [names, lifetime] = await Promise.all([
+    walletNames([...lb.difficulty.slice(0, 8), ...lb.loyalty.slice(0, 8)].map((e) => e.address), resolve),
+    lifetimeWork(o.pool.workSinceLastBlockDiff ?? 0, o.pool.lastFoundHeight > 0 ? o.pool.lastFoundHeight : null).catch(() => null),
+  ]);
   const pm = potMathFromOverview(o);
   const pot = o.potAge;
   const potClass = pot.verdict === "fresh" ? "green" : pot.verdict === "aging" ? "amber" : "red";
@@ -70,6 +75,7 @@ ${renderBlocksStrip(blocks)}
 <div class="grid statrow">
   <div class="card"><div class="k">↗ Highest diff since last block</div><div class="v">${fmtDiff(o.pool.highestDiffSinceBlock)}</div><div class="sub">${highestPctOfBlock.toFixed(2)}% of a block</div></div>
   <div class="card"><div class="k">⛏ Total work since last block</div><div class="v">${fmtDiff(o.pool.workSinceLastBlockDiff ?? 0)}</div><div class="sub">${pm.depth.toFixed(2)}× an average round</div></div>
+  <div class="card"><div class="k">∑ Lifetime Work</div><div class="v">${lifetime ? fmtDiff(lifetime.workDiff) : "—"}</div><div class="sub">${lifetime ? `all the pool's work, ever · ${lifetime.rounds} finished rounds + this one` : "updating after a new block…"}</div></div>
   <div class="card"><div class="k">↗ Minimum needed diff</div><div class="v">${fmtDiff(o.pool.networkDifficulty)}</div><div class="sub">→ ${pm.nextD.toFixed(2)}T next retarget</div></div>
   <div class="card"><div class="k">⚡ Avg to find block</div><div class="v">${fmtDuration(pm.expectedDays * 24)}</div><div class="sub">at ${fmtHashrate(o.pool.poolHashratePhs)} live</div></div>
   <div class="card"><div class="k">🔖 Last block found</div><div class="v">${fmtInt(o.pool.lastFoundHeight)}</div><div class="sub ${potClass}">${pot.verdict === "fresh" ? "🟢" : pot.verdict === "aging" ? "🟡" : "🔴"} ${fmtDuration(pot.hours)} ago</div></div>

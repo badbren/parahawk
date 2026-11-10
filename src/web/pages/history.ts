@@ -1,6 +1,7 @@
 import { renderPage } from "../layout.js";
 import { getHistory } from "../../services/history.js";
 import { getOverview } from "../../services/overview.js";
+import { lifetimeWork, type LifetimeWork } from "../../services/pool-blocks.js";
 import { computePoolHealth } from "../../services/poolhealth.js";
 import { getPoolStatsSeries, type PoolSeries } from "../../data/parasite.js";
 import { fmtInt, fmtDiff, fmtPhd, fmtDuration, esc, jsonForScript } from "../format.js";
@@ -84,9 +85,12 @@ export async function renderHistory(): Promise<string> {
   // measures every completed cycle against. Falls back to the calibration
   // constant (~127T) if the live overview call fails so the section still renders.
   let dT = 127;
+  let lifetime: LifetimeWork | null = null;
   try {
     const ov = await getOverview();
     if (ov.pool.networkDifficulty > 0) dT = ov.pool.networkDifficulty / 1e12;
+    // The pool's Lifetime Work for the pot-cycles stats (cached rounds list).
+    lifetime = await lifetimeWork(ov.pool.workSinceLastBlockDiff ?? 0, ov.pool.lastFoundHeight > 0 ? ov.pool.lastFoundHeight : null).catch(() => null);
   } catch {
     /* keep the 127T fallback */
   }
@@ -179,13 +183,15 @@ export async function renderHistory(): Promise<string> {
 </div>`;
 
   // ── Pot-length distribution stats ──────────────────────────────────────────
+  const lifetimeCard = `<div class="card"><div class="k">∑ Lifetime Work</div><div class="v">${lifetime ? fmtDiff(lifetime.workDiff) : "—"}</div><div class="sub">${lifetime ? `every pot so far · ${lifetime.rounds} cracked + this one` : "updating after a new block…"}</div></div>`;
   const distStats =
     health.count === 0
-      ? ""
+      ? `<div class="grid">${lifetimeCard}</div>`
       : `<div class="grid">
   <div class="card"><div class="k">Median pot</div><div class="v">${fmtDuration(health.medianHours ?? 0)}</div><div class="sub">${health.count} cycles</div></div>
   <div class="card"><div class="k">Shortest</div><div class="v">${fmtDuration(health.shortestHours ?? 0)}</div></div>
   <div class="card"><div class="k">Longest</div><div class="v">${fmtDuration(health.longestHours ?? 0)}</div></div>
+  ${lifetimeCard}
 </div>`;
 
   // ── Hall of fame ───────────────────────────────────────────────────────────
