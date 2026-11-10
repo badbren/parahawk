@@ -21,9 +21,11 @@ import {
 /**
  * Pot Math — the single home for round scorekeeping AND the what-if tools.
  * Structure: (1) the live headline card (auto), (2) a "where this pot sits"
- * percentile bar driven by the LIVE depth, (3) an expandable calculator holding
- * the manual Pot Math what-if + the rental-strategy/odds tool, and (4) the luck
- * audit heatmap. The old /luck and /calc pages are folded in here.
+ * percentile bar driven by the LIVE depth, (3) the calculator, always open (no
+ * dropdown, owner 2026-11-09): your cut of this pot from ONE input, your work
+ * this round, with the pool's numbers pulled in live and shown greyed out, plus
+ * the rental-strategy/odds tool, and (4) the luck audit heatmap. The old /luck
+ * and /calc pages are folded in here.
  */
 
 /** Depth (= −ln p) at which an average round has rarity p, for the percentile bar. */
@@ -36,6 +38,8 @@ const PBAR_MARKERS: Array<[number, string]> = [
 ];
 
 const RATE_10T_LABEL = `${RATE_10T_PHD} PHd`;
+/** Marks the calculator's greyed-out fields as the pool's live numbers. */
+const LIVE_TAG = `<span class="live"><i></i>LIVE</span>`;
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /** Map a ratio (~1.0 = expected) to a heatmap colour. */
@@ -102,10 +106,9 @@ export async function renderPotMath(): Promise<string> {
     })
     .join("");
 
-  // Prefill the calculator with live values (fallbacks if data is down).
-  const seedW = pm.W.toFixed(2);
-  const seedD = pm.D.toFixed(2);
-  const seedH = pm.hGauge.toFixed(2);
+  // The calculator's live (greyed-out) fields, as first painted; the page's
+  // script repaints them from the card's data-* every time the card refreshes.
+  const blk = pm.lastBlockFoundHeight > 0 ? ` (#${fmtInt(pm.lastBlockFoundHeight)})` : "";
 
   // Live percentile-bar marker for "where this pot sits".
   const livePos = Math.max(0, Math.min(100, (pm.depth / PBAR_MAX_DEPTH) * 100)).toFixed(1);
@@ -181,12 +184,12 @@ export async function renderPotMath(): Promise<string> {
 
   const body = `
 <h1>Calculator</h1>
-<p class="lead">The four numbers that describe the current round — depth, rarity, share price, and expected wait — from live pool data, plus a what-if calculator. Scorekeeping, never a forecast.</p>
+<p class="lead">The four numbers that describe the current round — depth, rarity, share price, and expected wait — from live pool data, plus a calculator for your cut. Scorekeeping, never a forecast.</p>
 
 <div id="pmcard">${potMathCard(pm, trend)}</div>
 
 <p class="muted-note" style="margin:-6px 0 26px">
-  Want to run your own numbers? <strong>Open the calculator</strong> below · look up <a href="/">live pool stats →</a>
+  What's your cut? Put your work this round into the <a href="#calc">calculator below ↓</a> · look up <a href="/">live pool stats →</a>
 </p>
 
 <h2>Where this pot sits 📏</h2>
@@ -202,24 +205,24 @@ export async function renderPotMath(): Promise<string> {
   <strong>These numbers are SCOREKEEPING, not forecasting.</strong> Mining is memoryless: the pot being deep does <em>not</em> make the next block more likely. Anyone saying "we're due" is describing the past, not the future.
 </div>
 
-<details class="calcwrap">
-<summary>🧮 Open the calculator — run your own what-if numbers</summary>
+<section class="calcwrap" id="calc">
+<h2 class="calchead">🧮 Calculator — run your own numbers</h2>
 <div class="calcbody">
 
-<h3 style="margin-top:8px">Pot Math — this round</h3>
-<p class="muted-note">Enter the pot's work (W), network difficulty (D), and pool hashrate (H) — today's live values are prefilled. Then drop in <strong>your own banked work this round</strong> to see your cut if the pot cracked right now.</p>
+<h3 style="margin-top:8px">Your cut of this pot</h3>
+<p class="muted-note">Type in <strong>your work this round</strong> (the number on your parasite.space dashboard) and that's it. The greyed-out numbers are the pool's live figures for this round, filled in for you — last checked <span id="pm_age">just now</span>.</p>
 <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr))">
-  <div class="card"><div class="k">W — work since last block (T)</div><input type="number" id="pm_w" value="${seedW}" step="0.1" min="0"/></div>
-  <div class="card"><div class="k">D — minimum needed diff (T)</div><input type="number" id="pm_d" value="${seedD}" step="0.1" min="0"/></div>
-  <div class="card"><div class="k">H — pool hashrate (PH/s)</div><input type="number" id="pm_h" value="${seedH}" step="1" min="0"/></div>
-  <div class="card" style="border-color:#33501f;background:#0d1408"><div class="k green">Your work this round (T)</div><input type="number" id="pm_g" placeholder="e.g. 5" step="0.1" min="0"/></div>
+  <div class="card mine"><div class="k green">Your work this round (T)</div><input type="text" inputmode="decimal" id="pm_g" placeholder="e.g. 5.24" autocomplete="off" spellcheck="false" aria-label="Your work this round, in T"/><div class="sub">this round only · 850G or 1.2P work too</div></div>
+  <div class="card livec"><div class="k">Pool's work this round</div><input type="text" id="pm_w" value="${pm.W.toFixed(2)} T" readonly tabindex="-1" aria-label="Pool's work this round (live)"/><div class="sub">${LIVE_TAG} · since the pool's last block<span id="pm_blk">${blk}</span> — back to 0 at the next one</div></div>
+  <div class="card livec"><div class="k">Network difficulty</div><input type="text" id="pm_d" value="${pm.D.toFixed(2)} T" readonly tabindex="-1" aria-label="Network difficulty (live)"/><div class="sub">${LIVE_TAG} · D, the minimum needed diff</div></div>
+  <div class="card livec"><div class="k">Pool hashrate</div><input type="text" id="pm_h" value="${pm.hGauge.toFixed(2)} PH/s" readonly tabindex="-1" aria-label="Pool hashrate (live)"/><div class="sub">${LIVE_TAG} · H, right now</div></div>
 </div>
-<div class="grid" style="margin-top:14px">
-  <div class="card"><div class="k">Round depth</div><div class="v" id="pm_depth">–</div><div class="sub" id="pm_depth_c">W / D</div></div>
-  <div class="card"><div class="k">Round rarity</div><div class="v" id="pm_rarity">–</div><div class="sub">P(round ≥ W) = e^(−W/D)</div></div>
-  <div class="card"><div class="k">Share price</div><div class="v green" id="pm_sats">–</div><div class="sub">212,500 / W · subsidy only</div></div>
-  <div class="card"><div class="k">Expected wait</div><div class="v" id="pm_wait">–</div><div class="sub" id="pm_wait_c">at H</div></div>
-  <div class="card" style="border-color:#33501f;background:#0d1408"><div class="k green">💰 Your stake in this pot</div><div class="v green" id="pm_stake">–</div><div class="sub" id="pm_stake_c">enter your work this round (T) to see your cut</div></div>
+<div class="card mine" style="margin-top:14px"><div class="k green">💰 Your stake in this pot</div><div class="v green"><span id="pm_stake">–</span> <span class="pm-alt" id="pm_stake_alt"></span></div><div class="sub" id="pm_stake_c">enter your work this round to see your cut</div></div>
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr));margin-top:14px">
+  <div class="card livec"><div class="k">Share price</div><div class="v" id="pm_sats">${pm.W > 0 ? `${fmtInt(pm.satsPerG)} sats/G` : "–"}</div><div class="sub">${LIVE_TAG} · 212,500 ÷ W · subsidy only</div></div>
+  <div class="card livec"><div class="k">Round depth</div><div class="v" id="pm_depth">${pm.D > 0 ? `${pm.depth.toFixed(2)}×` : "–"}</div><div class="sub">${LIVE_TAG} · W ÷ D</div></div>
+  <div class="card livec"><div class="k">Round rarity</div><div class="v" id="pm_rarity">${pm.D > 0 ? `${Math.round(pm.rarity * 100)}%` : "–"}</div><div class="sub">${LIVE_TAG} · P(round ≥ W) = e^(−W/D)</div></div>
+  <div class="card livec"><div class="k">Expected wait</div><div class="v" id="pm_wait">${Number.isFinite(pm.expectedDays) && pm.expectedDays > 0 ? fmtDuration(pm.expectedDays * 24) : "—"}</div><div class="sub">${LIVE_TAG} · at the pool's hashrate</div></div>
 </div>
 
 <h3>Rental strategy &amp; odds</h3>
@@ -256,7 +259,7 @@ export async function renderPotMath(): Promise<string> {
 <p class="muted-note" style="margin-top:14px">P(≥1 hit in W PHd) = 1 − e<sup>−W/rate</sup>. Long-run probabilities, not promises. Not financial advice.</p>
 
 </div>
-</details>
+</section>
 
 <h2>Is renting worth it right now? 💸</h2>
 <p class="muted-note">
@@ -314,30 +317,63 @@ ${luckAudit}
 
 <script src="/potmath.js"></script>
 <script>
+// Your cut of this pot. The one thing anyone types is their own work this
+// round; the pool's numbers (W, D, H) and the BTC price come in live from the
+// headline card's data-* attributes, re-read every time the card refreshes
+// (the "pm:live" event below), and are shown greyed out with a LIVE tag.
 (function(){
   var P = window.PotMath, $ = function(id){return document.getElementById(id);};
+  var live = {W:0, D:0, H:0, BTC:0, blk:0}, checkedAt = Date.now();
+  var TO_T = {k:1e-9, m:1e-6, g:1e-3, t:1, p:1e3, e:1e6};
   function fmtInt(n){return Math.round(n).toLocaleString("en-US");}
-  function fmtDur(days){ if(!isFinite(days)||days<=0) return "—"; var h=days*24; if(h<24) return h.toFixed(1)+"h"; var d=Math.floor(h/24), r=Math.round(h-d*24); return r>0? d+"d "+r+"h" : d+"d"; }
-  function recompute(){
-    var W=parseFloat($("pm_w").value)||0, D=parseFloat($("pm_d").value)||0, H=parseFloat($("pm_h").value)||0, g=parseFloat($("pm_g").value);
-    var m=P.computePotMath(W,D,H);
-    $("pm_depth").textContent = (W>0&&D>0)? m.depth.toFixed(2)+"×" : "–";
-    $("pm_depth_c").textContent = (W>0&&D>0)? Math.round(m.luckPct)+"% luck (W / D)" : "W / D";
-    $("pm_rarity").textContent = (D>0)? Math.round(m.rarity*100)+"%" : "–";
-    $("pm_sats").textContent = (W>0)? fmtInt(m.satsPerG)+" sats/G" : "–";
-    $("pm_wait").textContent = fmtDur(m.expectedDays);
-    $("pm_wait_c").textContent = "at "+(H||0)+" PH/s";
-    if(!isNaN(g) && $("pm_g").value!=="" && W>0){
-      var gG = g*1000;
-      $("pm_stake").textContent = fmtInt(P.stakeValue(gG,W))+" sats";
-      $("pm_stake_c").textContent = g+" T ("+fmtInt(gG)+" G) × "+fmtInt(m.satsPerG)+" sats/G — payout if the pot cracked now (subsidy only)";
-    } else {
-      $("pm_stake").textContent = "–";
-      $("pm_stake_c").textContent = "enter your work this round (T) to see your cut";
-    }
+  function fmtDur(days){ if(!isFinite(days)||days<=0) return "—"; var h=days*24; if(h<1) return Math.round(h*60)+"m"; if(h<24) return h.toFixed(1)+"h"; var d=Math.floor(h/24), r=Math.round(h-d*24); return r>0? d+"d "+r+"h" : d+"d"; }
+  function fmtUsd(n){ return "$"+n.toLocaleString("en-US",{minimumFractionDigits:2, maximumFractionDigits:2}); }
+  function fmtBtc(sats){ return (Math.round(sats)/1e8).toFixed(8).replace(/\\.?0+$/,"")+" BTC"; }
+  function fmtShare(f){ var p=f*100; return p>=10 ? p.toFixed(1)+"%" : p>=0.01 ? p.toFixed(2)+"%" : p>0 ? "<0.01%" : "0%"; }
+  // "5.24", "5.24T", "850G", "1.2P", "1,234.5" or "5,24" → work in T.
+  function parseWork(s){
+    s = String(s).trim().replace(/,(?=\\d{3}(?!\\d))/g,"").replace(",",".");
+    var m = s.match(/^(\\d+\\.?\\d*|\\.\\d+)\\s*([kmgtpe])?$/i);
+    return m ? parseFloat(m[1]) * TO_T[(m[2]||"t").toLowerCase()] : NaN;
   }
-  ["pm_w","pm_d","pm_h","pm_g"].forEach(function(id){$(id).addEventListener("input",recompute);});
-  recompute();
+  function readLive(){
+    var el = document.querySelector("#pmcard [data-w]");
+    if(!el) return;
+    var n = function(k){ var v = parseFloat(el.getAttribute("data-"+k)); return isFinite(v) ? v : 0; };
+    live.W = n("w"); live.D = n("d"); live.H = n("h"); live.blk = n("blk");
+    if(n("btc")>0) live.BTC = n("btc");
+    checkedAt = Date.now();
+  }
+  function paintLive(){
+    var m = P.computePotMath(live.W, live.D, live.H);
+    $("pm_w").value = live.W.toFixed(2)+" T";
+    $("pm_d").value = live.D.toFixed(2)+" T";
+    $("pm_h").value = live.H.toFixed(2)+" PH/s";
+    $("pm_blk").textContent = live.blk>0 ? " (#"+fmtInt(live.blk)+")" : "";
+    $("pm_sats").textContent = live.W>0 ? fmtInt(m.satsPerG)+" sats/G" : "–";
+    $("pm_depth").textContent = live.D>0 ? m.depth.toFixed(2)+"×" : "–";
+    $("pm_rarity").textContent = live.D>0 ? Math.round(m.rarity*100)+"%" : "–";
+    $("pm_wait").textContent = fmtDur(m.expectedDays);
+  }
+  function recompute(){
+    var raw = $("pm_g").value, g = parseWork(raw), W = live.W;
+    var out = $("pm_stake"), alt = $("pm_stake_alt"), cap = $("pm_stake_c");
+    alt.textContent = "";
+    if(raw.trim()===""){ out.textContent="–"; cap.textContent="enter your work this round to see your cut"; return; }
+    if(!(g>=0)){ out.textContent="–"; cap.textContent="type a number, like 5.24 (850G and 1.2P work too)"; return; }
+    if(!(W>0)){ out.textContent="–"; cap.textContent="waiting for the pool's live numbers…"; return; }
+    if(g>W){ out.textContent="⚠ too high"; cap.textContent="That's more than the whole pool's work this round ("+W.toFixed(2)+" T). Use just your own work this round and check the unit (850G = 0.85T). When the pool finds a block, the round starts again at 0."; return; }
+    var sats = P.stakeValue(g*1000, W);
+    out.textContent = fmtInt(sats)+" sats";
+    alt.textContent = "("+(live.BTC>0 ? "≈ "+fmtUsd(sats/1e8*live.BTC)+" · " : "")+fmtBtc(sats)+")";
+    cap.textContent = Number(g.toFixed(6))+" T of the pool's "+W.toFixed(2)+" T this round = "+fmtShare(g/W)+" of the pot — your payout if it cracked right now (subsidy only)";
+  }
+  function age(){ var s=Math.round((Date.now()-checkedAt)/1000); $("pm_age").textContent = s<5 ? "just now" : s<90 ? s+"s ago" : Math.round(s/60)+" min ago"; }
+  function update(){ readLive(); paintLive(); recompute(); age(); }
+  $("pm_g").addEventListener("input", recompute);
+  document.addEventListener("pm:live", update);
+  setInterval(age, 5000);
+  update();
 })();
 </script>
 <script>
@@ -390,12 +426,13 @@ recomputeRental();
 </script>
 <script>
 // Refresh only the live Pot Math card in place — no full-page reload, so the
-// open calculator keeps its state and the page never flashes.
+// calculator keeps what you typed and the page never flashes. "pm:live" tells
+// the calculator to pick up the card's fresh numbers.
 (function(){
   function refresh(){
     fetch("/potmath/card",{cache:"no-store"})
       .then(function(r){return r.ok?r.text():null;})
-      .then(function(html){ if(html){var el=document.getElementById("pmcard"); if(el) el.innerHTML=html;} })
+      .then(function(html){ if(html){var el=document.getElementById("pmcard"); if(el){ el.innerHTML=html; document.dispatchEvent(new Event("pm:live")); }} })
       .catch(function(){});
   }
   setInterval(refresh, 45000);
@@ -413,14 +450,20 @@ recomputeRental();
 .pbar-here{position:absolute;top:0;bottom:0;width:2px;background:var(--green);transform:translateX(-50%);color:var(--green)}
 .pbar-here i{position:absolute;bottom:-17px;left:50%;transform:translateX(-50%);font-style:normal;font-size:12px;line-height:1}
 .pbar-here b{position:absolute;top:48px;left:50%;transform:translateX(-50%);font-size:13px;white-space:nowrap;background:var(--bg);padding:0 5px}
-.calcwrap{border:1px solid var(--line);background:#070707;margin:26px 0;padding:0}
-.calcwrap>summary{cursor:pointer;padding:18px 22px;color:var(--green);font-size:19px;letter-spacing:1px;list-style:none;user-select:none}
-.calcwrap>summary::-webkit-details-marker{display:none}
-.calcwrap>summary::before{content:"▸ ";color:var(--green)}
-.calcwrap[open]>summary::before{content:"▾ "}
-.calcwrap[open]>summary{border-bottom:1px solid var(--line)}
+.calcwrap{border:1px solid var(--line);background:#070707;margin:26px 0;padding:0;scroll-margin-top:90px}
+.calcwrap>.calchead{margin:0;padding:18px 22px;color:var(--green);font-size:19px;letter-spacing:1px;text-transform:none;border-bottom:1px solid var(--line)}
 .calcbody{padding:8px 22px 22px}
 .calcbody h3{margin-top:26px}
+/* Yours (green: the one box you type in) vs the pool's (greyed out, LIVE). */
+.card.mine{border-color:#33501f;background:#0d1408}
+.card.livec{border-color:#1a1a1a;background:#080808}
+.card.livec .v,.card.livec input{color:#7a7a7a}
+.card.livec input{background:#0b0b0b;border-color:#1a1a1a;cursor:default;outline:none}
+.live{color:var(--green);font-size:12px;letter-spacing:1px;white-space:nowrap}
+.live i{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:5px;vertical-align:1px}
+@media (prefers-reduced-motion:no-preference){.live i{animation:pmlive 2s ease-in-out infinite}}
+@keyframes pmlive{50%{opacity:.3}}
+.pm-alt{display:inline-block;font-size:.55em}
 table.heat{border-collapse:collapse}
 table.heat th{font-size:10px;color:#8a8a8a;padding:2px 3px;text-align:center;border:0}
 table.heat th.day{text-align:right;padding-right:8px}

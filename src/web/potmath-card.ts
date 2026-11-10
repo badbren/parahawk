@@ -29,6 +29,9 @@ function chip(t: MetricTrend | null | undefined, fmt: (n: number) => string, eps
 /** Shown in place of a chip when the pot reset inside the window (W-scoped). */
 const RESET_CHIP = `<span class="tr reset">↻ new pot &lt;24h</span>`;
 
+/** A number for a data-* attribute (the Calculator reads the live values from them). */
+const num = (n: number | null | undefined): string => (Number.isFinite(n) ? String(n) : "0");
+
 /**
  * The headline POT MATH card — four big numbers, each with a plain-English
  * caption and (when a ~24h baseline exists) a trend pill showing which way it's
@@ -106,7 +109,7 @@ export function potMathCard(pm: PotMathSnapshot, trend?: PotMathTrend | null): s
 .potmath .keys li b{color:#fff;font-weight:600}
 .potmath .keys li sub,.potmath .keys li sup{color:#b7c9a6}
 </style>
-<section class="potmath">
+<section class="potmath" data-w="${num(pm.W)}" data-d="${num(pm.D)}" data-h="${num(pm.hGauge)}" data-btc="${num(pm.btcPriceUsd)}" data-blk="${num(pm.lastBlockFoundHeight)}">
   <div class="hd">
     <span class="t">⛏ Pot Math</span>
     <span class="s">the four numbers that describe this round — scorekeeping, not forecasting</span>
