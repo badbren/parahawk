@@ -89,6 +89,9 @@ export async function renderHistory(): Promise<string> {
   try {
     const ov = await getOverview();
     if (ov.pool.networkDifficulty > 0) dT = ov.pool.networkDifficulty / 1e12;
+    // A "found block" above the chain tip isn't real (the old mock mode left some
+    // in 2026-07), so it stays out of every pot-cycle stat and chart.
+    if (ov.chain.height > 0) h.potLengths = h.potLengths.filter((p) => p.height <= ov.chain.height);
     // The pool's Lifetime Work for the pot-cycles stats (cached rounds list).
     lifetime = await lifetimeWork(ov.pool.workSinceLastBlockDiff ?? 0, ov.pool.lastFoundHeight > 0 ? ov.pool.lastFoundHeight : null).catch(() => null);
   } catch {
@@ -110,7 +113,8 @@ export async function renderHistory(): Promise<string> {
   const workersVals = pool.workers.map((p) => Math.round(p.v));
 
   const potLabels = h.potLengths.map((p) => `#${p.height}`);
-  const potHours = h.potLengths.map((p) => Math.round(p.durationHours * 10) / 10);
+  // No bar for a pot whose length isn't known (the oldest round on record).
+  const potHours = h.potLengths.map((p) => (p.durationBlocks > 0 ? Math.round(p.durationHours * 10) / 10 : null));
   const potPhd = h.potLengths.map((p) => Math.round(p.estPhd));
 
   // 10T+ hits as scatter points {x: ts, y: difficulty in T} + parallel meta for tooltips
@@ -188,9 +192,9 @@ export async function renderHistory(): Promise<string> {
     health.count === 0
       ? `<div class="grid">${lifetimeCard}</div>`
       : `<div class="grid">
-  <div class="card"><div class="k">Median pot</div><div class="v">${fmtDuration(health.medianHours ?? 0)}</div><div class="sub">${health.count} cycles</div></div>
-  <div class="card"><div class="k">Shortest</div><div class="v">${fmtDuration(health.shortestHours ?? 0)}</div></div>
-  <div class="card"><div class="k">Longest</div><div class="v">${fmtDuration(health.longestHours ?? 0)}</div></div>
+  <div class="card"><div class="k">Median pot</div><div class="v">${health.medianHours != null ? fmtDuration(health.medianHours) : "—"}</div><div class="sub">${health.timedCount} cycles${health.timedCount < health.count ? " · the first round's start isn't known" : ""}</div></div>
+  <div class="card"><div class="k">Shortest</div><div class="v">${health.shortestHours != null ? fmtDuration(health.shortestHours) : "—"}</div></div>
+  <div class="card"><div class="k">Longest</div><div class="v">${health.longestHours != null ? fmtDuration(health.longestHours) : "—"}</div></div>
   ${lifetimeCard}
 </div>`;
 
@@ -199,9 +203,9 @@ export async function renderHistory(): Promise<string> {
     health.count === 0
       ? `<p class="muted-note">Nothing enshrined yet — records appear once cycles are logged.</p>`
       : `<div class="grid">
-  <div class="card"><div class="k">🏜️ Longest drought</div><div class="v">${fmtDuration(health.longestDrought!.durationHours)}</div><div class="sub">block ${blockLink(health.longestDrought!.height)} · ${fmtPhd(health.longestDrought!.estPhd)} banked</div></div>
-  <div class="card"><div class="k">⚡ Shortest pot</div><div class="v">${fmtDuration(health.shortestPot!.durationHours)}</div><div class="sub">block ${blockLink(health.shortestPot!.height)} · ${fmtPhd(health.shortestPot!.estPhd)} banked</div></div>
-  <div class="card"><div class="k">💰 Biggest pot</div><div class="v" style="font-size:22px">${fmtPhd(health.biggestPot!.estPhd)}</div><div class="sub">block ${blockLink(health.biggestPot!.height)} · ${fmtDuration(health.biggestPot!.durationHours)} to crack</div></div>
+  ${health.longestDrought ? `<div class="card"><div class="k">🏜️ Longest drought</div><div class="v">${fmtDuration(health.longestDrought.durationHours)}</div><div class="sub">block ${blockLink(health.longestDrought.height)} · ${fmtPhd(health.longestDrought.estPhd)} banked</div></div>` : ""}
+  ${health.shortestPot ? `<div class="card"><div class="k">⚡ Shortest pot</div><div class="v">${fmtDuration(health.shortestPot.durationHours)}</div><div class="sub">block ${blockLink(health.shortestPot.height)} · ${fmtPhd(health.shortestPot.estPhd)} banked</div></div>` : ""}
+  <div class="card"><div class="k">💰 Biggest pot</div><div class="v" style="font-size:22px">${fmtPhd(health.biggestPot!.estPhd)}</div><div class="sub">block ${blockLink(health.biggestPot!.height)} · ${health.biggestPot!.durationBlocks > 0 ? `${fmtDuration(health.biggestPot!.durationHours)} to crack` : "length unknown"}</div></div>
 </div>`;
 
   const body = `

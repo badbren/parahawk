@@ -129,3 +129,41 @@ describe("durationHistogram", () => {
     expect(bins[bins.length - 1]!.count).toBeGreaterThan(0); // max=10 lands in last bin
   });
 });
+
+describe("computePoolHealth — a cycle with an unknown length", () => {
+  // Parasite's real rounds (2026-11-09). The oldest has no earlier block to
+  // measure from, so it's stored with durationBlocks 0.
+  const first: PotCycle = { height: 938713, foundAt: 1, durationBlocks: 0, durationHours: 0, estPhd: 3868 };
+  const rest = [
+    cycle(945601, 2, 1148, 3461),
+    cycle(954873, 3, 1545.3, 10204),
+    cycle(958212, 4, 556.5, 3900),
+    cycle(958527, 5, 52.5, 1747),
+  ];
+  const h = computePoolHealth([first, ...rest], D);
+
+  it("stays out of the length stats", () => {
+    expect(h.count).toBe(5);
+    expect(h.timedCount).toBe(4);
+    expect(h.shortestHours).toBeCloseTo(52.5);
+    expect(h.longestHours).toBeCloseTo(1545.3);
+    expect(h.medianHours).toBeCloseTo((556.5 + 1148) / 2);
+    expect(h.shortestPot?.height).toBe(958527);
+    expect(h.longestDrought?.height).toBe(954873);
+    expect(h.histogram.reduce((s, b) => s + b.count, 0)).toBe(4);
+  });
+
+  it("still counts its work toward luck and the biggest pot", () => {
+    expect(h.allLuck).toBeCloseTo(EXP / ((3868 + 3461 + 10204 + 3900 + 1747) / 5), 6);
+    expect(h.biggestPot?.height).toBe(954873);
+  });
+
+  it("leaves no length stats when no cycle has a known length", () => {
+    const only = computePoolHealth([first], D);
+    expect(only.timedCount).toBe(0);
+    expect(only.medianHours).toBeNull();
+    expect(only.shortestPot).toBeNull();
+    expect(only.longestDrought).toBeNull();
+    expect(only.biggestPot?.height).toBe(938713);
+  });
+});

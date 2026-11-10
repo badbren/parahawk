@@ -48,6 +48,8 @@ export interface PoolHealth {
   rollingLuck: number | null;
   /** How many cycles the rolling figure actually covers. */
   rollingCount: number;
+  /** Cycles with a known length (durationBlocks > 0): the ones the length stats use. */
+  timedCount: number;
   /** Aggregate luck over every visible cycle. */
   allLuck: number | null;
   verdict: "lucky" | "unlucky" | "even" | "none";
@@ -161,19 +163,22 @@ export function computePoolHealth(
     }
   }
 
-  const hoursSorted = chrono
-    .map((c) => c.durationHours)
-    .filter((h) => Number.isFinite(h))
-    .sort((a, b) => a - b);
+  // Lengths only from cycles with a known start (durationBlocks > 0): the oldest
+  // round on record has no earlier block to measure from. Luck above still uses
+  // every cycle's work.
+  const timed = chrono.filter((c) => c.durationBlocks > 0 && Number.isFinite(c.durationHours));
+  const hoursSorted = timed.map((c) => c.durationHours).sort((a, b) => a - b);
 
-  const histogram = durationHistogram(chrono.map((c) => c.durationHours));
+  const histogram = durationHistogram(timed.map((c) => c.durationHours));
 
   let longestDrought: PotCycle | null = null;
   let shortestPot: PotCycle | null = null;
   let biggestPot: PotCycle | null = null;
-  for (const c of chrono) {
+  for (const c of timed) {
     if (!longestDrought || c.durationHours > longestDrought.durationHours) longestDrought = c;
     if (!shortestPot || c.durationHours < shortestPot.durationHours) shortestPot = c;
+  }
+  for (const c of chrono) {
     if (!biggestPot || c.estPhd > biggestPot.estPhd) biggestPot = c;
   }
 
@@ -183,6 +188,7 @@ export function computePoolHealth(
     cycles: cycleLuck,
     rollingLuck,
     rollingCount: rollingSlice.length,
+    timedCount: timed.length,
     allLuck,
     verdict,
     emoji,

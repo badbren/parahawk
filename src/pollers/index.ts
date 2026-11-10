@@ -52,13 +52,17 @@ async function checkBlock(): Promise<void> {
   const height = o.pool.lastFoundHeight;
 
   if (lastSeenFoundHeight === null) {
-    // initialise from persistent store so we don't re-alert across restarts
-    lastSeenFoundHeight = (await store.getLastSeenFoundHeight()) ?? height;
+    // initialise from persistent store so we don't re-alert across restarts. A
+    // stored height above the chain tip can't be a real block (the old mock mode
+    // left some in 2026-07), so start from the pool's own height instead.
+    const stored = await store.getLastSeenFoundHeight();
+    lastSeenFoundHeight = stored != null && stored <= o.chain.height ? stored : height;
     cycleStartHeight = lastSeenFoundHeight;
     return;
   }
 
-  if (height > lastSeenFoundHeight) {
+  // A found block can't be above the chain tip; wait for the tip to catch up.
+  if (height > lastSeenFoundHeight && height <= o.chain.height) {
     const prev = cycleStartHeight ?? lastSeenFoundHeight;
     const cycleDurationBlocks = Math.max(1, height - prev);
     const estCyclePhd = await estimateCurrentPotPhd(store, o);
@@ -175,10 +179,16 @@ async function backfillRounds(): Promise<void> {
   const rounds = await getRounds().catch(() => []);
   if (rounds.length === 0) return;
   const sorted = rounds.slice().sort((a, b) => a.height - b.height);
+  // The oldest round in the list has no previous round to measure from: take the
+  // block before it from the store if there is one, else its length is unknown
+  // (0). It used to be stored as 1 block, which showed as a 10-minute pot.
+  const stored = await store.getBlocksFound(100).catch(() => []);
+  const earlier = stored.map((b) => b.height).filter((h) => h < sorted[0]!.height);
+  const firstPrev = earlier.length > 0 ? Math.max(...earlier) : null;
   for (let i = 0; i < sorted.length; i++) {
     const r = sorted[i]!;
-    const prevHeight = i > 0 ? sorted[i - 1]!.height : r.height - 1;
-    const cycleDurationBlocks = Math.max(1, r.height - prevHeight);
+    const prevHeight = i > 0 ? sorted[i - 1]!.height : firstPrev;
+    const cycleDurationBlocks = prevHeight != null ? Math.max(1, r.height - prevHeight) : 0;
     const estCyclePhd = r.totalWorkDiff / PHD_TO_DIFF;
     const foundAt = (await getBlockTimestamp(r.height).catch(() => null)) ?? Date.now();
     await store.recordBlockFound({ height: r.height, foundAt, cycleDurationBlocks, estCyclePhd });
